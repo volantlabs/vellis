@@ -6,7 +6,7 @@ evolution:
   lifecycle: ready
   approval: {status: accepted, reason: "The query language, output and row identity, state selection, compatibility, and mutation locality change accepted meaning.", checkpoint: git:f3bfd25c6f814e745add11b99b7e48bef8168773}
   blocker: null
-  checkpoint: git:cdeeceb4320b15c81db54c7eee4f10ef2ffb9985
+  checkpoint: git:bac1c0e00b566de1c1142867bb9f72105ab4e747
 baselines:
   status: current
   source:
@@ -17,16 +17,16 @@ baselines:
     checkpoint: git:ca6539e10393a5a52e2cd2f67d0af662e92cc010
   target:
     model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:cdeeceb4320b15c81db54c7eee4f10ef2ffb9985
+    implementation: git:bac1c0e00b566de1c1142867bb9f72105ab4e747
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:cdeeceb4320b15c81db54c7eee4f10ef2ffb9985
+    checkpoint: git:bac1c0e00b566de1c1142867bb9f72105ab4e747
   observed:
     model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:cdeeceb4320b15c81db54c7eee4f10ef2ffb9985
+    implementation: git:bac1c0e00b566de1c1142867bb9f72105ab4e747
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:cdeeceb4320b15c81db54c7eee4f10ef2ffb9985
+    checkpoint: git:bac1c0e00b566de1c1142867bb9f72105ab4e747
 scope:
   authority_scope: [RTG::'Graph Query', RTG::'Property Comparison', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::stringPatternValidation, VellisRequirements::explicitGraphChangeSet, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisRequirements::canonicalSemanticEquality, VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability, VellisRequirements::mcpAgentToolContract, VellisRequirements::mcpOutcomeIntegrity, VellisVerification::semanticQuery, VellisVerification::invalidQuery, VellisVerification::stringPatterns, VellisVerification::validationCoverage, VellisVerification::currentWorkScaling, VellisVerification::historyGrowth]
   implementation_scope: [vellis/query.py, vellis/sqlite_query.py, vellis/store.py, vellis/system.py, vellis/mcp.py, vellis/json_value.py, vellis/definitions.py, tests/vellis/, tests/test_implementation_campaign.py, model/, README.md, docs/mcp-realization.md, docs/semantic-work-locality-handoff.md, implementation-campaign.yaml, system-evolution.yaml]
@@ -102,7 +102,7 @@ decisions:
   - {id: D006, summary: "Query and discovery carry one tagged evaluated-state selection.", authority_refs: [RTG::'Evaluated State Selection'], alternatives: [Scope plus optional history.], reversible: false, owner_work_item_id: W001, evidence_intent: [Exercise four selection kinds.], implementation_status: not applicable, evidence_refs: []}
   - {id: D007, summary: "JSON equality uses one immutable kind-tagged key for sets and counters.", authority_refs: [VellisRequirements::canonicalSemanticEquality], alternatives: [Pairwise scans., Serialization identity.], reversible: true, owner_work_item_id: W002, evidence_intent: [Preserve numeric equivalence and Boolean distinction with one key construction per value and no pairwise uniqueness scan.], implementation_status: conforming, evidence_refs: [path:tests/vellis/test_canonical_equality.py#test_json_kinds_stay_distinct, path:tests/vellis/test_canonical_equality.py#test_permitted_value_counter_preserves_nested_duplicate_multiplicity, path:tests/vellis/test_canonical_equality.py#test_permitted_value_uniqueness_constructs_one_key_per_input]}
   - {id: D008, summary: "Active and prospective multiplicity share one old/proposed reason kernel.", authority_refs: [VellisRequirements::explicitGraphChangeSet], alternatives: [Separate broad algorithms.], reversible: true, owner_work_item_id: W004, evidence_intent: [Exact rule-subject-end parity., Lookup-only far endpoints.], implementation_status: not evaluated, evidence_refs: []}
-  - {id: D009, summary: "The query oracle is test-only and shares no production evaluation or reduction.", authority_refs: [VellisVerification::semanticQuery], alternatives: [Import production evaluation.], reversible: true, owner_work_item_id: W003, evidence_intent: [Detect deliberately mutated compiler results.], implementation_status: conforming, evidence_refs: [path:tests/vellis/test_query_contract_v2.py#test_independent_oracle_detects_a_mutated_compiler_result, path:tests/vellis/test_query_contract_v2.py#test_fixed_seed_positive_patterns_match_the_independent_oracle]}
+  - {id: D009, summary: "The query oracle is test-only and shares no production evaluation or reduction.", authority_refs: [VellisVerification::semanticQuery], alternatives: [Import production evaluation.], reversible: true, owner_work_item_id: W003, evidence_intent: [Detect deliberately mutated compiler results.], implementation_status: conforming, evidence_refs: [path:tests/vellis/test_query_contract_v2.py#test_independent_oracle_detects_a_mutated_compiler_result, path:tests/vellis/test_query_contract_v2.py#test_fixed_seed_positive_patterns_match_the_independent_oracle, path:tests/vellis/test_query_contract_v2.py#test_oracle_value_identity_does_not_share_production_kind_classification]}
   - {id: D010, summary: "MCP query request objects are closed to extra members, and explicit state and output variants use required discriminators.", authority_refs: [VellisRequirements::mcpOutcomeIntegrity], alternatives: [Default discriminators with ignored extra members.], reversible: true, owner_work_item_id: W003, evidence_intent: [Reject untagged, mismatched, cross-mode, removed, and extra members before domain dispatch.], implementation_status: conforming, evidence_refs: [path:tests/vellis/test_query_contract_v2.py#test_explicit_variants_are_tagged_and_request_objects_are_closed, path:tests/vellis/test_mcp_boundary.py#test_removed_or_cross_variant_query_members_stop_before_domain_dispatch]}
   - {id: D011, summary: "Query matchesPattern reuses Google RE2 Unicode whole-string semantics for present string properties.", authority_refs: [VellisRequirements::semanticQueryMeaning, VellisRequirements::stringPatternValidation], alternatives: [Require client-side regex filtering., Add a general expression language.], reversible: true, owner_work_item_id: W001, evidence_intent: [Match complete string values and reject malformed, unsupported, or non-string pattern comparisons.], implementation_status: not applicable, evidence_refs: []}
   - {id: D012, summary: "Structural json_equal remains short-circuiting; immutable equality keys are used only for set, counter, and indexed membership work.", authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety], alternatives: [Implement every equality comparison by constructing two complete keys.], reversible: true, owner_work_item_id: W003, evidence_intent: [Early nested mismatches stop before later members., SQLite equality predicates retain exact meaning without full-key construction.], implementation_status: conforming, evidence_refs: [path:tests/vellis/test_canonical_equality.py#test_structural_json_equality_short_circuits_before_later_members, path:tests/vellis/test_canonical_equality.py#test_signed_zero_has_one_exact_numeric_equality_identity]}
@@ -163,7 +163,7 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_query_contract_v2.py#test_fixed_seed_positive_patterns_match_the_independent_oracle, path:tests/vellis/test_query_contract_v2.py#test_hidden_witness_fanout_does_not_form_a_quadratic_product, path:tests/vellis/test_query_contract_v2.py#test_pattern_matching_visits_only_relationally_relevant_candidates, path:tests/vellis/test_graph_queries.py#test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_invalid_queries.py#test_an_invalid_query_reports_findings_and_returns_no_rows, path:tests/vellis/test_invalid_queries.py#test_production_property_return_screen_walks_source_and_nested_value, path:tests/vellis/test_historical_selection.py#test_a_historical_query_at_a_selected_time_means_what_a_revision_query_means, path:tests/vellis/test_sqlite_prospective_state.py#test_prospective_overlay_isolated_queryable_and_activates_atomically, path:tests/vellis/test_mcp_boundary.py#test_removed_or_cross_variant_query_members_stop_before_domain_dispatch, path:tests/vellis/test_semantic_work_locality_triggers.py#test_compiled_binding_preflight_refuses_all_states_at_the_same_limit, path:tests/vellis/test_canonical_equality.py#test_structural_json_equality_short_circuits_before_later_members, command:just check]
     blocker: null
-    checkpoint: git:cdeeceb4320b15c81db54c7eee4f10ef2ffb9985
+    checkpoint: git:bac1c0e00b566de1c1142867bb9f72105ab4e747
   - id: W004
     order: 5
     label: Unify active and prospective invariant impact
