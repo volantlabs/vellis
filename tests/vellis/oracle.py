@@ -24,7 +24,7 @@ from vellis.definitions import (
 )
 from vellis.everyday_life import everyday_life_entries
 from vellis.graph import Anchor, AssociatedDataObject, Graph, GraphObject, Link, ObjectKind
-from vellis.json_value import JsonValue, json_kind
+from vellis.json_value import JsonValue
 from vellis.normalized import load_object_value
 from vellis.outcomes import OperationStatus, ValidationFinding
 from vellis.query import (
@@ -342,14 +342,21 @@ def _oracle_value_not_utf8(value: JsonValue) -> bool:
 
 
 def _oracle_value_key(value: JsonValue) -> object:
-    kind = json_kind(value).value
+    if value is None:
+        return "nullValue", None
+    if isinstance(value, bool):
+        return "booleanValue", value
+    if isinstance(value, Decimal):
+        return "numberValue", value
+    if isinstance(value, str):
+        return "stringValue", value
     if isinstance(value, list):
-        return kind, tuple(_oracle_value_key(member) for member in value)
+        return "arrayValue", tuple(_oracle_value_key(member) for member in value)
     if isinstance(value, dict):
-        return kind, tuple(
+        return "objectValue", tuple(
             (name, _oracle_value_key(member)) for name, member in sorted(value.items())
         )
-    return kind, value
+    raise TypeError(f"oracle received a non-JSON value: {value!r}")
 
 
 def _oracle_aggregate(aggregation, targets: tuple[AssociatedDataObject, ...]) -> AggregateBinding:

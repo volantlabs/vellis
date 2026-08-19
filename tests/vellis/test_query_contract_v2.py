@@ -178,6 +178,20 @@ def test_property_row_identity_includes_its_source_object() -> None:
     assert semantic_row_identity(first) != semantic_row_identity(second)
 
 
+def test_oracle_value_identity_does_not_share_production_kind_classification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A production Boolean/number kind collapse cannot make the oracle agree with it."""
+    import vellis.json_value as json_value_module
+    from vellis.query import GraphQueryRow
+
+    monkeypatch.setattr(json_value_module, "json_kind", lambda value: JsonKind.NULL)
+    boolean = GraphQueryRow(properties=(ReturnedProperty("value", "d", True, True),))
+    number = GraphQueryRow(properties=(ReturnedProperty("value", "d", True, Decimal(1)),))
+
+    assert oracle_row_identity(boolean) != oracle_row_identity(number)
+
+
 def test_sqlite_compiler_matches_parallel_self_and_cyclic_pattern(tmp_path: Path) -> None:
     """Hidden relationship aliases prove existence without multiplying the one answer."""
     system = RTGSystem.open(tmp_path / "positive-pattern.sqlite3")
