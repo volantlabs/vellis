@@ -1,15 +1,17 @@
 """Executable trigger evidence for ``vellis-2-semantic-work-locality``.
 
 These tests characterize the conflicting baseline so W001 evidence is reconstructible.
-W002-W004 replace them with target-conformance regressions; W005 removes assertions that
+W002-W004 and W006 replace them with target-conformance regressions; W005 removes assertions that
 depend on a superseded implementation shape.
 """
 
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -30,11 +32,17 @@ from vellis.definitions import (
     ValueRange,
     validate_definition_set,
 )
-from vellis.governance import DefinitionChange
+from vellis.governance import ActivateDefinitionDeltaRequest, DefinitionChange
 from vellis.graph import Anchor, Link
 from vellis.history import RevisionSelection
 from vellis.json_value import normalize
-from vellis.outcomes import OperationStatus
+from vellis.outcomes import (
+    OperationStatus,
+    ValidationFinding,
+    ValidationRequest,
+    ValidationRequestKind,
+    ValidationScope,
+)
 from vellis.query import (
     AggregationOperator,
     AnchorGroup,
@@ -47,6 +55,46 @@ from vellis.query import (
     ReturnShape,
 )
 from vellis.system import RTGSystem
+
+
+class _InterleavingCursor:
+    def __init__(
+        self,
+        cursor: sqlite3.Cursor,
+        after_first_fetch: Callable[[], None],
+    ) -> None:
+        self._cursor = cursor
+        self._after_first_fetch = after_first_fetch
+
+    def fetchone(self) -> Any:
+        row = self._cursor.fetchone()
+        callback, self._after_first_fetch = self._after_first_fetch, lambda: None
+        callback()
+        return row
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._cursor, name)
+
+
+class _InterleavingConnection:
+    def __init__(
+        self,
+        connection: sqlite3.Connection,
+        statement_prefix: str,
+        after_first_fetch: Callable[[], None],
+    ) -> None:
+        self._connection = connection
+        self._statement_prefix = statement_prefix
+        self._after_first_fetch = after_first_fetch
+
+    def execute(self, sql: str, parameters: Any = ()) -> Any:
+        cursor = self._connection.execute(sql, parameters)
+        if sql.startswith(self._statement_prefix):
+            return _InterleavingCursor(cursor, self._after_first_fetch)
+        return cursor
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._connection, name)
 
 
 def _active_hub_cost(tmp_path: Path, degree: int) -> tuple[int, int]:
@@ -356,6 +404,173 @@ def test_historical_aggregate_reproduces_missing_limit_binding_preflight(tmp_pat
         assert "too many SQL variables" in historical.findings[0].summary
         assert not historical.rows and not historical.aggregates
         assert historical.evaluated_revision is None
+    finally:
+        system.close()
+
+
+def test_definition_summary_trigger_reproduces_mixed_revision_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "mixed-definition-summary.sqlite3"
+    first = RTGSystem.open(path)
+    second = RTGSystem.open(path)
+    try:
+        assert first.initialize_fresh(
+            GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("person", "A person."),)),
+            provenance=OWNER,
+            initialization_summary="mixed definition summary trigger",
+        ).accepted
+        assert first.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(AnchorTypeDefinition("team", "A team."),)),
+            provenance=OWNER,
+        ).accepted
+        original = first.store._definition_selection_context_unlocked  # noqa: SLF001
+
+        def interleaved(*, prospective: bool, revision: int | None):
+            context = original(prospective=prospective, revision=revision)
+            assessment = second.check(
+                ValidationRequest(
+                    ValidationRequestKind.ASSESS,
+                    ValidationScope.DEFINITION_DELTA,
+                    maximum_findings=10,
+                ),
+                provenance=OWNER,
+            )
+            assert assessment.accepted and assessment.assessment_id is not None
+            activated = second.activate_definition_delta(
+                ActivateDefinitionDeltaRequest(assessment.assessment_id),
+                provenance=OWNER,
+            )
+            assert activated.accepted and activated.resulting_revision == 2
+            return context
+
+        monkeypatch.setattr(
+            first.store,
+            "_definition_selection_context_unlocked",
+            interleaved,
+        )
+
+        evaluated_revision, rows, delta_present = first.store.definition_summary_rows()
+
+        assert evaluated_revision == 1
+        assert rows == (("person", "A person."), ("team", "A team."))
+        assert delta_present
+        assert first.store.current_revision() == 2
+    finally:
+        first.close()
+        second.close()
+
+
+def test_assessment_page_trigger_reproduces_mixed_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "mixed-assessment-page.sqlite3"
+    first = RTGSystem.open(path)
+    second = RTGSystem.open(path)
+    try:
+        assert first.initialize_fresh(
+            GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("person", "A person."),)),
+            provenance=OWNER,
+            initialization_summary="mixed assessment page trigger",
+        ).accepted
+        prior = second.store.publish_assessment(
+            ValidationScope.GRAPH_CONFORMANCE,
+            0,
+            iter(
+                (
+                    ValidationFinding("first"),
+                    ValidationFinding("second"),
+                    ValidationFinding("third"),
+                )
+            ),
+            maximum_findings=3,
+        )
+        assert prior.assessment_id is not None
+
+        def replace_assessment() -> None:
+            replacement = second.store.publish_assessment(
+                ValidationScope.GRAPH_CONFORMANCE,
+                0,
+                iter((ValidationFinding("replacement"),)),
+                maximum_findings=1,
+            )
+            assert replacement.assessment_id != prior.assessment_id
+
+        proxy = _InterleavingConnection(
+            first.store._connection,  # noqa: SLF001
+            "SELECT scope, evaluated_revision",
+            replace_assessment,
+        )
+        monkeypatch.setattr(
+            first.store,
+            "_connection",
+            cast(sqlite3.Connection, proxy),
+        )
+
+        report = first.store.assessment_page(prior.assessment_id, 1, 3)
+
+        assert report is not None
+        assert report.assessment_id == prior.assessment_id
+        assert report.finding_count == 3
+        assert report.returned_findings == ()
+        assert report.returned_start_ordinal is None
+        assert report.more_findings
+    finally:
+        first.close()
+        second.close()
+
+
+def test_successful_assessment_and_restore_retain_population_work_rows(
+    tmp_path: Path,
+) -> None:
+    system = RTGSystem.open(tmp_path / "retained-work-rows.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("person", "A person."),)),
+            provenance=OWNER,
+            initialization_summary="retained work rows trigger",
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=tuple(
+                    Anchor(f"person-{index}", "person", f"Person {index}") for index in range(3)
+                )
+            ),
+            provenance=OWNER,
+        ).accepted
+        assert system.set_definition_delta(
+            DefinitionChange(type_removals=("person",)),
+            provenance=OWNER,
+        ).accepted
+        assessment = system.check(
+            ValidationRequest(
+                ValidationRequestKind.ASSESS,
+                ValidationScope.DEFINITION_DELTA,
+                maximum_findings=10,
+            ),
+            provenance=OWNER,
+        )
+        assert assessment.accepted
+
+        connection = system.store._connection  # noqa: SLF001
+        assert connection.execute(
+            "SELECT count(*) FROM assessment_effective_object"
+        ).fetchone() == (3,)
+        assert connection.execute("SELECT count(*) FROM assessment_impacted_uuid").fetchone() == (
+            3,
+        )
+        assert connection.execute("SELECT count(*) FROM assessment_validation_uuid").fetchone() == (
+            3,
+        )
+
+        assert system.discard_definition_delta(provenance=OWNER).accepted
+        restored = system.restore_historical_state(
+            RevisionSelection(0),
+            provenance=OWNER,
+        )
+        assert restored.accepted
+        assert connection.execute("SELECT count(*) FROM restore_candidate").fetchone() == (3,)
+        assert connection.execute("SELECT count(*) FROM restore_current").fetchone() == (3,)
     finally:
         system.close()
 

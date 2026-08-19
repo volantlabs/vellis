@@ -124,6 +124,18 @@ pass is evidence of missing discrimination, not evidence that the following shap
   splitting is duplicated in query and store code; query execution also retains specialized
   collection paths, recursive component evaluation, manual capacity formulas, legacy state and
   payload channels, and post-hydration row deduplication.
+- The first selected tagged-union handoff used defaulted discriminators and open standard
+  dataclasses. The locked Pydantic realization accepted contradictory members by silently choosing
+  a union branch and discarding the other branch's fields. The revised handoff requires explicit
+  discriminators for supplied variants, discriminated unions, and closed state/output variants.
+- Definition discovery and assessment interval reads execute related statements under a
+  connection-local lock but no SQLite read transaction. Deterministic two-connection interleaving
+  returned a definition summary with revision 1 and delta present while including a type activated
+  only at revision 2; replacing a published assessment between its header and finding reads returned
+  an old count of three with no findings.
+- Successful assessment and restoration leave population-sized rows in reusable temporary work
+  relations. A three-object fixture retained three effective/impacted/validation assessment rows and
+  three restore-candidate/current rows until another same-kind operation or connection close.
 
 These measurements characterize forbidden dependency shapes; they are not public latency budgets.
 The successor evolution record owns their model, implementation, evidence, and deletion closure.
@@ -145,17 +157,21 @@ prospective aggregation pass but revision-selected aggregation reaches SQLite wi
 binding. The final source-mechanism case additionally pins the late aggregate `SELECT DISTINCT`,
 the impacted-type and participant-by-rule expansion, and the production evaluator imported by the
 nominal oracle. Thus every recorded trigger is either rebuilt and measured or bound to the exact
-conflicting mechanism; no fixture or instrumentation must be invented from this prose.
+conflicting mechanism. Additional cases reproduce the mixed-revision definition summary, the mixed
+assessment publication, and retained assessment/restore work rows. No fixture or instrumentation
+must be invented from this prose.
 
-W002 through W004 replace these trigger recipes with permanent discriminating regression fixtures;
-the final subtraction review removes any evidence that asserts the superseded implementation shape.
+W002 through W004 and W006 replace these trigger recipes with permanent discriminating regression
+fixtures; the final subtraction review removes any evidence that asserts the superseded
+implementation shape.
 
 The proposed target instead has exclusive row and aggregate outputs. Row identity preserves every
 projected source object, including the associated-data UUID behind a property value, while aggregate
 output operates on one distinct associated-data target population. Equal property values from
 different source objects therefore remain different rows. Implementation work deletes the old
 return-shape advice and translation paths; callers needing distinct values may deduplicate a complete
-bounded row result.
+bounded row result. The query itself remains a finite must-exist pattern: disconnected, parallel,
+self-link, and cyclic predicates are ordinary conjunctions rather than invalid shapes.
 
 ## Local setup path
 

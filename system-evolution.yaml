@@ -1,7 +1,7 @@
 schema_version: "1.0"
 evolution:
   id: vellis-2-semantic-work-locality
-  objective: Replace locally optimized query and validation paths with one connected-tree query meaning and one exact reason-aware invariant-impact meaning.
+  objective: Replace locally optimized query and validation paths with one finite positive conjunctive-pattern meaning and one exact reason-aware invariant-impact meaning.
   observable_distinction: Hidden query witnesses cannot multiply answer work, and ordinary mutation contains only exact applicable rule-subject-end work rather than broad neighborhoods.
   lifecycle: awaiting-approval
   approval: {status: pending, reason: "The query language, output and row identity, state selection, compatibility, and mutation locality change accepted meaning.", checkpoint: null}
@@ -16,29 +16,29 @@ baselines:
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:ca6539e10393a5a52e2cd2f67d0af662e92cc010
   target:
-    model: sha256:a7e08c7ae2c82ee3f78d1d1fc4cc6e525026bdef682ceadb7369fcb7b93463d4
+    model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
     implementation: git:dd78ae90005a9cf2643e06352f17fb930bd7548b
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:dd78ae90005a9cf2643e06352f17fb930bd7548b
   observed:
-    model: sha256:a7e08c7ae2c82ee3f78d1d1fc4cc6e525026bdef682ceadb7369fcb7b93463d4
+    model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
     implementation: git:dd78ae90005a9cf2643e06352f17fb930bd7548b
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:dd78ae90005a9cf2643e06352f17fb930bd7548b
 scope:
-  authority_scope: [RTG::'Graph Query', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::explicitGraphChangeSet, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisRequirements::canonicalSemanticEquality, VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability, VellisRequirements::mcpAgentToolContract, VellisVerification::semanticQuery, VellisVerification::invalidQuery, VellisVerification::validationCoverage, VellisVerification::currentWorkScaling, VellisVerification::historyGrowth]
+  authority_scope: [RTG::'Graph Query', RTG::'Property Comparison', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::stringPatternValidation, VellisRequirements::explicitGraphChangeSet, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisRequirements::canonicalSemanticEquality, VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability, VellisRequirements::mcpAgentToolContract, VellisVerification::semanticQuery, VellisVerification::invalidQuery, VellisVerification::stringPatterns, VellisVerification::validationCoverage, VellisVerification::currentWorkScaling, VellisVerification::historyGrowth]
   implementation_scope: [vellis/query.py, vellis/sqlite_query.py, vellis/store.py, vellis/system.py, vellis/mcp.py, vellis/json_value.py, vellis/definitions.py, tests/vellis/, tests/test_implementation_campaign.py, model/, README.md, docs/mcp-realization.md, docs/semantic-work-locality-handoff.md, implementation-campaign.yaml, system-evolution.yaml]
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
-    - Add disconnected or cyclic patterns, traversal, OR, negation, sorting, paging, grouping, mixed output, multiple aggregate targets, a parser, optimizer, fallback evaluator, or rule engine.
+    - Add traversal, OR, negation, sorting, paging, grouping, mixed output, multiple aggregate targets, a parser, optimizer, fallback evaluator, or rule engine.
     - Change persistent schema, snapshots, replay, restore, v1 initialization, tool names, approval, or canonical transactions.
     - Add numerical budgets or touch ignored owner data, external clients, releases, tags, merges, or pull-request state.
 findings:
-  - {id: F001, summary: "The query model permits disconnected components, cycles, and mixed output without an owner use case.", classification: model gap, consequence: "Unneeded generality legitimizes component products and ambiguous outputs.", authority_refs: [RTG::'Graph Query', VellisRequirements::querySafety], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: model-change, owner_work_item_id: W001, implementation_status: conflicting, nearest_wrong_system: "One join is patched while the language retains forms requiring the same accidental machinery.", compatibility_effect: "Disconnected, cyclic, and mixed requests are removed."}
+  - {id: F001, summary: "The query model mixes row and aggregate output and does not state all positive predicates as one joint binding.", classification: model gap, consequence: "Ambiguous output and component-specific evaluation legitimize machinery unrelated to simple positive pattern matching.", authority_refs: [RTG::'Graph Query', VellisRequirements::querySafety], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: model-change, owner_work_item_id: W001, implementation_status: conflicting, nearest_wrong_system: "Output is split while component products still define query meaning.", compatibility_effect: "Mixed output is removed; every finite positive pattern topology remains valid."}
   - {id: F002, summary: "Property-only projection collapses distinct source objects carrying equal values.", classification: model gap, consequence: "Rows cannot preserve object cardinality safely.", authority_refs: [RTG::'Returned Property', VellisRequirements::semanticQueryMeaning], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: model-change, owner_work_item_id: W001, implementation_status: conflicting, nearest_wrong_system: "Equal values remain indistinguishable when their source objects differ.", compatibility_effect: "Property row identity includes its source data UUID."}
-  - {id: F003, summary: "Flat SQLite joins multiply hidden witnesses before late deduplication.", classification: implementation defect, consequence: "Work grows with combinations that cannot distinguish an answer.", authority_refs: [VellisRequirements::querySafety], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence, path:tests/vellis/test_semantic_work_locality_triggers.py#test_trigger_source_contains_late_distinct_false_oracle_and_manual_capacity], disposition: implementation-work, owner_work_item_id: W003, implementation_status: conflicting, nearest_wrong_system: "SELECT DISTINCT acts only after hidden witness products.", compatibility_effect: "Connected-tree answers remain while hidden branches become existential."}
+  - {id: F003, summary: "Flat SQLite joins multiply hidden witnesses before late deduplication.", classification: implementation defect, consequence: "Work grows with combinations that cannot distinguish an answer.", authority_refs: [VellisRequirements::querySafety], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence, path:tests/vellis/test_semantic_work_locality_triggers.py#test_trigger_source_contains_late_distinct_false_oracle_and_manual_capacity], disposition: implementation-work, owner_work_item_id: W003, implementation_status: conflicting, nearest_wrong_system: "SELECT DISTINCT acts only after hidden witness products.", compatibility_effect: "Positive conjunctive-pattern answers remain while unreturned variables become existential."}
   - {id: F004, summary: "The test oracle imports a second production assignment evaluator.", classification: plan gap, consequence: "Differential tests cannot expose shared semantic defects.", authority_refs: [VellisVerification::semanticQuery], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence, path:tests/vellis/test_semantic_work_locality_triggers.py#test_trigger_source_contains_late_distinct_false_oracle_and_manual_capacity], disposition: implementation-work, owner_work_item_id: W003, implementation_status: conflicting, nearest_wrong_system: "Named realizations agree because they share production semantics.", compatibility_effect: "No capability is lost; fallback evaluation is deleted."}
   - {id: F005, summary: "State selection uses parallel fields and arguments plus legacy middleware.", classification: model gap, consequence: "Equivalent meaning has invalid combinations and compatibility branches.", authority_refs: [RTG::'Graph Query', VellisRequirements::historicalStateCorrectness], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: model-change, owner_work_item_id: W001, implementation_status: conflicting, nearest_wrong_system: "A tagged selector is added while old selector channels remain.", compatibility_effect: "One tagged state replaces prerelease overloads without translation."}
   - {id: F006, summary: "Authority does not exclude far-end promotion and participant-by-rule work precisely enough.", classification: model gap, consequence: "Correct findings can still use forbidden quadratic neighborhoods.", authority_refs: [VellisRequirements::explicitGraphChangeSet], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: model-change, owner_work_item_id: W001, implementation_status: conflicting, nearest_wrong_system: "Every incident endpoint is affected even when its count cannot change.", compatibility_effect: "Findings remain complete; lookup-only identities stay unpromoted."}
@@ -51,25 +51,34 @@ findings:
   - {id: F013, summary: "Transitional trigger tests were scheduled to survive beyond the work items that make their assertions false.", classification: plan gap, consequence: "W002 through W004 could conform while their required full gate failed on obsolete baseline characterizations.", authority_refs: [VellisVerification::currentWorkScaling], evidence_refs: [path:docs/semantic-work-locality-handoff.md#transitional-evidence-retirement, path:tests/vellis/test_semantic_work_locality_triggers.py#test_trigger_source_contains_late_distinct_false_oracle_and_manual_capacity], disposition: resolved, owner_work_item_id: W001, implementation_status: conforming, nearest_wrong_system: "Old-cost and source-shape assertions remain until W005 and block the slice that removes their cause.", compatibility_effect: "Each implementation item replaces only its owned trigger with permanent conformance evidence."}
   - {id: F014, summary: "The completed implementation campaign's repository-tracking observed model baseline is stale.", classification: stale baseline, consequence: "The full project gate rejects the later evolution even though the completed campaign remains historical evidence.", authority_refs: [AGENTS.md], evidence_refs: [command:just implementation-campaign-check, path:tests/test_implementation_campaign.py#test_completed_campaign_accepts_the_current_repository_observation_only, path:tests/test_implementation_campaign.py#test_evidence_lookup_survives_updating_the_baseline_that_tracks_the_repository], disposition: resolved, owner_work_item_id: W001, implementation_status: conforming, nearest_wrong_system: "The completed campaign is rewritten or reactivated instead of updating only its explicitly moving observed baseline.", compatibility_effect: "Historical campaign meaning is unchanged; its observed repository digest tracks the proposed model."}
   - {id: F015, summary: "The W001 trigger characterization is not formatter-clean.", classification: plan gap, consequence: "The full project gate fails before implementation work can begin.", authority_refs: [AGENTS.md], evidence_refs: [command:just check], disposition: resolved, owner_work_item_id: W001, implementation_status: conforming, nearest_wrong_system: "Focused tests pass while repository formatting still fails.", compatibility_effect: "No runtime or evidence meaning changes."}
-  # W001 review record: proposed checkpoint git:dd78ae90005a9cf2643e06352f17fb930bd7548b;
+  # Superseded W001 review record: proposed checkpoint git:dd78ae90005a9cf2643e06352f17fb930bd7548b;
   # shared token git:4d061a0902b18daa87aa1f50a1804ed8d8f6eb96; model digest
   # sha256:a7e08c7ae2c82ee3f78d1d1fc4cc6e525026bdef682ceadb7369fcb7b93463d4.
   # /root/w001_authority_review6 — authority and conformance — clean.
   # /root/w001_engineering_review6 — engineering and evidence — clean.
   # Manager checks: trigger/campaign-focused evidence, formatter, lint, typecheck, model-check,
   # implementation-campaign-check, system-evolution-check, just check (1,203 tests and package
-  # artifact exercise), and git diff --check. Human acceptance and W005 closure reviews are pending.
+  # artifact exercise), and git diff --check. F017-F022 and the subsequent query-semantics revisions invalidate
+  # that pair for the current target; fresh W001 review, human acceptance, and W005 closure reviews are pending.
   - {id: F016, summary: "The clean W001 review pair is not durably attributable outside the conversation.", classification: plan gap, consequence: "A cold agent cannot reconstruct the reviewer identities, lenses, dispositions, and shared token that justified the approval checkpoint.", authority_refs: [AGENTS.md], evidence_refs: [path:docs/semantic-work-locality-handoff.md#semantic-work-locality-implementation-handoff, command:just check], disposition: resolved, owner_work_item_id: W001, implementation_status: conforming, nearest_wrong_system: "A checkpoint is marked reviewed without durable reviewer and token attribution.", compatibility_effect: "No system behavior changes; the W001 review record retains both clean reviewer identities, lenses, shared token, proposed checkpoint, model digest, and passed checks."}
+  - {id: F017, summary: "The selected query dataclasses accept contradictory or removed MCP members through defaulted discriminators and open request objects.", classification: plan gap, consequence: "Malformed input can silently select another state or output, discard contradictory fields, or partly translate an old request.", authority_refs: [RTG::'Evaluated State Selection', RTG::'Query Output', VellisRequirements::mcpOutcomeIntegrity], evidence_refs: [path:docs/semantic-work-locality-handoff.md#public-contract-and-analyzer], disposition: resolved, owner_work_item_id: W001, implementation_status: conforming, nearest_wrong_system: "Tagged unions exist in type hints while Pydantic union ordering and ignored extra fields still choose a different meaning.", compatibility_effect: "Every query request object is closed to extra members, and explicit state/output variants also require a discriminator."}
+  - {id: F018, summary: "Definition summary, inspection, and proposal discovery can combine statements from different committed revisions.", classification: implementation defect, consequence: "A read can report a revision and delta state that never contained its returned definitions or assessment.", authority_refs: [VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence, path:tests/vellis/test_semantic_work_locality_triggers.py#test_definition_summary_trigger_reproduces_mixed_revision_read], disposition: implementation-work, owner_work_item_id: W003, implementation_status: conflicting, nearest_wrong_system: "State selection is unified while related discovery statements still run outside one SQLite snapshot.", compatibility_effect: "Discovery results become linearizable without changing their payload meaning."}
+  - {id: F019, summary: "Assessment paging can combine an old publication header with findings removed by a concurrent replacement.", classification: implementation defect, consequence: "A bounded interval can report a positive finding count while returning no findings from an impossible publication state.", authority_refs: [RTGSystem::'Assess graph conformance'], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence, path:tests/vellis/test_semantic_work_locality_triggers.py#test_assessment_page_trigger_reproduces_mixed_publication], disposition: implementation-work, owner_work_item_id: W006, implementation_status: conflicting, nearest_wrong_system: "Each assessment query is correct alone but the interval has no shared read snapshot.", compatibility_effect: "Assessment intervals return one complete old or new publication."}
+  - {id: F020, summary: "Successful assessment and restore operations retain population-sized temporary work rows until reuse or connection close.", classification: implementation defect, consequence: "A long-lived server retains an equivalent whole-population materialization between invocations.", authority_refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::historicalRestoreSemantics], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence, path:tests/vellis/test_semantic_work_locality_triggers.py#test_successful_assessment_and_restore_retain_population_work_rows], disposition: implementation-work, owner_work_item_id: W006, implementation_status: conflicting, nearest_wrong_system: "Temporary table definitions are reusable but their completed-operation populations remain resident.", compatibility_effect: "Assessment and restore semantics remain unchanged while transient rows are cleared on every exit."}
+  - {id: F021, summary: "The proposed tree and connected-only restrictions reject valid must-exist pattern topologies.", classification: model gap, consequence: "The language can no longer express ordinary conjunctions such as disconnected existence gates or one named X managing and mentoring the same named Y.", authority_refs: [RTG::'Graph Query', VellisRequirements::semanticQueryMeaning], evidence_refs: [path:docs/semantic-work-locality-handoff.md#compiler-and-conjunctive-answer-relation], disposition: model-change, owner_work_item_id: W001, implementation_status: not evaluated, nearest_wrong_system: "Physical work-locality concerns are enforced as public topology restrictions.", compatibility_effect: "Disconnected, parallel, self-link, and cyclic finite positive patterns remain valid."}
+  - {id: F022, summary: "The query comparison vocabulary omits owner-required regular-expression filtering of string data.", classification: model gap, consequence: "A named data selector cannot express a must-exist string pattern and must over-return values for client-side filtering.", authority_refs: [RTG::'Property Comparison', VellisRequirements::semanticQueryMeaning, VellisRequirements::stringPatternValidation], evidence_refs: [path:docs/semantic-work-locality-handoff.md#public-contract-and-analyzer], disposition: model-change, owner_work_item_id: W001, implementation_status: conflicting, nearest_wrong_system: "The structural query reset succeeds while lower-level data constraints remain less expressive than the owner's pattern model.", compatibility_effect: "matchesPattern adds RE2 Unicode whole-string filtering for present string properties without a general expression language."}
 decisions:
-  - {id: D001, summary: "Public graph queries are connected acyclic selector trees.", authority_refs: [RTG::'Graph Query'], alternatives: [Retain disconnected or cyclic forms.], reversible: false, owner_work_item_id: W001, evidence_intent: [Reject disconnected and cyclic graphs., Accept paths, stars, and trees.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D001, summary: "Public graph queries are finite positive conjunctive patterns with no topology restriction.", authority_refs: [RTG::'Graph Query'], alternatives: [Restrict patterns to connected graphs., Restrict patterns to trees.], reversible: false, owner_work_item_id: W001, evidence_intent: [Accept disconnected projected combinations and hidden existence gates., Accept paths, stars, parallel predicates, self-links, and cycles under one joint assignment.], implementation_status: not evaluated, evidence_refs: []}
   - {id: D002, summary: "Row and aggregate output are exclusive with no grouping.", authority_refs: [RTG::'Query Output'], alternatives: [Retain mixed output.], reversible: false, owner_work_item_id: W001, evidence_intent: [Reject mixed output., Preserve one-target arithmetic.], implementation_status: not evaluated, evidence_refs: []}
   - {id: D003, summary: "Make a clean prerelease break without query translation.", authority_refs: [VellisRequirements::mcpAgentToolContract], alternatives: [Translate legacy payloads.], reversible: true, owner_work_item_id: W003, evidence_intent: [Old shapes fail., Ten tool names remain.], implementation_status: not evaluated, evidence_refs: []}
-  - {id: D004, summary: "Hidden selector branches affect answers only through existence.", authority_refs: [VellisRequirements::querySafety], alternatives: [Flat joins and late distinct.], reversible: true, owner_work_item_id: W003, evidence_intent: [Hidden fanout does not multiply answers or decodes.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D004, summary: "Unreturned selector and link variables affect answers only through joint existence.", authority_refs: [VellisRequirements::querySafety], alternatives: [Flat witness joins and late distinct.], reversible: true, owner_work_item_id: W003, evidence_intent: [Hidden fanout does not multiply answers or decodes after one joint assignment exists.], implementation_status: not evaluated, evidence_refs: []}
   - {id: D005, summary: "Collection query restrictions use one relational member mechanism.", authority_refs: [VellisRequirements::querySafety], alternatives: [Threshold-specific filter paths.], reversible: true, owner_work_item_id: W003, evidence_intent: [Large filters ignore host-variable thresholds.], implementation_status: not evaluated, evidence_refs: []}
   - {id: D006, summary: "Query and discovery carry one tagged evaluated-state selection.", authority_refs: [RTG::'Evaluated State Selection'], alternatives: [Scope plus optional history.], reversible: false, owner_work_item_id: W001, evidence_intent: [Exercise four selection kinds.], implementation_status: not evaluated, evidence_refs: []}
   - {id: D007, summary: "JSON equality uses one immutable kind-tagged key for sets and counters.", authority_refs: [VellisRequirements::canonicalSemanticEquality], alternatives: [Pairwise scans., Serialization identity.], reversible: true, owner_work_item_id: W002, evidence_intent: [Preserve numeric equivalence and Boolean distinction with one key construction per value and no pairwise uniqueness scan.], implementation_status: not evaluated, evidence_refs: []}
   - {id: D008, summary: "Active and prospective multiplicity share one old/proposed reason kernel.", authority_refs: [VellisRequirements::explicitGraphChangeSet], alternatives: [Separate broad algorithms.], reversible: true, owner_work_item_id: W004, evidence_intent: [Exact rule-subject-end parity., Lookup-only far endpoints.], implementation_status: not evaluated, evidence_refs: []}
   - {id: D009, summary: "The query oracle is test-only and shares no production evaluation or reduction.", authority_refs: [VellisVerification::semanticQuery], alternatives: [Import production evaluation.], reversible: true, owner_work_item_id: W003, evidence_intent: [Detect deliberately mutated compiler results.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D010, summary: "MCP query request objects are closed to extra members, and explicit state and output variants use required discriminators.", authority_refs: [VellisRequirements::mcpOutcomeIntegrity], alternatives: [Default discriminators with ignored extra members.], reversible: true, owner_work_item_id: W003, evidence_intent: [Reject untagged, mismatched, cross-mode, removed, and extra members before domain dispatch.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D011, summary: "Query matchesPattern reuses Google RE2 Unicode whole-string semantics for present string properties.", authority_refs: [VellisRequirements::semanticQueryMeaning, VellisRequirements::stringPatternValidation], alternatives: [Require client-side regex filtering., Add a general expression language.], reversible: true, owner_work_item_id: W001, evidence_intent: [Match complete string values and reject malformed, unsupported, or non-string pattern comparisons.], implementation_status: not evaluated, evidence_refs: []}
 work_items:
   - id: W001
     order: 1
@@ -77,14 +86,14 @@ work_items:
     kind: modeling
     dependencies: []
     planned_baseline: {dimension: model, identity: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7}
-    finding_ids: [F001, F002, F005, F006, F012, F013, F014, F015, F016]
-    decision_ids: [D001, D002, D006]
+    finding_ids: [F001, F002, F005, F006, F012, F013, F014, F015, F016, F017, F021, F022]
+    decision_ids: [D001, D002, D006, D011]
     authority:
-      - {refs: [RTG::'Graph Query', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::agentDefinitionDiscoverability], coverage: full, remaining_work_item_ids: []}
+      - {refs: [RTG::'Graph Query', RTG::'Property Comparison', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::stringPatternValidation, VellisRequirements::agentDefinitionDiscoverability], coverage: full, remaining_work_item_ids: []}
       - {refs: [VellisRequirements::explicitGraphChangeSet, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork], coverage: partial, remaining_work_item_ids: [W003, W004]}
     approval: {status: pending, reason: "This changes public query language, row identity, state selection, compatibility, and mutation locality.", checkpoint: null}
-    nearest_wrong_system: "Disconnected queries are rejected but mixed output, value-only property identity, physical ordering, or generic affected participants remain."
-    compatibility_effect: "The prerelease query schema breaks and disconnected, cyclic, mixed, and multi-target questions are removed."
+    nearest_wrong_system: "The query schema is simplified by rejecting valid positive topologies, or mixed output, value-only property identity, physical ordering, or generic affected participants remain."
+    compatibility_effect: "The prerelease query schema breaks and mixed and multi-target questions are removed; every finite positive pattern topology remains valid."
     non_effects: [No persistence or snapshot change., No new subsystem or public operation., No implementation relies on the target before acceptance.]
     lifecycle: pending
     implementation_status: not evaluated
@@ -96,7 +105,7 @@ work_items:
     label: Replace quadratic JSON collection equality
     kind: implementation
     dependencies: [W001]
-    planned_baseline: {dimension: model, identity: sha256:a7e08c7ae2c82ee3f78d1d1fc4cc6e525026bdef682ceadb7369fcb7b93463d4}
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
     finding_ids: [F010]
     decision_ids: [D007]
     authority: [{refs: [VellisRequirements::canonicalSemanticEquality], coverage: partial, remaining_work_item_ids: [W005]}]
@@ -114,10 +123,10 @@ work_items:
     label: Replace the query contract and execution path end to end
     kind: implementation
     dependencies: [W002]
-    planned_baseline: {dimension: model, identity: sha256:a7e08c7ae2c82ee3f78d1d1fc4cc6e525026bdef682ceadb7369fcb7b93463d4}
-    finding_ids: [F003, F004, F009]
-    decision_ids: [D003, D004, D005, D009]
-    authority: [{refs: [RTG::'Graph Query', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability, VellisRequirements::mcpAgentToolContract], coverage: full, remaining_work_item_ids: []}]
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    finding_ids: [F003, F004, F009, F018]
+    decision_ids: [D003, D004, D005, D009, D010]
+    authority: [{refs: [RTG::'Graph Query', RTG::'Property Comparison', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::stringPatternValidation, VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability, VellisRequirements::mcpAgentToolContract], coverage: full, remaining_work_item_ids: []}]
     approval: {status: not-required, reason: "W001 acceptance governs changed public meaning; this realizes it.", checkpoint: null}
     nearest_wrong_system: A new compiler exists while a legacy evaluator, component path, late distinct, or manual capacity formula remains reachable.
     compatibility_effect: Only new prerelease schemas remain under unchanged tool names.
@@ -132,7 +141,7 @@ work_items:
     label: Unify active and prospective invariant impact
     kind: implementation
     dependencies: [W003]
-    planned_baseline: {dimension: model, identity: sha256:a7e08c7ae2c82ee3f78d1d1fc4cc6e525026bdef682ceadb7369fcb7b93463d4}
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
     finding_ids: [F007, F008]
     decision_ids: [D008]
     authority: [{refs: [VellisRequirements::explicitGraphChangeSet, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork], coverage: partial, remaining_work_item_ids: [W005]}]
@@ -146,11 +155,11 @@ work_items:
     blocker: null
     checkpoint: null
   - id: W005
-    order: 5
+    order: 6
     label: Integrate evidence, synchronize documentation, and close the evolution
     kind: closure
-    dependencies: [W001, W002, W003, W004]
-    planned_baseline: {dimension: model, identity: sha256:a7e08c7ae2c82ee3f78d1d1fc4cc6e525026bdef682ceadb7369fcb7b93463d4}
+    dependencies: [W001, W002, W003, W004, W006]
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
     finding_ids: [F011]
     decision_ids: []
     authority: [{refs: [VellisRequirements, VellisVerification, AGENTS.md], coverage: full, remaining_work_item_ids: []}]
@@ -163,13 +172,33 @@ work_items:
     evidence_refs: []
     blocker: null
     checkpoint: null
+  - id: W006
+    order: 5
+    label: Bound transient read and work-state lifetimes
+    kind: implementation
+    dependencies: [W004]
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    finding_ids: [F019, F020]
+    decision_ids: []
+    authority:
+      - {refs: [RTGSystem::'Assess graph conformance', VellisRequirements::historyIndependentCurrentWork], coverage: partial, remaining_work_item_ids: [W005]}
+      - {refs: [VellisRequirements::historicalRestoreSemantics], coverage: partial, remaining_work_item_ids: [W005]}
+    approval: {status: not-required, reason: "Accepted snapshot and bounded-work authority already decides these lifecycle corrections.", checkpoint: null}
+    nearest_wrong_system: "Each SQL statement is locally correct and temporary tables are reusable, but reads mix publications and completed populations remain resident."
+    compatibility_effect: "Assessment paging and restore meaning remain unchanged."
+    non_effects: [No persistent schema or snapshot change., No replay or restore semantic change., No new public request or result.]
+    lifecycle: pending
+    implementation_status: conflicting
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
 closure:
   finding_disposition: open
   model_status: not evaluated
   implementation_status: conflicting
   integration_status: not evaluated
   external_status: not applicable
-  compatibility: Proposed prerelease break for query payloads and property row identity; persistence, snapshots, restore, v1 initialization, and ten MCP names remain unchanged.
+  compatibility: Proposed prerelease break for query payloads and property row identity; mixed-output questions are removed, while disconnected, parallel, self-link, and cyclic finite positive patterns remain valid; persistence, snapshots, restore, v1 initialization, and ten MCP names remain unchanged.
   reviews:
     - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
     - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}

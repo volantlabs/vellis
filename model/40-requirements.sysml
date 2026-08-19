@@ -51,9 +51,12 @@ package VellisRequirements {
          * named projections in its row output at an identified revision.
          * An anchor group shall select anchors of any of one or more named
          * active anchor types, so one group can span several shapes of thing.
-         * Its selector vertices and direct-association or required-link edges
-         * shall form one connected acyclic tree without self-edges or parallel
-         * edges. A query shall state exactly one non-empty row or aggregate
+         * Its selector variables and direct-association or required-link
+         * predicates shall form one finite positive conjunctive pattern with no
+         * topology restriction. Disconnected variables, parallel predicates,
+         * self-link predicates, and cyclic predicate paths shall be permitted,
+         * and every predicate shall hold under the same joint assignment. A
+         * query shall state exactly one non-empty row or aggregate
          * output. Aggregate output shall select one named data condition as its
          * distinct object population. Each aggregation shall count that
          * population, or sum, minimise, or maximise one present property of it,
@@ -70,6 +73,9 @@ package VellisRequirements {
          * for string-valued properties by exact Unicode code-point sequence
          * without normalization, and shall be rejected for every other JSON kind
          * and whenever the expected value's kind differs from the property's.
+         * A matchesPattern comparison shall require a string-valued property and
+         * string expression, use Google RE2 Unicode whole-string FullMatch
+         * behavior, and reject malformed or unsupported expressions.
          * A listed property
          * comparison shall match only when that property is present; omission
          * shall remain distinct from a present null value.
@@ -82,8 +88,13 @@ package VellisRequirements {
          * including when that value is JSON null. Equal property values from
          * distinct source objects shall remain distinct rows; hidden satisfying
          * witnesses shall not distinguish rows.
-         * Distinct aliases may bind the same graph object when their constraints
-         * permit it, including two endpoint aliases that discover a self-link.
+         * Distinct selector and required-link aliases may bind the same graph
+         * object when their constraints permit it. A required link using one
+         * selector at both ends shall match only an actual self-link on that
+         * bound object. Projected variables from disconnected portions shall
+         * produce genuine combinations of their bindings. A disconnected
+         * portion with no projected variable shall affect an answer only through
+         * the existence of one satisfying assignment for that portion.
          * Query-local names shall be unique and every selector and projection
          * reference shall resolve within that query. Evaluation strategy shall
          * not change this meaning. Current selection shall evaluate active state;
@@ -101,10 +112,9 @@ package VellisRequirements {
          * Graph queries shall change no canonical state or revision. Their
          * permitted, rejected, or failed attempts may append observational
          * activity. Unknown or
-         * incompatible type keys, empty or duplicate names, disconnected or
-         * cyclic selector graphs, self-edges, parallel edges, out-of-query references,
+         * incompatible type keys, empty or duplicate names, out-of-query references,
          * endpoint roles, empty, unknown, or duplicate UUID restrictions, properties,
-         * comparisons, projections, or unresolved
+         * comparisons, malformed or kind-incompatible query patterns, projections, or unresolved
          * historical selections shall produce observable findings and no result
          * rows. A missing, empty, or mixed output, or an aggregation naming no data condition of the query, omitting a
          * property its operator requires, naming a property its condition's type
@@ -117,14 +127,18 @@ package VellisRequirements {
          * reads, and a selection exceeding it shall be rejected whole, so
          * returning one number never licenses reading an unbounded population.
          * Query work may scale with named candidates, stated property values,
-         * matching associations and links, paths joining returned selectors,
-         * genuine combinations of returned identities, and distinct rows or
-         * target objects needed to decide the caller's maximum. A selector branch
-         * that cannot distinguish a returned row or aggregate target shall affect
-         * it only through existence and shall not multiply work by its satisfying
-         * witnesses. Evaluation shall bound distinct answer identities before
+         * matching associations and links, candidate bindings needed to establish
+         * the stated conjunction, genuine combinations of returned identities,
+         * and distinct rows or target objects needed to decide the caller's
+         * maximum. An unreturned selector or link identity shall affect a
+         * returned row or aggregate target only through the existence of a joint
+         * satisfying assignment. Once that existence is established, duplicate
+         * hidden relationship witnesses and additional satisfying hidden
+         * assignments shall not be enumerated, counted, or materialized for that
+         * answer identity. Evaluation shall bound distinct answer identities before
          * object-value hydration or arithmetic. It shall not scale with
-         * disconnected populations, duplicate hidden witnesses, declaration
+         * unstated or unrelated graph populations, duplicate hidden witnesses after existence is
+         * established, declaration
          * order, or graph-object decoding before that bound, and shall not fail
          * merely because a collection crosses a private execution threshold.
          */
@@ -662,17 +676,18 @@ package VellisRequirements {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * An optional property pattern shall use Google RE2 syntax and Unicode
+         * An optional definition property pattern and a query matchesPattern
+         * comparison shall use Google RE2 syntax and Unicode
          * semantics with whole-string FullMatch behavior. The system shall reject
-         * malformed or unsupported expressions and patterns on non-string
-         * properties. Requiredness, shape, range, and pattern shall apply
+         * malformed or unsupported expressions and either form on non-string
+         * properties. Definition requiredness, shape, range, and pattern shall apply
          * conjunctively to present values, without requiring general
          * satisfiability analysis. Pattern expression text shall be discoverable
          * exactly and shall participate exactly in definition equality. Pattern
-         * validation shall add no regex query comparison, and shall neither
-         * define nor constrain how string comparisons order values; a pattern
-         * describes which stored values are valid, never how any two of them
-         * compare.
+         * meaning shall neither define nor constrain how string comparisons order
+         * values. A definition pattern describes which stored values are valid;
+         * a query pattern filters present values without changing that validity;
+         * neither says how any two strings compare.
          */
         }
     }

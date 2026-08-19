@@ -3,25 +3,26 @@
 This is the durable execution handoff for evolution `vellis-2-semantic-work-locality`. Product
 meaning remains authoritative in `model/`; `system-evolution.yaml` owns lifecycle and evidence.
 This document records selected realization, deletion, and verification work so a cold agent can
-resume W002–W005 without reconstructing decisions from a conversation.
+resume W002–W006 without reconstructing decisions from a conversation.
 
 The proposed authority baseline is model digest
-`sha256:a7e08c7ae2c82ee3f78d1d1fc4cc6e525026bdef682ceadb7369fcb7b93463d4`.
+`sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240`.
 Implementation must not begin until the owner accepts the exact checkpoint recorded in the
 evolution record. This is a prerelease schema break, not a compatibility-middleware campaign.
 
 ## Completion boundary
 
 The completed evolution has one production query path and one active/prospective invariant-impact
-kernel. Queries restrict relational identities, express hidden branches existentially, bound
+kernel. Queries restrict relational identities, express unreturned variables existentially, bound
 distinct answer identities, then hydrate or aggregate. Mutation work is derived from exact
 old/proposed reasons and deduplicated by `(rule_key, subject_uuid, constrained_end)`. Canonical JSON
 collection operations are linear in supplied members. SQLite capacity is derived from compiled
 statements. No dormant fallback retains the old algorithms.
 
-Legitimate work may still scale with selected candidates, matching edges, genuine projected
+Legitimate work may still scale with selected candidates, matching predicates, candidate bindings
+needed to establish a conjunction, genuine projected
 combinations, exact affected subjects, changed-rule populations, historical replay, and explicit
-complete assessment. It must not scale with disconnected populations, hidden witness products,
+complete assessment. It must not scale with unstated or unrelated graph populations, hidden witness products,
 unrelated rules, far endpoints promoted only because a relationship was inspected, collection
 placeholder counts, or parallel capacity formulas.
 
@@ -56,44 +57,69 @@ family. Preserve the ten MCP tool names while regenerating typed schemas.
 The selected prerelease Python contract is exact realization guidance rather than SysML authority:
 
 ```python
+from dataclasses import field
+from typing import Annotated
+
+from pydantic import ConfigDict, Field
+
+
+_CLOSED_REQUEST = ConfigDict(extra="forbid")
+
+
 @dataclass(frozen=True, slots=True)
 class UuidFilter:
     uuids: tuple[str, ...]
 
+    __pydantic_config__ = _CLOSED_REQUEST
+
 
 @dataclass(frozen=True, slots=True)
 class CurrentSelection:
-    kind: Literal["current"] = "current"
+    kind: Literal["current"]
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
 class ProspectiveSelection:
-    kind: Literal["prospective"] = "prospective"
+    kind: Literal["prospective"]
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
 class RevisionSelection:
+    kind: Literal["revision"]
     revision: int
-    kind: Literal["revision"] = "revision"
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
 class TimeSelection:
+    kind: Literal["time"]
     time: datetime
-    kind: Literal["time"] = "time"
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
-EvaluatedStateSelection = (
-    CurrentSelection | ProspectiveSelection | RevisionSelection | TimeSelection
-)
-HistoricalSelection = RevisionSelection | TimeSelection
+EvaluatedStateSelection = Annotated[
+    CurrentSelection | ProspectiveSelection | RevisionSelection | TimeSelection,
+    Field(discriminator="kind"),
+]
+HistoricalSelection = Annotated[
+    RevisionSelection | TimeSelection,
+    Field(discriminator="kind"),
+]
 
 
 @dataclass(frozen=True, slots=True)
 class RowQueryOutput:
+    kind: Literal["rows"]
     projections: tuple[ReturnProjection, ...]
     maximum_rows: int
-    kind: Literal["rows"] = "rows"
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,16 +128,23 @@ class QueryAggregation:
     operator: AggregationOperator
     property_name: str | None = None
 
+    __pydantic_config__ = _CLOSED_REQUEST
+
 
 @dataclass(frozen=True, slots=True)
 class AggregateQueryOutput:
+    kind: Literal["aggregates"]
     data_condition: str
     aggregations: tuple[QueryAggregation, ...]
     maximum_matches: int
-    kind: Literal["aggregates"] = "aggregates"
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
-QueryOutput = RowQueryOutput | AggregateQueryOutput
+QueryOutput = Annotated[
+    RowQueryOutput | AggregateQueryOutput,
+    Field(discriminator="kind"),
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,7 +153,9 @@ class GraphQuery:
     output: QueryOutput
     required_links: tuple[RequiredLink, ...] = ()
     data_conditions: tuple[AssociatedDataCondition, ...] = ()
-    state: EvaluatedStateSelection = CurrentSelection()
+    state: EvaluatedStateSelection = field(default_factory=lambda: CurrentSelection(kind="current"))
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +166,24 @@ class ReturnedProperty:
     value: JsonValue = None
 ```
 
+`PropertyComparison` also adds `MATCHES_PATTERN = "matchesPattern"`. It takes a string expected
+value containing a Google RE2 expression and applies Unicode whole-string FullMatch semantics to a
+present string property. Malformed or RE2-unsupported expressions, non-string properties, and
+non-string expected values are semantic query invalidities. This reuses the installed RE2 boundary;
+it does not introduce a textual expression language or make a query predicate part of definition
+validity.
+
+An explicitly supplied variant object always carries its discriminator. Omitting the entire
+`state` member selects current state, but supplying `{}` does not. Every externally exposed query
+request dataclass is closed to additional members at the Pydantic/FastMCP boundary, including the
+existing selector, predicate, and projection values as well as the values shown above. The published
+schemas contain real discriminators and closed object schemas. Consequently a current variant
+carrying `revision`, a revision variant carrying `time`, an untagged explicit variant, a row output
+carrying aggregate members, or any object carrying a removed legacy field is malformed input and
+forms no domain request. W003 must verify both the generated schemas and real client-boundary
+rejection; constructor defaults, union ordering, or ignored extras must not silently choose a
+variant, discard contradictory fields, or accept a partly translated old request.
+
 `UuidFilter | None` is used by `AnchorGroup`, `AssociatedDataCondition`, and `RequiredLink`.
 `RTGSystem.query_graph`, definition summary, and definition inspection take no separate
 `selection=` argument. Restore and other inherently historical operations continue to use
@@ -138,14 +191,23 @@ class ReturnedProperty:
 populate only `aggregates`. Rejected or failed results contain neither, contain no evaluated
 revision, and echo the normalized query. Bound or encoding refusal is whole-result refusal.
 
+The query is one finite positive must-exist pattern. Anchor groups and associated-data conditions name
+object variables. Each associated-data condition adds its required direct-association predicate, and
+each `RequiredLink` names a link variable plus its directed endpoint predicate. Every type, UUID,
+association, link, and property predicate must hold under the same joint assignment. The pattern has
+no topology restriction: disconnected variables, parallel predicates, a direct association plus a
+link over the same aliases, self-links, and cycles are ordinary conjunctions. Different selector or
+link aliases may bind the same graph object when their constraints permit it; aliases do not imply
+inequality. Projected variables in disconnected portions produce genuine Cartesian combinations,
+subject to the result bound. A disconnected portion with no projected variable is one existence gate.
+
 `vellis/query.py` owns public immutable values and one pure analyzer. `AnalyzedGraphQuery` contains:
 
-- validated selector lookup and references;
-- connected-tree adjacency and a compilation orientation;
+- validated selector and required-link variable lookup and references;
 - projection-to-selector mapping and aggregate target;
-- visible selector and projected-link sets;
-- the minimal answer-relevant backbone;
-- hidden branch attachment roots;
+- answer variables whose identities distinguish output;
+- existential selector and required-link variables;
+- each atomic type, UUID, direct-association, property, and link predicate's query-variable signature;
 - referenced type/property keys; and
 - ordered output identity columns.
 
@@ -161,6 +223,12 @@ historical predicates/parameters, and prospective-delta presence. The compiler r
 context and must not rediscover state independently. Summary and inspection reuse the resolver but
 retain focused retrieval. Current/prospective report the current canonical revision; historical
 reports the resolved revision; rejection/failure reports none.
+
+Every public operation that resolves state and then executes additional reads does so inside one
+explicit SQLite read transaction. Definition summary, focused inspection, and proposal discovery
+must not combine a revision/delta header from one committed state with definitions, objects, or a
+current assessment from another connection's later commit. W003 adds deterministic two-connection
+interleaving evidence for all three discovery paths as well as the four state selections.
 
 ### Unified collection relation
 
@@ -181,37 +249,65 @@ properties when needed. Create once, clear inside each query transaction, popula
 failure. Never interpolate public collection lengths into placeholder lists. Delete the specialized
 filter tables and small/large-list branch.
 
-### Compiler and answer backbone
+### Compiler and conjunctive answer relation
 
 Add `vellis/sqlite_query.py`. `CompiledQuery` owns ordered statements, exact ordered parameters for
 each statement, per-`SELECT` table counts, selected-column counts, generated expression/subquery
 depth, identity/hydration columns, output bound and kind, and cleanup needs. Compilation and
 preflight finish before answer SQL executes.
 
-For row output:
+Compile the query as one positive conjunction over named identity variables:
 
-1. A selector is visible when directly projected or supplying a projected property; a required-link
-   edge is visible when the link is projected.
-2. Compute the minimal connected subtree joining all visible vertices and projected link edges.
-3. Join only this backbone. A hidden branch becomes a correlated `EXISTS` rooted at its attachment.
-4. A hidden connector between visible selectors may be traversed, but its identity is absent from
-   the row key.
-5. Insert ordered projected identities into a query-specific temporary answer table with a primary
-   key, stopping at `maximum_rows + 1` distinct identities.
-6. Reject whole when over bound; otherwise hydrate projected identities only.
+Let the logical joint-binding relation be the natural join of the unary candidate predicates and
+the direct-association and link predicate relations on their shared named UUID columns. Row answer
+identities are the set projection of that relation onto the requested output-identity columns;
+aggregate targets are its set projection onto the one target UUID. This is the complete topology-
+independent semantic reference. The compiler realizes an equivalent relation with semijoins and
+`EXISTS`; it must not materialize the full hidden-witness bag merely to project it away.
+
+1. Each anchor or associated-data selector begins as an indexed candidate UUID relation narrowed by
+   its named types and optional UUID members. Property comparisons, including RE2, are unary
+   predicates on associated-data candidates; direct associations and required links are relational
+   predicates between candidates. Compile their shared UUID columns as semijoins, intersections, or
+   equivalent `EXISTS` relations so any selective predicate may reduce candidates and that reduction
+   propagates through the conjunction. Do not prescribe whether connectivity or a value predicate is
+   physically evaluated first, and do not hydrate objects during this reduction.
+2. Each unprojected required-link alias contributes a distinct endpoint-pair relation. Link UUIDs are
+   omitted because only existence can affect an answer. A projected link contributes its UUID plus
+   its endpoint pair because that UUID distinguishes rows.
+3. Direct association contributes an anchor/data UUID-pair relation. Parallel link predicates and a
+   direct-association/link pair over the same aliases are ordinary intersections on shared identity
+   columns. A self-link predicate restricts its endpoint pair to one bound selector UUID. A cyclic
+   pattern closes additional predicates over the same joint assignment.
+4. Semijoin candidate UUID relations against incident relationship relations, or use an equivalent
+   relational plan, so impossible identities are removed before hydration. Existential variables
+   are projected away after all predicates incident to them are satisfied or are evaluated in a
+   correlated `EXISTS` over every answer variable on their boundary.
+5. Relations that share no variables form a genuine Cartesian product only when both contribute an
+   answer identity. A disjoint subpattern with no answer variable is an uncorrelated `EXISTS` gate
+   evaluated once. A disjoint subpattern with answer variables contributes its bounded combinations;
+   hidden variables within it remain existential.
+6. Once one joint hidden assignment establishes existence for an answer identity, do not enumerate,
+   count, or materialize additional hidden assignments for that identity. Proving that no cyclic or
+   otherwise constrained assignment exists may still examine the candidate bindings and relationship
+   tuples the conjunction genuinely requires.
+7. Insert ordered projected identities into a query-specific temporary answer table with a primary
+   key, stopping at `maximum_rows + 1` distinct identities. Reject whole when over bound; otherwise
+   hydrate projected identities only.
 
 Identity includes projection name plus anchor/link/data UUID. A property identity includes
 projection name, source associated-data UUID, presence, and canonical value. Equal values from
 different sources remain distinct; hidden witnesses do not distinguish rows.
 
-For aggregate output, the named data condition is the sole visible selector. Populate one temporary
-target table keyed by its data UUID with every other branch existential, stopping at
-`maximum_matches + 1`. Reject before arithmetic when over bound. Count the target table and stream
+For aggregate output, the named data condition is the sole answer selector. Populate one temporary
+target table keyed by its data UUID with every other variable existential under the same
+conjunction, stopping at `maximum_matches + 1`. Reject before arithmetic when over bound. Count the target table and stream
 requested property rows through existing exact reducers. Retain sparse SQLite-backed exact-sum
 terms. There is no per-target loop because one request has one target population.
 
 SQLite may push any selective type, UUID, association, link, or property predicate. The semantic
-constraint is elimination of forbidden logical witness products, not a prescribed physical order.
+constraint is elimination of forbidden logical witness bags, not a prescribed physical order or a
+new general-purpose optimizer.
 
 ### Exact capacity
 
@@ -222,10 +318,12 @@ Capacity excess is a typed whole-result rejection before answer execution.
 
 ### Oracle and integration
 
-Rewrite `tests/vellis/oracle.py` as small brute-force tree semantics importing only public graph and
-query values. It independently implements row identity, recursive JSON comparison, and aggregate
-reduction; it imports no production analyzer, planner, evaluator, identity, or reducer. Add fixed-seed
-generated connected-tree cases and prove a deliberately mutated production result is detected.
+Rewrite `tests/vellis/oracle.py` as small brute-force conjunctive-pattern semantics importing only
+public graph and query values. It independently implements row identity, recursive JSON comparison,
+and aggregate reduction; it imports no production analyzer, planner, evaluator, identity, or
+reducer. Add fixed-seed generated finite-pattern cases, including disconnected projected and hidden
+portions, parallel predicates, self-links, and cycles, and prove a deliberately mutated production
+result is detected.
 
 `store.py` retains locking, transaction/state ownership, hydration, complete-return screening, and
 error translation. `system.py` owns dispatch/observation. `mcp.py` exposes generated schemas and the
@@ -240,7 +338,8 @@ Delete, not merely bypass:
 - `QueryCandidateIndex`, `evaluate_indexed_query`, `_Assignment`, `_walk`, `_assignments`;
 - `_component_assignments`, `_distinct_component_assignments`, `_selector_components`;
 - both `_component_query` implementations, `_query_component_names`, and component reconstruction;
-- recursive SQL `validate=False` / `existence_only=True` paths and disconnected existence gates;
+- recursive SQL `validate=False` / `existence_only=True` paths and the legacy component-specific
+  disconnected-aggregation workaround;
 - `_SQLiteQueryIndex`, `_query_requires_relational_filters_unlocked`, and manual capacity formulas;
 - specialized query filter tables, conditional `IN (...)` collection compilation, and Python
   post-hydration deduplication;
@@ -327,6 +426,8 @@ performance budgets. Retire them with the work that makes each old assertion fal
   hidden-witness, and independent-oracle conformance evidence.
 - W004 replaces exact quadratic active/prospective costs with exact-work-cardinality and
   sub-quadratic scaling regressions.
+- W006 replaces mixed-assessment-page and retained assessment/restore work-table characterizations
+  with snapshot-consistency and empty-after-success/failure lifecycle regressions.
 - W005 verifies that no transitional source-shape or old-cost assertion remains; it does not defer
   every replacement until closure.
 
@@ -337,13 +438,17 @@ them. They characterize the selected execution environment and are not public bu
 
 Query evidence covers broad/multi-type and UUID-restricted anchors; UUID restrictions for all three
 object kinds; mixed known/unknown and wrong-kind/type refusal; data association and property
-comparisons; missing versus null; directed links; paths/stars/branching trees; hidden branches;
-projected links; same-object aliases; source-preserving equal property values; genuine projected
-combinations; bound-plus-one refusal; unreturnable encoding; and declaration-order invariance.
+comparisons and RE2 whole-string matching; missing versus null; directed links;
+paths/stars/branching patterns; parallel links over
+the same aliases; direct-association/link conjunction; self-links; cycles; disconnected projected
+combinations; disconnected hidden existence gates; hidden variables;
+projected links; same-object and same-link aliases; source-preserving equal property values; genuine
+projected combinations; bound-plus-one refusal; unreturnable encoding; and declaration-order
+invariance.
 
 Invalidity evidence covers empty/duplicate names, unknown references/types, empty/duplicate UUID
-filters, disconnected branches, self/parallel edges, direct-association parallel edges, longer
-cycles, empty outputs/aggregations, bad aggregate target/property/operator, nonpositive bounds,
+filters, malformed or unsupported RE2 expressions, pattern comparisons on
+non-string properties, empty outputs/aggregations, bad aggregate target/property/operator, nonpositive bounds,
 prospective without delta, unknown revision, naive time, and structural SQLite excess. Every refusal
 preserves graph, definitions, delta, revision, and canonical history and returns no partial answer or
 evaluated revision.
@@ -352,11 +457,13 @@ Aggregation evidence covers zero/nonzero count, exact and cancelling sums, numer
 missing/all-missing properties, several operations/properties on one target, hidden witness
 deduplication, equal-valued distinct targets, bound-plus-one, and all four state selections.
 
-Differential generation uses fixed-seed small connected trees with sparse/dense links, missing/null
-properties, duplicate values/witnesses, and alias reuse. Compare status, revision, canonical row
-identity, returned values, aggregates, and refusal. Metamorphic cases reorder declarations, rename
-aliases, duplicate hidden witnesses, add unrelated population, substitute equivalent revision state,
-change multiplicity-irrelevant display/property data, and permute semantically equal object members.
+Differential generation uses fixed-seed small finite positive patterns with connected and disconnected
+variables, sparse/dense links, parallel and cyclic predicates, missing/null properties, duplicate
+values/witnesses, and alias reuse.
+Compare status, revision, canonical row identity, returned values, aggregates, and refusal.
+Metamorphic cases reorder declarations, rename aliases, duplicate hidden witnesses, add unrelated
+population, substitute equivalent revision state, change multiplicity-irrelevant display/property
+data, and permute semantically equal object members.
 
 Scaling evidence uses SQLite VM steps and decoded-object counts, not wall-clock budgets:
 
@@ -373,7 +480,33 @@ Scaling evidence uses SQLite VM steps and decoded-object counts, not wall-clock 
 MCP evidence keeps exactly ten tool names, exposes output/state discriminators, rejects rather than
 translates every removed shape, distinguishes typed semantic refusal from malformed boundary input,
 opens existing databases without migration, and keeps snapshot/replay/restore/restart/v1 evidence
-green.
+green. Negative boundary cases include absent explicit discriminators, wrong discriminator values,
+variant-specific members attached to another state kind, aggregate members attached to row output,
+row members attached to aggregate output, and otherwise unknown members of the closed state/output
+variants. Each malformed case proves that no domain operation or observation ran.
+
+## W006 — bounded transient read and work-state lifetimes
+
+After W004 has replaced prospective assessment internals, close the two lifecycle gaps that are not
+query or multiplicity semantics:
+
+- Read every published assessment interval in one explicit SQLite read transaction. A concurrent
+  replacement may occur before or after that transaction, but cannot combine an old assessment
+  header/count with missing or newer finding rows.
+- Clear every population-bearing `assessment_*` working relation after successful assessment and
+  after failure. Preserve only the normalized published assessment and its bounded retrieval rows.
+- Clear `restore_candidate`, `restore_current`, and every other population-bearing `restore_*`
+  working relation after successful restoration and after failure. Preserve the committed restored
+  current projection and canonical transition, not the transient comparison population.
+- Keep temporary relation definitions connection-local for reuse; clear their rows. Cleanup is part
+  of the owning transaction/failure discipline and must not hide the original operation error.
+
+Deterministic two-connection evidence replaces a published assessment between the header and
+finding reads and accepts only a complete old or complete new interval. Success/failure fixtures
+inspect every assessment/restore temporary relation and require zero retained population rows before
+the next invocation. Scale fixtures use a multi-object population so a constant-row residue cannot
+masquerade as cleanup. Restoration meaning, schema version, snapshots, replay, and canonical history
+remain unchanged.
 
 ## W005 closure and subtraction
 
@@ -401,8 +534,11 @@ unchanged; otherwise add a dependent item or stop for model acceptance. Sweep a 
 review. Do not add an optimizer, runtime-selectable planner, fallback evaluator, generic rule engine,
 persistent cache/view, schema migration, new public tool, or new authorization/session/worker concept.
 
-The evolution intentionally removes atomic single-query disconnected, cyclic, mixed-output, and
-multi-target aggregate questions and changes prerelease request schemas/property row identity. It
-does not change graph/type meaning, direct associations, link meaning, property comparison,
+The evolution intentionally removes mixed-output and multi-target aggregate questions and changes
+prerelease request schemas/property row identity. It retains the complete finite positive graph-pattern
+conjunction: disconnected, parallel, self-link, and cyclic relationship patterns remain valid under
+one joint binding. Server-side anchor/link aggregation remains
+an explicit non-goal rather than a lost capability of this change. The evolution does not change
+graph/type meaning, direct associations, link meaning, property comparison,
 persistence/history/snapshots/restore/v1 initialization, tool names, launch/registration, approval,
 or canonical mutation boundaries.

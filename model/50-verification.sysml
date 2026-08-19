@@ -70,6 +70,8 @@ package VellisVerification {
              * comparison of a null-, Boolean-, array-, or object-valued property,
              * and one whose expected value is of a different JSON kind from the
              * property.
+             * Match a present string property with a valid RE2 whole-string
+             * expression and reject a prefix-only or suffix-only value.
              * Show each row is one jointly satisfying assignment with exactly one
              * binding per requested projection, including an absent-valued binding
              * only for a projected missing optional property, present-valued
@@ -86,12 +88,20 @@ package VellisVerification {
              * Add a proposal-only type and changed proposed property rule and show
              * prospective selection accepts and applies them while current rejects
              * the proposal-only type and retains the active rule.
-             * Exercise paths, stars, and branching selector trees. Independently
-             * increase satisfying hidden witnesses on a connected branch and
-             * show they govern existence without multiplying returned rows or
-             * aggregate targets. Bind two compatible aliases to the same object
-             * and use two endpoint aliases to discover a self-link, showing no
-             * implicit alias-inequality constraint.
+             * Exercise paths, stars, branching patterns, disconnected projected
+             * selectors, a disconnected hidden selector, a triangle cycle, two
+             * differently typed required links over the same endpoint aliases,
+             * a direct association and required link over the same selectors,
+             * and a required self-link whose source and target are one selector.
+             * Show every repeated or cyclic predicate is conjunctive under one
+             * joint assignment. Show disconnected projected selectors produce
+             * genuine bounded combinations, while a disconnected hidden portion
+             * gates every answer only on whether one of its assignments exists.
+             * Independently increase satisfying hidden
+             * witnesses and show they govern existence without multiplying
+             * returned rows or aggregate targets after one joint witness exists.
+             * Bind two compatible aliases and two compatible link aliases to the
+             * same objects, showing no implicit alias-inequality constraint.
              * Hold a broad query's maximum fixed while increasing unrelated
              * matching rows and show identity selection stops at maximum plus one
              * and hydrates no more than that bounded candidate result.
@@ -109,8 +119,9 @@ package VellisVerification {
              * Exercise empty or duplicate query-local names, unknown and incompatible
              * type keys, out-of-query references, endpoint directions, anchor,
              * associated-data, and link UUIDs, empty and duplicate UUID restrictions,
-             * disconnected selectors, self-edges, parallel edges, longer cycles,
-             * property names, incompatible comparisons, missing, empty, or mixed
+             * property names, incompatible comparisons, malformed or unsupported
+             * query patterns and pattern comparisons on non-string properties,
+             * missing, empty, or mixed
              * output, malformed projections, and an
              * unrequested result binding, zero maximum, and a result exceeding
              * its positive maximum, plus a result the system cannot return
@@ -621,8 +632,10 @@ package VellisVerification {
              * graph, definitions, delta, revision, and canonical history. Discover
              * the exact active expression. Change only its text and show a
              * meaningful definition change even when the expressions recognize
-             * the same language. Confirm query comparisons remain the existing
-             * closed set, and that changing or removing a pattern moves no
+             * the same language. Use the same expression in a query
+             * matchesPattern comparison and show identical Unicode whole-string
+             * meaning without making that query predicate stored-value validity
+             * authority. Changing or removing a definition pattern moves no
              * ordered string comparison result, so ordering follows the stored
              * values rather than the pattern describing them.
              */

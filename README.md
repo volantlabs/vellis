@@ -120,11 +120,18 @@ Useful commands:
 ## Implementation status
 
 The existing v2 prerelease implementation remains runnable, but this branch now contains a proposed
-query-semantics and work-locality authority change awaiting owner acceptance. That target limits one
-query to a connected selector tree, makes row and aggregate output exclusive, preserves the source
+query-semantics and work-locality authority change awaiting owner acceptance. That target treats one
+query as a finite positive must-exist pattern with no topology restriction, makes row and aggregate
+output exclusive, preserves the source
 identity of projected properties, and requires exact rule-subject-end mutation work. The current
 runtime does not yet conform to that proposed target; implementation begins only after its exact
 model checkpoint is accepted.
+
+The pre-approval release review also found that related definition-discovery and assessment-page
+statements do not yet share one SQLite read snapshot, and that successful assessment/restore work
+can leave population-bearing temporary rows resident until reuse or connection close. The accepted
+model already excludes those states; W003 and W006 own the implementation corrections without a
+persistent migration or restore-semantics change.
 
 All seventeen original campaign slices and corrective slice S018 are complete. S018 implements the
 selected setup-program/public-CLI behavior with fake-client evidence. Closure confirmed both

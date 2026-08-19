@@ -139,6 +139,7 @@ package RTG {
         enum lessThanOrEqual;
         enum greaterThan;
         enum greaterThanOrEqual;
+        enum matchesPattern;
     }
 
     enum def 'History Kind' {
@@ -536,7 +537,9 @@ package RTG {
          * same basis equality already uses. Ordered comparison of a
          * nullValue, booleanValue, arrayValue, or objectValue property, and any
          * ordered comparison whose expected value is of a different JSON kind
-         * from the property, are rejected.
+         * from the property, are rejected. matchesPattern requires a stringValue
+         * property and string expected value containing a valid Google RE2
+         * expression; it uses Unicode whole-string FullMatch behavior.
          */
         attribute propertyName : ScalarValues::String;
         attribute comparison : 'Property Comparison';
@@ -640,13 +643,19 @@ package RTG {
          * group, link-condition, data-condition, projection, and aggregation names are
          * unique within the query. Every reference resolves to an element owned
          * by the same query. Anchor groups and associated-data conditions are
-         * selector vertices; each direct association and required link is an
-         * edge. The selector graph is connected and acyclic, has exactly one
-         * fewer edge than vertex, and contains no self-edge or parallel edge.
-         * Distinct selector aliases may bind the same graph object when their
-         * constraints allow it; aliases do not imply inequality. A self-link is
-         * therefore discoverable through two compatible endpoint aliases even
-         * when both aliases bind the same endpoint identity.
+         * selector variables; each direct association and required link is a
+         * positive relationship predicate over those variables. The finite
+         * pattern has no topology restriction: disconnected variables, repeated
+         * predicates, parallel predicates, self-link predicates, and cyclic
+         * predicate paths are valid conjunctions. Every predicate shall hold
+         * under the same joint assignment. Distinct selector or required-
+         * link aliases may bind the same graph object when their constraints
+         * allow it; aliases do not imply inequality. A required link whose
+         * source and target name the same selector requires an actual self-link
+         * on that bound object. Projected variables in disconnected portions
+         * produce genuine combinations of their bindings. A disconnected
+         * portion with no projected variable affects an answer only through
+         * whether one satisfying assignment for that portion exists.
          * Current selection evaluates active state; prospective selection
          * evaluates active state with the sole definition delta's graph overlay
          * and proposed definitions. Revision or time selection evaluates the
@@ -656,8 +665,8 @@ package RTG {
          * evaluated revision for this query. An omitted external state value
          * means current. Exactly one row or aggregate output is present. Its
          * positive maximum bounds one complete result rather than requesting a
-         * page. Sorting, pagination, traversal, computed expressions, grouping,
-         * disconnected patterns, and cyclic patterns are outside this query model.
+         * page. Sorting, pagination, traversal, computed expressions, and grouping
+         * are outside this query model.
          */
     }
 
