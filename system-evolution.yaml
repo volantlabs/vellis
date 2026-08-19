@@ -17,16 +17,16 @@ baselines:
     checkpoint: git:29e60d41199a1810b0d758715066717cb987c4a9
   target:
     model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:57b42f4e7d7c994abd94c7808e11d472da5ac7c2
+    implementation: git:d1c91842fcf97a38771926a547033e4f3f842bf5
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:57b42f4e7d7c994abd94c7808e11d472da5ac7c2
+    checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5
   observed:
     model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:57b42f4e7d7c994abd94c7808e11d472da5ac7c2
+    implementation: git:d1c91842fcf97a38771926a547033e4f3f842bf5
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:57b42f4e7d7c994abd94c7808e11d472da5ac7c2
+    checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5
 scope:
   authority_scope: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::explicitGraphChangeSet, VellisVerification::currentWorkScaling, AGENTS.md]
   implementation_scope: [vellis/store.py, tests/vellis/test_semantic_work_locality.py, tests/test_system_evolution.py, README.md, docs/mcp-realization.md, system-evolution.yaml]
@@ -85,7 +85,7 @@ work_items:
     label: Clear completed active-mutation validation work
     kind: implementation
     dependencies: []
-    planned_baseline: {dimension: implementation, identity: git:57b42f4e7d7c994abd94c7808e11d472da5ac7c2}
+    planned_baseline: {dimension: implementation, identity: git:d1c91842fcf97a38771926a547033e4f3f842bf5}
     finding_ids: [F001, F002, F003]
     decision_ids: [D001]
     authority:
