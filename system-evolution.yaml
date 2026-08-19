@@ -199,6 +199,14 @@ work_items:
     evidence_refs: [path:tests/vellis/test_mutation_impact.py#test_link_insertion_changes_only_its_exact_constrained_subject, path:tests/vellis/test_mutation_impact.py#test_direct_association_move_enqueues_only_old_and_new_anchors, path:tests/vellis/test_mutation_impact.py#test_direct_association_opposite_type_change_is_not_a_relationship_change, path:tests/vellis/test_sqlite_prospective_state.py#test_active_and_prospective_share_exact_relationship_membership_work, path:tests/vellis/test_sqlite_prospective_state.py#test_active_and_prospective_share_exact_subject_membership_work, path:tests/vellis/test_sqlite_prospective_state.py#test_active_and_prospective_share_exact_opposite_membership_work, path:tests/vellis/test_sqlite_prospective_state.py#test_active_and_prospective_share_direct_association_opposite_membership_work, path:tests/vellis/test_sqlite_prospective_state.py#test_accepted_incremental_mutations_agree_with_complete_conformance, path:tests/vellis/test_sqlite_prospective_state.py#test_stale_proposal_base_does_not_hide_prospective_multiplicity_findings, path:tests/vellis/test_sqlite_prospective_state.py#test_stale_proposal_base_does_not_hide_structural_relationship_findings, path:tests/vellis/test_sqlite_prospective_state.py#test_rule_meaning_change_enqueues_only_that_rules_applicable_subjects, path:tests/vellis/test_semantic_work_locality_triggers.py#test_active_endpoint_type_work_scales_with_applicable_degree, path:tests/vellis/test_semantic_work_locality_triggers.py#test_display_only_edit_has_zero_rule_population_dependency, path:tests/vellis/test_semantic_work_locality_triggers.py#test_independent_changes_produce_one_exact_work_tuple_each, command:just check]
     blocker: null
     checkpoint: git:04a24e5e85948b32962ff002f29483e22d2c6063
+  # W004 clean post-root-audit review pair at shared token
+  # git:d9551769656fec3eafb4749956d3c74acdbdbcbe; substantive checkpoint
+  # git:04a24e5e85948b32962ff002f29483e22d2c6063.
+  # /root/w004_authority_review4 — authority and conformance — clean.
+  # /root/w004_engineering_review4 — engineering and evidence — clean.
+  # Both reviewers independently passed focused W004 evidence, just system-evolution-check,
+  # just check (1,228 tests plus package build/install/exercise), and git diff --check;
+  # the authority reviewer also passed just model-check with the official Java pilot 0.60.1.
   - id: W005
     order: 7
     label: Integrate evidence, synchronize documentation, and close the evolution
