@@ -3,10 +3,10 @@ evolution:
   id: vellis-2-semantic-work-locality
   objective: Replace locally optimized query and validation paths with one finite positive conjunctive-pattern meaning and one exact reason-aware invariant-impact meaning.
   observable_distinction: Hidden query witnesses cannot multiply answer work, and ordinary mutation contains only exact applicable rule-subject-end work rather than broad neighborhoods.
-  lifecycle: ready
+  lifecycle: active
   approval: {status: accepted, reason: "The query language, output and row identity, state selection, compatibility, and mutation locality change accepted meaning.", checkpoint: git:f3bfd25c6f814e745add11b99b7e48bef8168773}
   blocker: null
-  checkpoint: git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a
+  checkpoint: null
 baselines:
   status: current
   source:
@@ -17,16 +17,16 @@ baselines:
     checkpoint: git:ca6539e10393a5a52e2cd2f67d0af662e92cc010
   target:
     model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a
+    implementation: git:f42e43baa026df80d1cef505920293a833128318
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a
+    checkpoint: git:f42e43baa026df80d1cef505920293a833128318
   observed:
     model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a
+    implementation: git:f42e43baa026df80d1cef505920293a833128318
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a
+    checkpoint: git:f42e43baa026df80d1cef505920293a833128318
 scope:
   authority_scope: [RTG::'Graph Query', RTG::'Property Comparison', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::stringPatternValidation, VellisRequirements::explicitGraphChangeSet, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisRequirements::canonicalSemanticEquality, VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability, VellisRequirements::mcpAgentToolContract, VellisRequirements::mcpOutcomeIntegrity, VellisVerification::semanticQuery, VellisVerification::invalidQuery, VellisVerification::stringPatterns, VellisVerification::validationCoverage, VellisVerification::currentWorkScaling, VellisVerification::historyGrowth]
   implementation_scope: [vellis/query.py, vellis/sqlite_query.py, vellis/store.py, vellis/system.py, vellis/mcp.py, vellis/json_value.py, vellis/definitions.py, tests/vellis/, tests/test_implementation_campaign.py, model/, README.md, docs/mcp-realization.md, docs/semantic-work-locality-handoff.md, implementation-campaign.yaml, system-evolution.yaml]
@@ -220,9 +220,9 @@ work_items:
     nearest_wrong_system: Focused fixes pass while obsolete code or claims retain the prior accidental model.
     compatibility_effect: The prerelease break is documented while persistence and tool names remain stable.
     non_effects: [No release, tag, merge, external client mutation, or owner-data access.]
-    lifecycle: ready
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: active
+    implementation_status: partial
+    evidence_refs: [path:tests/vellis/test_canonical_equality.py#test_structural_equality_and_canonical_keys_agree_over_fixed_seed_values, path:tests/vellis/test_query_contract_v2.py#test_broad_pattern_matching_scales_with_genuine_association_candidates, path:tests/vellis/test_query_contract_v2.py#test_fixed_seed_positive_patterns_match_the_independent_oracle, path:tests/vellis/test_semantic_work_locality.py#test_active_endpoint_type_work_scales_with_applicable_degree, path:README.md#implementation-status, path:docs/mcp-realization.md#semantic-work-locality-evidence, command:just model-check, command:just system-evolution-check, command:just package-check, command:just check]
     blocker: null
     checkpoint: null
   - id: W006
@@ -278,13 +278,13 @@ work_items:
   # focused W007 evidence, just system-evolution-check, and git diff --check.
 closure:
   finding_disposition: open
-  model_status: not evaluated
-  implementation_status: conflicting
-  integration_status: not evaluated
+  model_status: accepted
+  implementation_status: partial
+  integration_status: partial
   external_status: not applicable
   compatibility: Proposed prerelease break for query payloads and property row identity; mixed-output questions are removed, while disconnected, parallel, self-link, and cyclic finite positive patterns remain valid; persistence, snapshots, restore, v1 initialization, and ten MCP names remain unchanged.
   reviews:
     - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
     - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
-  evidence_refs: []
+  evidence_refs: [path:README.md#implementation-status, path:docs/mcp-realization.md#semantic-work-locality-evidence, command:just model-check, command:just system-evolution-check, command:just package-check, command:just check]
   checkpoint: null
