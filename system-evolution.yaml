@@ -73,9 +73,9 @@ findings:
     classification: model gap
     consequence: The compiler carries a general query language where identity lookup and connected pattern matching suffice.
     authority_refs: [owner-plan:sections-3.3-through-3.6]
-    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix]
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase3-evidence.md#implemented-distinction, path:docs/v2-simplification-phase3-evidence.md#focused-evidence, path:docs/v2-simplification-phase3-evidence.md#subtraction-and-locality-review]
     disposition: implementation-work
-    owner_work_item_id: W003
+    owner_work_item_id: W008
     implementation_status: conflicting
     nearest_wrong_system: A unified tool name hides existing projection, aggregation, hidden-selector, or two-step machinery.
     compatibility_effect: Prototype query requests and results are unsupported.
@@ -193,8 +193,8 @@ decisions:
     reversible: false
     owner_work_item_id: W003
     evidence_intent: [Evidence rejects hidden selectors, disconnected products, and hydration before bounding.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_query_v2_successor.py#test_identity_selection_reports_missing_and_hydrates_only_requested_fields, path:tests/vellis/test_query_v2_successor.py#test_connected_patterns_bind_every_selector_and_enforce_whole_result_bound, path:docs/v2-simplification-phase3-evidence.md#focused-evidence]
   - id: D003
     summary: Use immutable domain values, SQLite functions, operation functions, and thin adapters.
     authority_refs: [owner-plan:sections-4.2-through-4.7]
@@ -210,9 +210,9 @@ decisions:
     alternatives: [General query AST., In-memory graph evaluation.]
     reversible: true
     owner_work_item_id: W003
-    evidence_intent: [Oracle catches compiler mutations., Limit-plus-one precedes hydration., Historical search respects intervals.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    evidence_intent: [Topology oracle catches selector and join mutations., Limit-plus-one precedes hydration., Historical search respects intervals.]
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_query_v2_successor.py#test_sql_topology_matches_independent_oracle_and_catches_distinctness_mutant, path:tests/vellis/test_query_v2_successor.py#test_bound_is_checked_before_hydration, path:tests/vellis/test_query_v2_successor.py#test_historical_query_uses_selected_intervals_for_graph_and_search, path:docs/v2-simplification-phase3-evidence.md#subtraction-and-locality-review]
   - id: D005
     summary: Store one normalized draft patch per key and opaque continuations with internal fingerprints.
     authority_refs: [owner-plan:section-4.9]
@@ -349,7 +349,7 @@ work_items:
     kind: implementation
     dependencies: [W002]
     planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: [F002]
+    finding_ids: []
     decision_ids: [D002, D004]
     authority: [{refs: [owner-plan:phase-3], coverage: full, remaining_work_item_ids: []}]
     approval: {status: not-required, reason: The approved plan fixes query behavior and realization., checkpoint: null}
@@ -357,8 +357,8 @@ work_items:
     compatibility_effect: Old query requests and results are unsupported.
     non_effects: [No aggregation., No fuzzy or semantic search., No query AST.]
     lifecycle: active
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:docs/v2-simplification-phase3-evidence.md#implemented-distinction, path:docs/v2-simplification-phase3-evidence.md#focused-evidence, path:docs/v2-simplification-phase3-evidence.md#subtraction-and-locality-review, command:uv run pytest -q tests/vellis/test_domain_v2.py tests/vellis/test_canonical_encoding_v2.py tests/vellis/test_storage_v2.py tests/vellis/test_query_v2_successor.py, command:just lint, command:just typecheck, command:just model-check, command:just model-reference-check, command:just system-evolution-check]
     blocker: null
     checkpoint: null
   - id: W004
@@ -439,7 +439,7 @@ work_items:
     kind: closure
     dependencies: [W007]
     planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: [F010]
+    finding_ids: [F002, F010]
     decision_ids: [D009]
     authority: [{refs: [owner-plan:phase-8], coverage: full, remaining_work_item_ids: []}]
     approval: {status: not-required, reason: Closure removes superseded paths and aligns claims., checkpoint: null}

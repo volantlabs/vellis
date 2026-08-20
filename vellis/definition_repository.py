@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections import defaultdict
 
@@ -74,21 +75,25 @@ def definition_descriptors(
 
 
 def load_definitions(
-    connection: sqlite3.Connection, state: ResolvedState
+    connection: sqlite3.Connection,
+    state: ResolvedState,
+    type_keys: tuple[str, ...] | None = None,
 ) -> tuple[TypeDefinition, ...]:
     parameters = interval_parameters(state)
+    key_sql, key_parameters = _key_filter("v.type_key", type_keys)
     rows = connection.execute(
         f"""
         SELECT v.*, i.created_revision, i.legacy_v1
         FROM definition_version AS v
         JOIN type_key_identity AS i USING (type_key)
-        WHERE {interval_sql("v")}
+        WHERE {interval_sql("v")}{key_sql}
         ORDER BY v.type_key
         """,
-        parameters,
+        (*parameters, *key_parameters),
     ).fetchall()
-    permitted = _load_permitted(connection, state)
-    properties = _load_properties(connection, state)
+    loaded_keys = tuple(str(row["type_key"]) for row in rows)
+    permitted = _load_permitted(connection, state, loaded_keys)
+    properties = _load_properties(connection, state, loaded_keys)
     return tuple(_definition_from_row(row, permitted, properties) for row in rows)
 
 
@@ -250,16 +255,17 @@ def _insert_allowed_values(
 
 
 def _load_permitted(
-    connection: sqlite3.Connection, state: ResolvedState
+    connection: sqlite3.Connection, state: ResolvedState, type_keys: tuple[str, ...]
 ) -> dict[str, dict[str, tuple[str, ...]]]:
+    key_sql, key_parameters = _key_filter("p.type_key", type_keys)
     rows = connection.execute(
         f"""
         SELECT type_key, role, permitted_type_key
         FROM definition_permitted_type AS p
-        WHERE {interval_sql("p")}
+        WHERE {interval_sql("p")}{key_sql}
         ORDER BY type_key, role, permitted_type_key
         """,
-        interval_parameters(state),
+        (*interval_parameters(state), *key_parameters),
     ).fetchall()
     collected: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     for row in rows:
@@ -271,19 +277,20 @@ def _load_permitted(
 
 
 def _load_properties(
-    connection: sqlite3.Connection, state: ResolvedState
+    connection: sqlite3.Connection, state: ResolvedState, type_keys: tuple[str, ...]
 ) -> dict[str, tuple[PropertyDefinition, ...]]:
     parameters = interval_parameters(state)
+    key_sql, key_parameters = _key_filter("p.type_key", type_keys)
     rows = connection.execute(
         f"""
         SELECT *
         FROM property_definition_version AS p
-        WHERE {interval_sql("p")}
+        WHERE {interval_sql("p")}{key_sql}
         ORDER BY type_key, property_name
         """,
-        parameters,
+        (*parameters, *key_parameters),
     ).fetchall()
-    allowed = _load_allowed(connection, state)
+    allowed = _load_allowed(connection, state, type_keys)
     collected: dict[str, list[PropertyDefinition]] = defaultdict(list)
     for row in rows:
         key = (str(row["type_key"]), str(row["property_name"]))
@@ -292,16 +299,17 @@ def _load_properties(
 
 
 def _load_allowed(
-    connection: sqlite3.Connection, state: ResolvedState
+    connection: sqlite3.Connection, state: ResolvedState, type_keys: tuple[str, ...]
 ) -> dict[tuple[str, str], tuple]:
+    key_sql, key_parameters = _key_filter("a.type_key", type_keys)
     rows = connection.execute(
         f"""
         SELECT *
         FROM property_definition_allowed_value AS a
-        WHERE {interval_sql("a")}
+        WHERE {interval_sql("a")}{key_sql}
         ORDER BY type_key, property_name, ordinal
         """,
-        interval_parameters(state),
+        (*interval_parameters(state), *key_parameters),
     ).fetchall()
     collected: dict[tuple[str, str], list] = defaultdict(list)
     for row in rows:
@@ -310,6 +318,15 @@ def _load_allowed(
         assert value is not None
         collected[key].append(value)
     return {key: tuple(values) for key, values in collected.items()}
+
+
+def _key_filter(column: str, type_keys: tuple[str, ...] | None) -> tuple[str, tuple[object, ...]]:
+    if type_keys is None:
+        return "", ()
+    if not type_keys:
+        return " AND 0", ()
+    encoded = json.dumps(type_keys, ensure_ascii=False, separators=(",", ":"))
+    return f" AND {column} IN (SELECT value FROM json_each(?))", (encoded,)
 
 
 def _definition_from_row(

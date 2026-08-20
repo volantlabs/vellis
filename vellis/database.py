@@ -7,6 +7,8 @@ from pathlib import Path
 
 APPLICATION_ID = 0x56454C32  # VEL2
 PROTOTYPE_APPLICATION_ID = 0x56454C31  # VEL1
+# VEL2 is unreleased during this rebaseline. Once released, any incompatible schema or canonical
+# encoding change must select a new user_version rather than silently redefining this format.
 USER_VERSION = 1
 PROTOTYPE_SCHEMA_VERSION = 5
 
@@ -753,16 +755,21 @@ CREATE TABLE activity_payload (
 
 CREATE TABLE search_document (
     document_id INTEGER PRIMARY KEY,
-    object_uuid TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    type_key TEXT NOT NULL,
+    object_uuid TEXT NOT NULL REFERENCES graph_object_identity(uuid),
+    kind TEXT NOT NULL CHECK (kind IN ('anchor', 'associatedData')),
+    type_key TEXT NOT NULL REFERENCES type_key_identity(type_key),
     field_name TEXT NOT NULL,
     content TEXT NOT NULL,
-    valid_from_revision INTEGER NOT NULL,
-    valid_to_revision INTEGER
+    valid_from_revision INTEGER NOT NULL REFERENCES canonical_record(revision),
+    valid_to_revision INTEGER REFERENCES canonical_record(revision),
+    FOREIGN KEY (object_uuid, valid_from_revision)
+        REFERENCES graph_object_version(uuid, valid_from_revision),
+    CHECK (valid_to_revision IS NULL OR valid_to_revision > valid_from_revision)
 ) STRICT;
 CREATE INDEX search_document_scope_interval_idx
     ON search_document(kind, type_key, field_name, valid_from_revision, valid_to_revision);
+CREATE INDEX search_document_object_interval_idx
+    ON search_document(object_uuid, field_name, valid_from_revision, valid_to_revision);
 CREATE VIRTUAL TABLE search_fts USING fts5(
     content,
     content='search_document',
