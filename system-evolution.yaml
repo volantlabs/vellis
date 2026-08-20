@@ -18,8 +18,13 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:5196bb01fedb90c815ae15f40cddb041fc915d01
-  target: null
-  observed: *source
+  target: &phase0_target
+    model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
+    implementation: git:4d2f88f8d6742588396cd1e0c1647568897e9319
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
+    checkpoint: git:4d2f88f8d6742588396cd1e0c1647568897e9319
+  observed: *phase0_target
 scope:
   authority_scope:
     - owner-plan:Vellis-v2-Simplification-Rebaseline
@@ -267,11 +272,18 @@ work_items:
     nearest_wrong_system: The validator remains coupled to live topology or Git state in pure tests.
     compatibility_effect: No product or model behavior changes.
     non_effects: [No model edit., No product patch., No protected user-data access., No stale campaign reconstruction.]
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs: [path:docs/v2-simplification-baseline.md#size-and-complexity, path:docs/v2-simplification-baseline.md#portable-forward-test-disposition, path:docs/v2-simplification-baseline.md#phase-0-review-convergence-audit, path:tests/test_system_evolution.py#test_schema_requires_work_and_at_least_one_finding_or_decision, path:tests/test_system_evolution.py#test_pure_invariants_do_not_consult_git_or_repository_state, path:tests/test_system_evolution.py#test_committed_evolution_record_is_valid, path:tests/test_system_evolution.py#test_complete_record_must_be_committed, path:tests/test_system_evolution.py#test_an_accepted_approval_binds_and_seals_owned_meaning, path:tests/test_system_evolution.py#test_evolution_approval_allows_later_not_required_internal_decision, command:uv run pytest tests/test_system_evolution.py, command:just system-evolution-check, command:just skills-check, command:just lint, command:just typecheck]
     blocker: null
-    checkpoint: null
+    checkpoint: git:4d2f88f8d6742588396cd1e0c1647568897e9319
+  # Phase 0 clean review pair inspected shared staged tree token
+  # 5a4dea7556e82bffbd9c9eb55036b01c3b60bef3, preserved by checkpoint
+  # git:4d2f88f8d6742588396cd1e0c1647568897e9319.
+  # /root/phase0_authority_review_4 — authority and conformance — clean.
+  # /root/phase0_engineering_review_4 — engineering and evidence — clean.
+  # Both independently confirmed the focused tests, evolution/skills/lint/type checks,
+  # successor C901 check, diff check, portable forward tests, and exact inventory.
   - id: W001
     order: 2
     label: Rebaseline and accept complete SysML authority
@@ -285,7 +297,7 @@ work_items:
     nearest_wrong_system: Vocabulary changes while predecessor identity, query, mutation, or proposal semantics remain.
     compatibility_effect: Unreleased prototype-v2 behavior and storage assumptions break intentionally.
     non_effects: [No product implementation before model acceptance., No deferred feature., No v1 storage access.]
-    lifecycle: pending
+    lifecycle: active
     implementation_status: absent
     evidence_refs: []
     blocker: null
