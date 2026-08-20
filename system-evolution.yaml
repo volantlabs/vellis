@@ -19,7 +19,7 @@ baselines:
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:5196bb01fedb90c815ae15f40cddb041fc915d01
   target: &phase0_target
-    model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
+    model: sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794
     implementation: git:4d2f88f8d6742588396cd1e0c1647568897e9319
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
@@ -62,9 +62,9 @@ findings:
     classification: model gap
     consequence: Agents must reason about nested values and independently identified constraints instead of scalar facts and local type cardinality.
     authority_refs: [owner-plan:sections-2.1-through-2.6]
-    evidence_refs: []
-    disposition: model-change
-    owner_work_item_id: W001
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix]
+    disposition: implementation-work
+    owner_work_item_id: W002
     implementation_status: conflicting
     nearest_wrong_system: The model renames predecessor concepts while retaining recursive values or participant-rule identities.
     compatibility_effect: The unreleased prototype model and database are intentionally incompatible.
@@ -73,9 +73,9 @@ findings:
     classification: model gap
     consequence: The compiler carries a general query language where identity lookup and connected pattern matching suffice.
     authority_refs: [owner-plan:sections-3.3-through-3.6]
-    evidence_refs: []
-    disposition: model-change
-    owner_work_item_id: W001
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix]
+    disposition: implementation-work
+    owner_work_item_id: W003
     implementation_status: conflicting
     nearest_wrong_system: A unified tool name hides existing projection, aggregation, hidden-selector, or two-step machinery.
     compatibility_effect: Prototype query requests and results are unsupported.
@@ -84,9 +84,9 @@ findings:
     classification: model gap
     consequence: A small change requires reconstructing unrelated content and creates a silent-loss footgun.
     authority_refs: [owner-plan:sections-2.8-and-3.7]
-    evidence_refs: []
-    disposition: model-change
-    owner_work_item_id: W001
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix]
+    disposition: implementation-work
+    owner_work_item_id: W004
     implementation_status: conflicting
     nearest_wrong_system: An upsert-shaped adapter still replaces an entire persisted object.
     compatibility_effect: Mutation becomes field-level with explicit removal and no cascade.
@@ -95,9 +95,9 @@ findings:
     classification: model gap
     consequence: A bucket of deltas acquires an unnecessary public lifecycle and persisted identities.
     authority_refs: [owner-plan:sections-2.9-and-3.8-through-3.12]
-    evidence_refs: []
-    disposition: model-change
-    owner_work_item_id: W001
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix]
+    disposition: implementation-work
+    owner_work_item_id: W004
     implementation_status: conflicting
     nearest_wrong_system: Draft terminology changes while version, stale status, or assessment identity remains.
     compatibility_effect: Prototype proposal and assessment contracts are removed.
@@ -178,12 +178,12 @@ decisions:
     implementation_status: conforming
     evidence_refs: [path:tests/test_system_evolution.py#test_pure_invariants_do_not_consult_git_or_repository_state, path:tests/test_system_evolution.py#test_schema_requires_work_and_at_least_one_finding_or_decision, path:tests/test_system_evolution.py#test_an_accepted_approval_binds_and_seals_owned_meaning, path:tests/test_system_evolution.py#test_evolution_approval_allows_later_not_required_internal_decision, path:docs/v2-simplification-baseline.md#portable-forward-test-disposition, command:just skills-check, command:just lint, command:just typecheck]
   - id: D001
-    summary: Use scalar values, local cardinality, field patches, and one unversioned draft.
+    summary: Use scalar values and local cardinality.
     authority_refs: [owner-plan:section-2]
     alternatives: [Retain recursive JSON., Retain relationship rules., Retain versioned proposals and assessments.]
     reversible: false
-    owner_work_item_id: W001
-    evidence_intent: [The model distinguishes scalar kinds, patch non-effects, local bounds, and draft overlay.]
+    owner_work_item_id: W002
+    evidence_intent: [The implementation distinguishes scalar kinds and enforces local bounds without relationship-rule identities.]
     implementation_status: not evaluated
     evidence_refs: []
   - id: D002
@@ -191,7 +191,7 @@ decisions:
     authority_refs: [owner-plan:section-3]
     alternatives: [Separate match and get., Retain projection and aggregation.]
     reversible: false
-    owner_work_item_id: W001
+    owner_work_item_id: W003
     evidence_intent: [Evidence rejects hidden selectors, disconnected products, and hydration before bounding.]
     implementation_status: not evaluated
     evidence_refs: []
@@ -220,6 +220,15 @@ decisions:
     reversible: true
     owner_work_item_id: W004
     evidence_intent: [Live writes preserve unstaged fields., Cursors expire correctly., Activation revalidates.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D010
+    summary: Use field-level graph patches and one unversioned durable draft.
+    authority_refs: [owner-plan:sections-2.8-through-2.9]
+    alternatives: [Use complete-object replacement., Retain proposal versions and assessment identities.]
+    reversible: false
+    owner_work_item_id: W004
+    evidence_intent: [One-field changes preserve unseen data., Draft overlay follows live fields without public version or assessment identity.]
     implementation_status: not evaluated
     evidence_refs: []
   - id: D006
@@ -289,17 +298,17 @@ work_items:
     label: Rebaseline and accept complete SysML authority
     kind: modeling
     dependencies: [W000]
-    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
-    finding_ids: [F001, F002, F003, F004]
-    decision_ids: [D001, D002]
+    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
+    finding_ids: []
+    decision_ids: []
     authority: [{refs: [owner-plan:sections-1-through-3], coverage: full, remaining_work_item_ids: []}]
-    approval: {status: accepted, reason: "The owner approved this plan as the changed-meaning gate, subject to a conforming Phase 1 model.", checkpoint: git:d2723f131a11ae6b339c36311b4dabcc632c6bf5}
+    approval: {status: not-required, reason: "The accepted evolution approval already governs this model-only authority work.", checkpoint: null}
     nearest_wrong_system: Vocabulary changes while predecessor identity, query, mutation, or proposal semantics remain.
     compatibility_effect: Unreleased prototype-v2 behavior and storage assumptions break intentionally.
     non_effects: [No product implementation before model acceptance., No deferred feature., No v1 storage access.]
     lifecycle: active
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#authority-and-compatibility, path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-model-evidence.md#sysml-reference-evidence, path:docs/v2-simplification-model-evidence.md#adequacy-review, path:docs/v2-simplification-model-evidence.md#subtraction-review, path:docs/v2-simplification-model-evidence.md#medium-rehearsal-disposition, command:just model-check, command:just model-reference-check]
     blocker: null
     checkpoint: null
   - id: W002
@@ -307,9 +316,9 @@ work_items:
     label: Build the typed domain and fresh SQLite foundation
     kind: implementation
     dependencies: [W001]
-    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
-    finding_ids: [F005]
-    decision_ids: [D003]
+    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
+    finding_ids: [F001, F005]
+    decision_ids: [D001, D003]
     authority: [{refs: [owner-plan:phase-2], coverage: full, remaining_work_item_ids: []}]
     approval: {status: not-required, reason: The approved plan selects this fresh-storage realization., checkpoint: null}
     nearest_wrong_system: New modules wrap the monolith, shared connection, recursive domain, or duplicate loaders.
@@ -325,9 +334,9 @@ work_items:
     label: Implement progressive discovery and unified query
     kind: implementation
     dependencies: [W002]
-    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
-    finding_ids: []
-    decision_ids: [D004]
+    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
+    finding_ids: [F002]
+    decision_ids: [D002, D004]
     authority: [{refs: [owner-plan:phase-3], coverage: full, remaining_work_item_ids: []}]
     approval: {status: not-required, reason: The approved plan fixes query behavior and realization., checkpoint: null}
     nearest_wrong_system: Renamed tools retain projection, aggregation, hidden selectors, or unbounded hydration.
@@ -343,9 +352,9 @@ work_items:
     label: Implement active changes, draft, validation, and activation
     kind: implementation
     dependencies: [W003]
-    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
-    finding_ids: []
-    decision_ids: [D005]
+    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
+    finding_ids: [F003, F004]
+    decision_ids: [D005, D010]
     authority: [{refs: [owner-plan:phase-4], coverage: full, remaining_work_item_ids: []}]
     approval: {status: not-required, reason: The approved plan fixes patches and the draft bucket., checkpoint: null}
     nearest_wrong_system: Patches lose data, removal cascades, or activation needs a stale assessment identity.
@@ -361,7 +370,7 @@ work_items:
     label: Implement ledgers, history, restore, audit, and backup
     kind: implementation
     dependencies: [W004]
-    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
     finding_ids: [F006]
     decision_ids: [D006]
     authority: [{refs: [owner-plan:phase-5], coverage: full, remaining_work_item_ids: []}]
@@ -379,7 +388,7 @@ work_items:
     label: Implement streamed v1 initialization
     kind: implementation
     dependencies: [W005]
-    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
     finding_ids: [F007]
     decision_ids: [D007]
     authority: [{refs: [owner-plan:phase-6], coverage: full, remaining_work_item_ids: []}]
@@ -397,7 +406,7 @@ work_items:
     label: Implement MCP, transports, setup, and client onboarding
     kind: integration
     dependencies: [W006]
-    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
     finding_ids: [F008]
     decision_ids: [D008]
     authority: [{refs: [owner-plan:phase-7], coverage: full, remaining_work_item_ids: []}]
@@ -415,7 +424,7 @@ work_items:
     label: Subtract predecessor machinery, synchronize documentation, and close
     kind: closure
     dependencies: [W007]
-    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
     finding_ids: [F010]
     decision_ids: [D009]
     authority: [{refs: [owner-plan:phase-8], coverage: full, remaining_work_item_ids: []}]

@@ -2,360 +2,212 @@ package RTGSystem {
     private import RTG::*;
 
     part def 'RTG Client' {
-        doc /*
-         * A person or system outside RTG that requests an outcome within a
-         * scope already established by the owner. RTG operations do not create
-         * or evaluate that authorization scope.
-         */
+        doc /* A person or system acting within scope already established by the owner. */
     }
-
     part def 'MCP Client' :> 'RTG Client' {
-        doc /*
-         * A trusted, owner-configured agent client that discovers and invokes
-         * the selected RTG tools within its pre-established scope.
-         */
+        doc /* One trusted owner-configured agent client. */
     }
-
     part def 'RTG System' {
         doc /*
-         * The one cohesive semantic and transactional boundary. It owns the
-         * state-change and activity ledgers and governs graph, definition, and
-         * revision meaning. The state-change ledger is authority; current state
-         * is one derived reference to the canonical-state tuple established by
-         * replay through the final canonical record, not parallel authority.
-         * It also owns at most one latest retrievable completed validation
-         * assessment for each scope; these are observational state, not ledger or
-         * replay authority. Query, validation, history, and recovery are capabilities, not
-         * independently existing subsystems.
+         * One cohesive semantic and transactional boundary. Current and
+         * historical state are directly indexed meanings, not replay products.
+         * Query, draft, validation, history, search, backup, and audit are
+         * capabilities rather than independent subsystems.
          */
-        derived ref item currentState : 'Canonical State';
-        item stateChanges : 'State Change Ledger';
+        item currentState : 'Canonical State';
+        item canonicalHistory : 'Canonical Ledger';
         item activities : 'Activity Ledger';
-        item retrievableAssessments [0..2] : 'Validation Assessment';
+        attribute activityMode : 'Activity Mode' default = 'Activity Mode'::semantic;
+        item draft [0..1] : Draft;
+        item latestValidation [0..2] : 'Validation Report';
 
-        perform action definitionSummary : rtg_definition_summary;
-        perform action definitionInspect : rtg_definition_inspect;
-        perform action retrieveDefinitionDelta : rtg_definition_delta;
-        perform action graphQuery : rtg_query;
-        perform action graphChange : rtg_change;
-        perform action setDefinitionDelta : rtg_set_definition_delta;
-        perform action activateDefinitionDelta : rtg_activate_definition_delta;
-        perform action discardDefinitionDelta : rtg_discard_definition_delta;
-        perform action checkConformance : rtg_check;
-        perform action inspectHistory : rtg_history;
+        perform action typeSummary : rtg_type_summary;
+        perform action typeInspect : rtg_type_inspect;
+        perform action query : rtg_query;
+        perform action change : rtg_change;
+        perform action draftInspect : rtg_draft_inspect;
+        perform action draftChange : rtg_draft_change;
+        perform action validate : rtg_validate;
+        perform action draftActivate : rtg_draft_activate;
+        perform action draftDiscard : rtg_draft_discard;
+        perform action history : rtg_history;
     }
 
-    /* Black-box owner-visible use-case landscape. */
-
-    use case def 'Discover evaluated graph definitions' {
+    use case def 'Discover evaluated definitions' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
             require constraint {
             doc /*
-             * Input: a current, prospective, or revision-or-time selector for the shallow
-             * summary, followed by a non-empty unique selection of anchor type
-             * keys and the same optional selector for focused inspection.
-             * Current means active state; prospective requires the sole delta.
-             * Success: return the complete shallow
-             * anchor vocabulary and, for
-             * each later selection, its complete relevant data, link, endpoint,
-             * property, and multiplicity meaning at the exact evaluated revision.
-             * A time uses the historical-query resolution rule. The summary
-             * reports whether a definition delta exists in the evaluated state.
-             * A summary that cannot be returned completely returns no summaries.
-             * Unknown, duplicate, or incompletely answerable selections
-             * return findings and no partial details. Canonical state and
-             * revision never change. One observational activity record for the
-             * completed read, rejection, or failure is appended after its
-             * outcome is determined.
-             * Unresolved selections return no summary, details, or evaluated
-             * revision. Evidence: a client with no prior graph knowledge can
-             * construct a valid bounded current, prospective, or historical query. A client
-             * preparing a current mutation rediscovers current definitions.
+             * Return a complete shallow anchor summary, then complete focused
+             * neighborhoods for selected anchor keys at current, draft, revision,
+             * or time state. Every success identifies the evaluated revision.
+             * Draft requires a present draft. Unknown, duplicate, unresolved, or
+             * incompletely answerable selections reject whole. The canonical
+             * state and draft do not change; activity records the attempt.
              */
             }
         }
     }
 
-    use case def 'Query graph' {
+    use case def 'Query evaluated graph' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
             require constraint {
             doc /*
-             * Input: one finite positive pattern of named anchor and directly
-             * associated-data selectors, optional known UUIDs for each selector,
-             * conjunctive typed directed links, associated-data value conditions,
-             * exactly one row or aggregate output with its positive complete
-             * bound, and current, prospective, revision, or time selection.
-             * Success: return either the complete shaped named rows or the
-             * requested arithmetic over one distinct associated-data target
-             * population, together with the evaluated revision.
-             * Refusal or failure: return findings for unknown or incompatible
-             * names, types, identities, properties, projections, output mode, history
-             * targets, a result that exceeds the caller's bound, or a result the
-             * system cannot return completely; return no partial
-             * rows. Canonical state and revision never change. One observational
-             * activity record for the completed read, rejection, or failure is
-             * appended after its outcome is determined. Prospective evaluation
-             * uses the sole delta's effective graph and definitions without
-             * changing active state. Historical evaluation
-             * may reuse the exact revision resolved by a time-based definition
-             * summary for inspection and query. Evidence: current and historical
-             * evaluation preserve identical query meaning.
+             * Accept exactly one known-identity or connected-pattern selection.
+             * Identity selection reports found and missing UUIDs and hydrates
+             * only requested properties. Pattern selection first establishes at
+             * most maximumMatches complete distinct bindings, rejects whole on
+             * maximum plus one, and only then hydrates requested object fields.
+             * No match is an accepted empty result. Evaluation has identical
+             * meaning for current, draft, revision, and time state and changes no
+             * canonical or draft state while recording activity.
              */
             }
         }
     }
 
-    use case def 'Apply graph change' {
+    use case def 'Apply active graph change' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
             require constraint {
             doc /*
-             * Input: an active or definition-delta target with complete-object
-             * anchor, associated-data, and link upserts, explicit UUID removals,
-             * and prospective-only unstaging. Active-target success validates
-             * every invariant whose truth can change and commits once with one
-             * new revision and contiguous transition record. Definition-delta-
-             * target success updates only the prospective graph overlay and its
-             * revision; when no delta exists, it creates one with active definitions
-             * as its proposed definitions. It may remain nonconforming while being edited. Direct associations change only
-             * through associated-data anchor references; no implicit cascade
-             * occurs. An effective no-op is accepted without a revision.
-             * Unstaging the final difference from active state is rejected and
-             * preserves the delta; only explicit discard removes it.
-             * Refusal or failure: report why it was not applied. State effect:
-             * active success updates the current projection and appends its transition
-             * as one recoverably atomic effect while
-             * leaving active definitions and the delta unchanged; prospective
-             * success changes only the delta; rejection or
-             * failure changes no canonical state or revision. Evidence: replay reconstructs the
-             * same accepted graph transition without activity history.
+             * Require expectedRevision to equal the current revision, including
+             * for a no-op. Apply one bounded final-state batch of field upserts
+             * and explicit removals independent of command order. Creation needs
+             * complete required content; updates preserve every unnamed field.
+             * Validate exact affected references and cardinality subjects with
+             * no cascade or whole-state assessment. Rejection changes no
+             * canonical state. An effective success creates one revision; a
+             * redundant success creates none. Both append activity atomically
+             * with their observable effect. A draft, when present, is untouched.
              */
             }
         }
     }
 
-    use case def 'Assess graph conformance' {
+    use case def 'Edit durable draft' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
             require constraint {
             doc /*
-             * Input: request a new complete current or prospective assessment,
-             * or one bounded interval from a completed assessment. New-assessment
-             * success publishes every finding once and returns its identity,
-             * complete count, and first bounded interval. Publishing it replaces
-             * the prior retrievable assessment for that scope; failure publishes
-             * nothing and preserves that prior assessment. Publishing a new
-             * assessment and its required activity observation is one atomic
-             * observational effect, so an observation failure also preserves the
-             * prior assessment. Interval success reads
-             * another ordered interval without reassessment. Refusal or failure
-             * produces no successful validation report. Canonical state and revision never change;
-             * one observational validation, rejection, or failure record is
-             * appended after the outcome is determined; inability to append it is
-             * an unexpected failure with no completed validation result. Evidence:
-             * findings identify
-             * implicated definitions and graph objects when available. Canonical
-             * or proposal changes may make a retained assessment stale for
-             * activation but do not rewrite its immutable findings.
+             * Stage complete definition replacements or tombstones and graph
+             * field patches or tombstones by natural key. Repeated edits merge
+             * into one normalized entry; whole-entry unstage removes it. Draft
+             * editing validates request structure and lineage kind reservation
+             * but may leave effective meaning nonconforming. It never advances
+             * canonical revision or changes live state. The final removed entry
+             * removes draft presence. An empty request is an accepted no-op and
+             * does not create a draft. Activity records the attempt.
              */
             }
         }
     }
 
-    use case def 'Create or edit definition delta' {
+    use case def 'Configure activity detail' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
             require constraint {
             doc /*
-             * Input: one bounded natural-keyed definition change. Success: create
-             * or edit proposed definitions while retaining staged graph work,
-             * return its bounded summary,
-             * using complete active-definition meaning as the base of the first
-             * effective edit and current proposed meaning thereafter. Untouched
-             * definitions retain their effective meaning without being copied in
-             * the request; advance one revision when its canonical content changed. A
-             * proposal may retain description or consistency findings across
-             * several edits. With no delta, an empty or effective no-op edit is
-             * accepted without creating one. With a delta, an edit that changes
-             * no proposed meaning is an accepted no-op. Editing definitions to equal active
-             * definitions retains any staged overlay; when the overlay is empty,
-             * an edit that would remove the final semantic difference is rejected
-             * atomically with the proposal and revision unchanged; the discard
-             * operation is the only removal path.
-             * Changing proposed definitions makes any prior assessment stale.
-             * Every effective no-op advances nothing. Refusal or failure
-             * preserves prior canonical state and returns no proposal or success
-             * metadata; the client may retrieve the unchanged current delta
-             * separately. Active definitions and graph never change.
-             * Evidence: prospective discovery, query, and replay show exactly
-             * the accepted proposal and revision while active meaning is unchanged.
+             * Let the owner select semantic or verbose activity detail. Semantic
+             * is the initial mode. An accepted change appends configuration
+             * activity without a canonical revision. Rejection or failure
+             * preserves the prior mode and canonical state.
              */
             }
         }
     }
 
-    use case def 'Review definition delta' {
+    use case def 'Inspect durable draft' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
             require constraint {
             doc /*
-             * Input: none; inspect the current in-flight delta. Success: return
-             * normal absence, or proposed-definition identity, staged graph
-             * cardinality, and its latest exact completed assessment when current.
-             * Prospective definition discovery and graph query expose its content
-             * through bounded focused results rather than copying it here.
-             * Failure is observable. Canonical state and revision never change;
-             * one observational read or failure record is appended after the
-             * outcome is determined. Evidence: a client can compare bounded
-             * prospective and focused active views without a server-side diff.
+             * Return filtered raw normalized entries with current content, exact
+             * staged operations, mechanically composed proposal, effect flag,
+             * whole-draft raw/effective counts, evaluated revision, and a bounded
+             * continuation. A continuation expires after current or draft change
+             * or a newer fresh inspection. No draft digest or version is public.
+             * Draft absence is an accepted empty inspection with presence false.
+             * The read changes neither live nor draft content and appends activity.
              */
             }
         }
     }
 
-    use case def 'Activate definition delta' {
+    use case def 'Validate current or draft state' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
             require constraint {
             doc /*
-             * Input: the identity of one complete conforming prospective
-             * assessment; operate on the sole current delta. Success requires
-             * that assessment to match the exact active revision, proposed
-             * definitions, and graph overlay, then atomically apply its graph
-             * upserts and tombstones, replace the active set, clear the delta,
-             * and commit one revision. Refusal or failure preserves graph,
-             * active set, delta, revision, and canonical history. Evidence: replay
-             * reconstructs the singular accepted definition-and-graph activation.
+             * A fresh call computes every current or effective-draft finding once,
+             * publishes only the latest backing for that scope, and returns its
+             * complete count, cleanliness, and first bounded page. Continuations
+             * page that backing without reassessment and expire after relevant
+             * content or newer validation changes. Non-clean is an accepted
+             * assessment result. Draft scope rejects when no draft is present.
+             * Validation changes no canonical or draft content; publication of
+             * its latest backing and activity is one atomic observational effect.
              */
             }
         }
     }
 
-    use case def 'Discard definition delta' {
+    use case def 'Activate durable draft' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
             require constraint {
             doc /*
-             * Input: none; operate on the sole current delta. Success: clear it and
-             * commit one revision. Refusal reports no delta; failure preserves
-             * it. Graph and active definitions never change. Evidence: whole-
-             * delta retrieval and replay show absence at the resulting revision.
+             * Recompose the present draft over latest live state and validate the
+             * complete effective system in one atomic operation. Invalidity
+             * preserves live state and draft, publishes pageable findings, and
+             * records rejected activity. A valid effective proposal creates one
+             * canonical revision, clears the draft, and records activity. A valid
+             * redundant proposal clears the draft without a revision. No prior
+             * assessment authorizes activation; the latest state is always
+             * revalidated. Draft operations carry no system metadata; publication
+             * applies the same canonical create, update, or reactivation envelope
+             * rules as active change. Absence rejects.
              */
             }
         }
     }
 
-    use case def 'Inspect state-change history' {
+    use case def 'Discard durable draft' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
             require constraint {
             doc /*
-             * Input: an optional chronological range and positive maximum.
-             * Success: return one owner-facing entry for every matching canonical
-             * record in ledger order, with present chronological bounds included.
-             * Each entry carries time, provenance, revision, transition kind when
-             * applicable, and a semantic summary, but no replay payload or full
-             * canonical state. A range exceeding the bound is rejected without
-             * partial entries. Canonical state and revision never change; one
-             * observational read, rejection, or failure record is appended after
-             * the outcome is determined. Evidence: every returned entry represents
-             * one canonical record in the selected inclusive interval and order.
+             * Clear a present draft and append activity without changing live
+             * graph, definitions, revision, or canonical history. Absence is an
+             * accepted no-op.
              */
             }
         }
     }
 
-    use case def 'Inspect activity history' {
+    use case def 'Inspect bounded history' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
             require constraint {
             doc /*
-             * Input: an optional chronological range and positive maximum.
-             * Success: return one owner-facing entry for every matching record
-             * in ledger order, with present chronological bounds included:
-             * permitted reads, validations, rejections, failures, snapshots,
-             * provenance, and summaries. The selected interval is evaluated
-             * before the record of this read is appended, so it never includes
-             * itself. An over-broad range returns no partial entries, nor does a
-             * request the system cannot return completely. Canonical state and
-             * revision never change; one observational read, rejection, or failure
-             * record is appended after the outcome is determined. Evidence: changing
-             * activity retention cannot change replayed canonical state.
-             */
-            }
-        }
-    }
-
-    use case def 'Manage activity retention' {
-        subject system : 'RTG System';
-        actor client : 'RTG Client';
-        objective {
-            require constraint {
-            doc /*
-             * Input: an owner-selected retention decision over observational
-             * activity records. Success: retain or remove only the selected
-             * activity records. Refusal or failure preserves every preexisting
-             * activity record, while the failed attempt itself may append one
-             * failure observation after its outcome is determined. Canonical
-             * graph, definitions, delta, revision, and
-             * state-change history never change. Evidence: replay before and
-             * after an accepted retention decision reconstructs equivalent state.
-             */
-            }
-        }
-    }
-
-    use case def 'Reconstruct canonical state' {
-        subject system : 'RTG System';
-        actor client : 'RTG Client';
-        objective {
-            require constraint {
-            doc /*
-             * Input: exactly one initial record or complete snapshot and an
-             * optional contiguous later ledger tail. A snapshot identifies the
-             * exact source record it captures and a tail identifies the exact
-             * preceding record from the same ledger; matching revision numbers
-             * alone are insufficient. Success: completely verify equivalent
-             * graph, active definitions, optional delta, and revision and
-             * identify the reconstructed final record without returning one
-             * whole-state value. A gap, duplicate, reorder, incompatibility, or invalid
-             * transition is rejected without partial state. Live canonical state
-             * and revision never change; one observational validation, rejection,
-             * or failure record is appended after the outcome is determined.
-             * Evidence: the accepted reconstructed projection is canonically
-             * equivalent to direct state at its reconstructed revision.
-             */
-            }
-        }
-    }
-
-    use case def 'Create canonical snapshot' {
-        subject system : 'RTG System';
-        actor client : 'RTG Client';
-        objective {
-            require constraint {
-            doc /*
-             * Input: current canonical state. Success: produce a self-contained
-             * snapshot of graph, active definitions, optional delta, and total
-             * revision, bound to the exact final canonical record it captures.
-             * Completeness does not require one resident aggregate.
-             * Refusal or failure is observable. State effect: no
-             * canonical state or revision change; one observational snapshot,
-             * rejection, or failure record is appended after the outcome is
-             * determined. Evidence: the snapshot initializes an
-             * equivalent fresh RTG.
+             * Select one complete bounded canonical or activity interval by
+             * inclusive time or by sequence range with an exclusive after and
+             * inclusive through boundary, and report the observed head.
+             * Exceeding the caller maximum rejects whole. Canonical entries are
+             * owner-readable records without replay payloads. Activity selection
+             * occurs before recording this history read, so a response never
+             * includes itself. History reads change no canonical or draft state.
              */
             }
         }
@@ -364,41 +216,14 @@ package RTGSystem {
     use case def 'Initialize fresh RTG' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
-        in item initialDefinitions : 'Graph Definition Set';
+        in item definitions : 'Graph Definition Set';
         objective {
             require constraint {
             doc /*
-             * Input: one internally valid initial definition set, supplied only
-             * for an RTG with no established canonical state. Success: establish
-             * revision 0 with an empty graph, exactly those active definitions,
-             * no definition delta, one initial-state record containing that
-             * state, no transition records, and an empty activity ledger.
-             * Refusal or failure establishes no partial canonical or activity
-             * state. Evidence: direct state, the initial record, and replay all
-             * agree on the same revision-0 state.
-             */
-            }
-        }
-    }
-
-    use case def 'Initialize fresh RTG from snapshot' {
-        subject system : 'RTG System';
-        actor client : 'RTG Client';
-        objective {
-            require constraint {
-            doc /*
-             * Input: a complete snapshot bound to its exact source record and an
-             * optional contiguous later same-ledger tail bound to the exact
-             * record it follows, for an RTG with no established canonical state.
-             * Success:
-             * establish the reconstructed graph, definitions, optional delta,
-             * and captured or replayed revision without inventing a revision.
-             * No blank or recommended fresh-start definitions are overlaid.
-             * Begin the fresh RTG's canonical history with one initial record
-             * containing that reconstructed state; do not claim omitted earlier
-             * transitions. Refusal or failure establishes no partial canonical
-             * or activity state. Evidence: current query and replay agree with
-             * the supplied snapshot and accepted tail at the established revision.
+             * For an empty destination, atomically establish revision zero with
+             * an empty graph, exactly the validated definitions, no draft, one
+             * initial canonical record, and empty activity. Failure publishes
+             * nothing. Initial system envelopes use revision zero.
              */
             }
         }
@@ -410,125 +235,92 @@ package RTGSystem {
         objective {
             require constraint {
             doc /*
-             * Input: a committed historical revision. Success: when no delta
-             * is in flight, commit its graph and active definitions with no
-             * delta as one new revision. Refusal or failure preserves all
-             * current canonical state. Earlier canonical history is never rewritten. Evidence: the
-             * new current state equals the selected historical graph and active
-             * definitions while the prior ledger prefix remains unchanged.
+             * Refuse while a draft exists. Resolve a revision or time, compute
+             * its difference from current state, validate complete resulting
+             * meaning, and append one new canonical revision when effective.
+             * Equality appends activity without revision. Preserve all intervening
+             * history and original identity creation metadata.
              */
             }
         }
     }
 
-    use case def 'Initialize fresh RTG from recovery candidate' {
+    use case def 'Audit complete RTG' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
-        in ref item candidate : 'Recovery Candidate';
         objective {
             require constraint {
             doc /*
-             * Input: one complete, validated transient recovery candidate for an
-             * RTG with no established canonical state. Success: establish its
-             * unchanged graph and translated active definitions at revision 0,
-             * no delta, one initial-state record with bounded import provenance,
-             * no transitions, and an empty activity ledger. This creates a new
-             * lineage and claims no predecessor ledger history. Refusal or
-             * failure, including any existing canonical state, establishes no
-             * canonical or activity state. Evidence: current query, the initial
-             * record, and replay agree on the candidate's graph and definitions.
+             * Read-only verification covers lineage and schema identity,
+             * contiguous nondecreasing canonical history and integrity evidence,
+             * version intervals, identity reservations, definitions, graph
+             * conformance, indexed projection equivalence, search equivalence,
+             * and activity/validation structural integrity. Audit appends no activity.
              */
             }
         }
     }
 
-    /* Selected external MCP tool contract. Each operation uses typed objects. */
+    use case def 'Back up complete RTG' {
+        subject system : 'RTG System';
+        actor client : 'RTG Client';
+        objective {
+            require constraint {
+            doc /*
+             * Produce an audited owner-private complete database backup while
+             * serving. Include current and historical state, both ledgers,
+             * settings, draft, and useful validation backing. Exclude HTTP tokens
+             * and v1 report/source sidecars. Backup reads append no source activity.
+             */
+            }
+        }
+    }
 
-    action def rtg_definition_summary {
+    /* Selected external MCP behavior. Names are boundary decisions, not architecture. */
+
+    action def rtg_type_summary {
         in item request : 'Definition Summary Request';
         out item result : 'Definition Summary Result';
-        doc /* Discover every anchor type at current, prospective, or selected historical state. */
     }
-
-    action def rtg_definition_inspect {
+    action def rtg_type_inspect {
         in item request : 'Definition Inspection Request';
         out item result : 'Definition Inspection Result';
-        bind result.request = request;
-        doc /* Inspect complete evaluated neighborhoods for selected anchors. */
     }
-
-    action def rtg_definition_delta {
-        out item result : 'Definition Delta Result';
-        doc /* Retrieve the sole proposal summary and current assessment identity, or normal absence. */
-    }
-
     action def rtg_query {
-        in item query : 'Graph Query';
+        in item request : 'Graph Query';
         out item result : 'Graph Query Result';
-        bind result.query = query;
-        doc /* Query current, prospective, or selected historical graph meaning with one complete bound. */
     }
-
     action def rtg_change {
-        in item request : 'Graph Change Request';
-        out item result : 'Revisioned Outcome';
-        doc /* Apply explicit active or prospective upserts, tombstones, and prospective unstaging. */
+        in item request : 'Active Change Request';
+        out item result : 'Operation Outcome';
     }
-
-    action def rtg_set_definition_delta {
-        in item request : 'Set Definition Delta Request';
-        out item result : 'Definition Delta Result';
-        doc /* Apply one bounded keyed proposed-definition edit, retain its graph overlay, and return identity and counts. */
+    action def rtg_draft_inspect {
+        in item request : 'Draft Inspection Request';
+        out item result : 'Draft Inspection Result';
     }
-
-    action def rtg_activate_definition_delta {
-        in item request : 'Activate Definition Delta Request';
-        out item result : 'Revisioned Outcome';
-        doc /* Activate the valid sole proposal atomically or preserve all current canonical state. */
+    action def rtg_draft_change {
+        in item request : 'Draft Change';
+        out item result : 'Draft Change Result';
     }
-
-    action def rtg_discard_definition_delta {
-        out item result : 'Revisioned Outcome';
-        doc /* Discard the sole proposal atomically or report normal absence. */
-    }
-
-    action def rtg_check {
+    action def rtg_validate {
         in item request : 'Validation Request';
         out item result : 'Validation Report';
-        doc /* Assess current or prospective conformance once or read one bounded finding interval. */
     }
-
+    action def rtg_draft_activate { out item result : 'Validation Report'; }
+    action def rtg_draft_discard { out item result : 'Operation Outcome'; }
     action def rtg_history {
-        in item query : 'History Query';
+        in item request : 'History Query';
         out item result : 'History Result';
-        bind result.query = query;
-        doc /* Return one complete bounded canonical or activity history-entry interval. */
     }
 
-    /*
-     * Tool actions depend on the black-box behavior they expose. These abstract
-     * trace relationships express change impact, not execution, control, or an
-     * internal action decomposition.
-     */
-    dependency summaryToolBehavior
-        from rtg_definition_summary to 'Discover evaluated graph definitions';
-    dependency inspectionToolBehavior
-        from rtg_definition_inspect to 'Discover evaluated graph definitions';
-    dependency deltaReadToolBehavior
-        from rtg_definition_delta to 'Review definition delta';
-    dependency queryToolBehavior
-        from rtg_query to 'Query graph';
-    dependency changeToolBehavior
-        from rtg_change to 'Apply graph change';
-    dependency setDeltaToolBehavior
-        from rtg_set_definition_delta to 'Create or edit definition delta';
-    dependency activateDeltaToolBehavior
-        from rtg_activate_definition_delta to 'Activate definition delta';
-    dependency discardDeltaToolBehavior
-        from rtg_discard_definition_delta to 'Discard definition delta';
-    dependency checkToolBehavior
-        from rtg_check to 'Assess graph conformance';
-    dependency historyToolBehavior
-        from rtg_history to 'Inspect state-change history', 'Inspect activity history';
-
+    dependency typeSummaryBehavior from rtg_type_summary to 'Discover evaluated definitions';
+    dependency typeInspectBehavior from rtg_type_inspect to 'Discover evaluated definitions';
+    dependency queryBehavior from rtg_query to 'Query evaluated graph';
+    dependency changeBehavior from rtg_change to 'Apply active graph change';
+    dependency draftInspectBehavior from rtg_draft_inspect to 'Inspect durable draft';
+    dependency draftChangeBehavior from rtg_draft_change to 'Edit durable draft';
+    dependency validateBehavior from rtg_validate to 'Validate current or draft state';
+    dependency activateBehavior from rtg_draft_activate to 'Activate durable draft';
+    dependency discardBehavior from rtg_draft_discard to 'Discard durable draft';
+    dependency historyBehavior from rtg_history to 'Inspect bounded history';
 }

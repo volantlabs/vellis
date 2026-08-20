@@ -2,692 +2,355 @@ package VellisRequirements {
     private import RTGSystem::*;
     private import Vellis::*;
 
-    requirement def 'Graph Invariants' {
+    requirement def 'Scalar And Definition Integrity' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * The graph shall preserve globally unique object identity; distinct
-         * anchor, associated-data, and link kinds; same-graph direct
-         * associations and link endpoints; permitted type pairings; one type-
-         * key namespace; lossless JSON; Boolean live normalization; associated-
-         * data property constraints with JSON-kind-compatible closed size,
-         * inclusive numeric-bound, permitted-value, and string-pattern meaning;
-         * endpoint constraints; directed link multiplicity; and direct-association
-         * multiplicity. Every anchor shall have a non-empty display name.
-         * Every graph object's type key shall resolve to exactly one active type
-         * definition of the same object kind, and active type keys shall be
-         * unique across the shared namespace.
-         * A size condition shall apply only to string, array, or object values,
-         * contain at least one bound, and never invert its bounds. String size
-         * shall be its number of Unicode code points without normalization;
-         * array and object size shall be their number of elements and members.
-         * A value range shall contain at least one inclusive numeric bound or
-         * permitted value;
-         * numeric bounds shall be ordered, permitted values shall be unique and
-         * match the property's JSON kind, and coexisting forms shall both hold.
-         * A string pattern shall occur only on a stringValue property and every
-         * listed permitted string shall match it. Duplicate multiplicity-rule
-         * natural identities and duplicate participating types shall be invalid;
-         * distinct overlapping multiplicity rules shall all hold conjunctively.
-         * Property names shall be non-empty and unique within each associated-
-         * data type definition. Each associated-data object's properties shall
-         * use only names declared by its active type definition, include every
-         * required property, and validate every present required or optional
-         * property against its declared JSON kind, shape, range, and pattern.
+         * User properties shall contain only Boolean, safe integer, finite
+         * binary64 number, exact text, valid Gregorian date, normalized
+         * offset-aware timestamp, and permitted null. Integer and number remain
+         * distinct; negative number zero normalizes to positive zero. Absence and
+         * null remain distinct. Text is neither trimmed nor normalized. Required
+         * nullable properties must be present but may be null. Non-null values
+         * shall conform to their one declared kind and compatible allowed values,
+         * inclusive range, text code-point length, and RE2 whole-string pattern.
+         * Definitions shall reject empty or duplicate names, empty descriptions,
+         * duplicate canonical allowed values, incompatible or inverted rules,
+         * unsafe or non-finite values, invalid dates or timestamps, and unsupported
+         * RE2 constructs, without general pattern satisfiability analysis.
          */
         }
     }
 
-    requirement def 'Semantic Query Meaning' {
+    requirement def 'Graph And Lineage Integrity' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * A graph query shall select named anchor groups of one or more active
-         * types in the definitions governing the evaluated state,
-         * optionally narrow anchors, associated data, and links by known UUIDs, select directly
-         * associated-data groups by type and optional structured value
-         * comparisons, require typed directed links between anchor or
-         * associated-data groups, and return only bindings that reference the
-         * named projections in its row output at an identified revision.
-         * An anchor group shall select anchors of any of one or more named
-         * active anchor types, so one group can span several shapes of thing.
-         * Its selector variables and direct-association or required-link
-         * predicates shall form one finite positive conjunctive pattern with no
-         * topology restriction. Disconnected variables, parallel predicates,
-         * self-link predicates, and cyclic predicate paths shall be permitted,
-         * and every predicate shall hold under the same joint assignment. A
-         * query shall state exactly one non-empty row or aggregate
-         * output. Aggregate output shall select one named data condition as its
-         * distinct object population. Each aggregation shall count that
-         * population, or sum, minimise, or maximise one present property of it,
-         * summing only number-valued properties and ordering number-valued and
-         * string-valued properties exactly as an ordered comparison does.
-         * A count shall be present and zero when nothing matches; a sum,
-         * minimum, or maximum shall be absent when no match carries the property. An
-         * associated-data group with no property comparisons shall select by
-         * direct association and type alone. Definitions governing the evaluated
-         * state shall govern property kind, shape, range, pattern validation,
-         * and endpoint validity.
-         * Equality shall compare lossless JSON values; ordered comparisons shall
-         * be valid for number-valued properties by exact mathematical value and
-         * for string-valued properties by exact Unicode code-point sequence
-         * without normalization, and shall be rejected for every other JSON kind
-         * and whenever the expected value's kind differs from the property's.
-         * A matchesPattern comparison shall require a string-valued property and
-         * string expression, use Google RE2 Unicode whole-string FullMatch
-         * behavior, and reject malformed or unsupported expressions.
-         * A listed property
-         * comparison shall match only when that property is present; omission
-         * shall remain distinct from a present null value.
-         * Each result row shall be one jointly satisfying assignment and shall
-         * contain exactly one binding for each requested projection. Identical
-         * projected tuples shall occur once. A selected optional property shall
-         * retain its binding when absent so absence remains distinct from JSON null.
-         * A returned property value shall identify its source associated-data
-         * object and be present exactly when the projected property is present,
-         * including when that value is JSON null. Equal property values from
-         * distinct source objects shall remain distinct rows; hidden satisfying
-         * witnesses shall not distinguish rows.
-         * Distinct selector and required-link aliases may bind the same graph
-         * object when their constraints permit it. A required link using one
-         * selector at both ends shall match only an actual self-link on that
-         * bound object. Projected variables from disconnected portions shall
-         * produce genuine combinations of their bindings. A disconnected
-         * portion with no projected variable shall affect an answer only through
-         * the existence of one satisfying assignment for that portion.
-         * Query-local names shall be unique and every selector and projection
-         * reference shall resolve within that query. Evaluation strategy shall
-         * not change this meaning. Current selection shall evaluate active state;
-         * prospective selection shall evaluate the sole delta's effective graph
-         * and proposed definitions; revision or time selection shall evaluate
-         * the resolved historical graph and definitions with the same semantics.
+         * UUIDs shall be canonical valid hyphenated UUIDs, globally unique across
+         * graph kinds for the lineage, and permanently reserved to first-used kind.
+         * Type keys shall share one exact namespace and remain reserved to their
+         * first definition kind. Same-kind retired identities may reactivate.
+         * Every current object shall resolve a correct current type. Associated
+         * data shall have a nonempty duplicate-free permitted anchor set and only
+         * declared conforming properties. Links shall resolve permitted anchor or
+         * data endpoints, never links; self-links are valid. Object kind is
+         * immutable while type may change explicitly. No removal cascades.
+         * Every canonical current or historical object and definition shall expose
+         * read-only created and last-changed revisions and optional v1 legacy text.
+         * Patches preserve original creation and legacy metadata; reactivation
+         * preserves creation and legacy metadata; lastChangedRevision changes only
+         * with that subject's canonical content.
          */
         }
     }
 
-    requirement def 'Query Safety' {
+    requirement def 'Local Cardinality Integrity' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * Graph queries shall change no canonical state or revision. Their
-         * permitted, rejected, or failed attempts may append observational
-         * activity. Unknown or
-         * incompatible type keys, empty or duplicate names, out-of-query references,
-         * endpoint roles, empty, unknown, or duplicate UUID restrictions, properties,
-         * comparisons, malformed or kind-incompatible query patterns, projections, or unresolved
-         * historical selections shall produce observable findings and no result
-         * rows. A missing, empty, or mixed output, or an aggregation naming no data condition of the query, omitting a
-         * property its operator requires, naming a property its condition's type
-         * does not define, or naming a property whose kind its operator cannot
-         * sum or order, shall produce observable findings and no result.
-         * Every output shall provide a positive complete-result maximum; a row
-         * result or distinct aggregate target selection exceeding it, or one the system cannot
-         * return completely, shall be rejected whole, never truncated or paged.
-         * The aggregate maximum shall bound the distinct objects its arithmetic
-         * reads, and a selection exceeding it shall be rejected whole, so
-         * returning one number never licenses reading an unbounded population.
-         * Query work may scale with named candidates, stated property values,
-         * matching associations and links, candidate bindings needed to establish
-         * the stated conjunction, genuine combinations of returned identities,
-         * and distinct rows or target objects needed to decide the caller's
-         * maximum. An unreturned selector or link identity shall affect a
-         * returned row or aggregate target only through the existence of a joint
-         * satisfying assignment. Once that existence is established, duplicate
-         * hidden relationship witnesses and additional satisfying hidden
-         * assignments shall not be enumerated, counted, or materialized for that
-         * answer identity. Evaluation shall bound distinct answer identities before
-         * object-value hydration or arithmetic. It shall not scale with
-         * unstated or unrelated graph populations, duplicate hidden witnesses after existence is
-         * established, declaration
-         * order, or graph-object decoding before that bound, and shall not fail
-         * merely because a collection crosses a private execution threshold.
+         * Associated-data types shall own permitted anchor types, anchors-per-
+         * object bounds with minimum at least one, and objects-per-anchor bounds.
+         * Link types shall own complete permitted source and target type sets and
+         * links-per-source and links-per-target bounds. Each count applies to the
+         * complete permitted population of that exact one type. Distinct
+         * cardinality meaning requires a distinct type. No independently named,
+         * overlapping, participant-subset, or generalized relationship rule is
+         * valid system meaning.
          */
         }
     }
 
-    requirement def 'Atomic Canonical Revision' {
+    requirement def 'Unified Query Meaning' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * Every accepted canonical state change shall advance the one total
-         * revision exactly once and commit its semantic change and contiguous
-         * transition record recoverably atomically. The updated current graph,
-         * active definitions, optional delta, and revision projection and the
-         * appended transition shall become recoverable as one effect. Rejected
-         * or failed operations shall change no canonical state or revision. An accepted
-         * effective no-op shall create neither a revision nor a transition.
-         * Definition activation shall apply its exact assessed graph overlay,
-         * active-definition change, delta removal, and transition as that one effect.
+         * One query shall accept exactly one identity or pattern selection at
+         * current, draft, revision, or time state. Identity selection shall
+         * resolve known UUIDs without topology or type requirements, preserve
+         * request order, report every missing UUID, always return structural and
+         * revision-system fields, and hydrate only requested properties and
+         * legacy metadata. A live-backed draft result retains its unchanged
+         * canonical envelope; a draft-only addition or reactivation has no system
+         * envelope until activation. Pattern selection shall name anchor/data nodes and
+         * identity-bearing directed links; direct associations are predicates.
+         * One node is valid and every larger pattern is connected. Names are
+         * unique across nodes and links; distinct names bind distinct identities;
+         * reusing one endpoint node requests a real self-link. Type and UUID
+         * filters intersect. Conditions are conjunctive; type/UUID lists and
+         * anyOf are the only local alternatives. Every node and link selector is
+         * returned. No hidden variable, arbitrary projection, aggregation,
+         * disconnected product, traversal, grouping, computed expression,
+         * caller ordering, or general OR language exists. Accepted identity and
+         * pattern results have exactly their selection-specific payload;
+         * semantic rejection has no query payload.
          */
         }
     }
 
-    requirement def 'Definition Cardinality' {
+    requirement def 'Query Predicate And Search Integrity' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * At every established revision, the current canonical-state projection
-         * shall contain exactly one active definition set and zero or one
-         * definition delta. A present delta owns exactly one proposed definition
-         * set and one keyed graph overlay; neither is active state.
+         * Property predicates apply only to typed associated-data nodes and
+         * display-name predicates only to anchors. Presence, absence, null,
+         * equality, inequality, same-kind ordering, anyOf, contains, prefix,
+         * RE2 substring regex, and structured all-term, any-term, and phrase
+         * full-text matching shall have their selected closed meanings. Exact
+         * equality and ordering use code-point exact text. Case-insensitive
+         * contains/prefix use Unicode case folding without diacritic removal.
+         * Full text is case- and diacritic-insensitive over anchor names and text
+         * properties, accepts no raw FTS syntax, and returns Boolean matches only.
+         * Unknown or incompatible fields, types, properties, values, endpoints,
+         * selectors, or predicates reject the whole request.
          */
         }
     }
 
-    requirement def 'Non Disruptive Definition Work' {
+    requirement def 'Bounded Query Safety' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * Creating, editing, retrieving, querying, or assessing a definition
-         * delta shall not change active definitions or graph. Its graph overlay
-         * shall use complete-object upserts, explicit tombstones, and explicit
-         * unstaging without implicit cascade. Proposed definitions shall be built
-         * through bounded natural-keyed upserts and removals rather than one
-         * complete definition-set request, and may remain temporarily invalid
-         * across edits. The first effective definition edit shall apply over
-         * complete active-definition meaning and retain untouched definitions;
-         * later edits apply over current proposed meaning. Activation shall succeed only from
-         * an exact current complete assessment showing that every description is
-         * non-empty, the proposed set is internally valid, and the effective
-         * post-cutover graph conforms;
-         * failure shall preserve graph, active set, delta, revision, and canonical history.
-         * A present delta's effective definitions and graph shall differ
-         * semantically from active state. Staging definition content equal to the
-         * sole current proposal, or equal to the active set when no delta exists,
-         * shall be an accepted no-op. A prospective graph change when no delta
-         * exists shall create one whose proposed definitions equal the active set.
-         * When a delta exists, setting proposed definitions equal to active shall
-         * retain a non-empty overlay and shall not implicitly discard an empty proposal.
-         * When the overlay is empty, a definition edit that would remove the final
-         * semantic difference shall be rejected atomically with the prior proposal
-         * and revision unchanged; only explicit discard removes the delta.
-         * Active changes that alter a staged identity shall make the prior prospective
-         * assessment stale without silently discarding the overlay.
+         * No match is an accepted empty result. Pattern evaluation shall establish
+         * distinct complete binding tuples only through maximum plus one. An
+         * additional tuple rejects without rows or hydrated values. Hydration
+         * occurs only after the bounded row set and each returned object occurs
+         * once by UUID. Results and findings are deterministic. Queries alter no
+         * canonical or draft content. Ordinary query work may depend on stated
+         * candidates, predicates, matching relationships, and bounded answers but
+         * not excluded history, unrelated populations, or unrequested value
+         * hydration. Server aggregation, fuzzy matching, ranking, embeddings,
+         * phonetic matching, and semantic similarity remain absent.
          */
         }
     }
 
-    requirement def 'Validation Coverage' {
+    requirement def 'Atomic Field Change' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * The system shall produce typed findings within the governing outcome
-         * for semantically invalid graph queries, proposed graph changes,
-         * replayed state, and v1 recovery candidates. Validation assessments shall
-         * identify only complete current-graph conformance and complete prospective
-         * definition-and-graph conformance. One completed assessment shall contain
-         * every finding and be bound to its exact evaluated revision and, when
-         * prospective, exact delta meaning. One public check request shall either
-         * produce that assessment once or retrieve a positive bounded ordered
-         * one-based finding interval from it without reassessment. The result shall expose
-         * assessment identity, complete finding count, returned interval, and
-         * whether more findings remain. Only the latest completed assessment for
-         * each current or prospective scope remains retrievable; publishing its
-         * replacement expires the prior assessment identity, while a failed run
-         * preserves the prior one. Current or proposal changes may make the
-         * retained assessment stale for activation without changing its findings
-         * or immediate retrievability. Assessment state is observational evidence,
-         * never canonical or replay authority. Active changes and prospective
-         * assessments shall derive the same affected structural subjects and
-         * exact multiplicity work from their respective old and proposed meaning.
+         * Active graph change shall first compare expectedRevision with current
+         * revision. A UUID absent from current state is created only with complete
+         * required content; an existing UUID changes only supplied fields.
+         * Properties independently set, set null, remove, or remain untouched;
+         * associations independently add, remove, or remain untouched. Explicit
+         * property sets contain exactly one value or null. A property cannot be
+         * both set and removed, and an anchor cannot be both added and removed,
+         * in one upsert; these contradictions reject without state change.
+         * object removal alone retires an object. Removing absent content and
+         * adding an existing association are accepted no-ops. One UUID occurs in
+         * at most one command. The complete batch is interpreted against its
+         * final combined state independent of command ordering. Surviving
+         * dangling dependents reject and identify every affected dependent; no
+         * cascade is inferred. Validation visits only the changed neighborhood,
+         * old/new types, old/new relationships, direct dependents, and exact
+         * cardinality subjects whose count can change. A redundant accepted batch
+         * appends activity without canonical revision; an effective batch creates
+         * exactly one revision and one atomic canonical/activity effect.
          */
         }
     }
 
-    requirement def 'Durable Canonical History' {
+    requirement def 'Durable Draft Governance' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * Canonical history shall be complete, ordered, locally durable across
-         * ordinary process restarts, and append-only in ordinary operation from
-         * its owned initial base. One initial record and one contiguous
-         * transition per successive revision after that base shall be sufficient
-         * for deterministic replay without activity history. Every initial record
-         * shall establish its contained-state revision and every transition shall
-         * establish its resulting revision. Current graph, active definitions,
-         * optional delta, and revision shall form one current canonical-state
-         * projection of replay through the final canonical record and shall not
-         * form parallel authority. No permitted current-state tuple shall mix
-         * values established by different canonical records. An initial base
-         * seeded from reconstructed snapshot state shall not claim
-         * omitted earlier transitions. Each transition's semantic change shall be
-         * valid for its kind. Graph mutation, definition activation, and
-         * historical restoration records shall carry their replay-sufficient
-         * explicit graph changes rather than a complete replacement graph.
+         * At most one durable noncanonical draft bucket shall contain complete
+         * definition replacements/removals and normalized field-level graph
+         * patches/removals. Later staged fields replace prior operations for those
+         * fields; tombstone replaces the whole entry; later upsert after tombstone
+         * starts over the then-current live base; whole-entry unstage removes it.
+         * Draft editing never advances canonical revision and may leave effective
+         * meaning nonconforming. Live writes never rewrite draft entries. Staged
+         * fields win over corresponding latest live fields; unrelated live fields
+         * survive; staged add/remove guarantees membership or absence; tombstone
+         * hides the whole object. Loss of a partial patch's live base is a finding
+         * unless it now has complete create content. Compatible live creation
+         * combines with staged fields; kind conflict is invalid. Draft reads may
+         * evaluate mechanically representable portions and reject a query that
+         * needs an unmaterializable object. No public draft version, status,
+         * digest, stale flag, assessment identity, or activation token exists.
+         * Empty draft change is an accepted no-op and creates no draft. Selecting
+         * draft state or draft validation while no draft exists shall reject.
+         * Draft entries never contain system metadata. Effective draft content
+         * backed by a live object or definition exposes that unchanged canonical
+         * envelope; a staged addition or reactivation exposes none. Activation
+         * alone applies ordinary create, update, or reactivation metadata rules.
          */
         }
     }
 
-    requirement def 'Canonical Snapshot Completeness' {
+    requirement def 'Draft Inspection Validation And Activation' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * A canonical snapshot shall be a self-contained, lossless capture of
-         * graph, active definitions, optional in-flight delta, and total
-         * revision and shall identify the exact canonical record it captures.
-         * Creating it shall not change canonical state or revision. Semantic
-         * completeness shall not require constructing a resident canonical-state,
-         * graph, definition-set, or snapshot-document aggregate.
+         * Draft inspection shall expose filtered raw entries, current and
+         * proposed content, exact staged graph operations, effect flags, and
+         * whole-draft raw/effective counts through a bounded opaque continuation.
+         * Empty fresh filter collections select all entries; fresh inspection
+         * requires a limit and no cursor, while continuation accepts only its
+         * cursor and reuses the bound filters and limit. Fresh validation requires
+         * scope and limit; continuation requires the same scope and cursor with no
+         * limit. Invalid combinations form no domain request.
+         * Draft absence yields an accepted empty inspection with presence false.
+         * Validation shall compute all current or effective-draft findings once,
+         * report cleanliness and total, and page only the latest backing per
+         * scope. Continuations expire on relevant content or newer-call changes.
+         * Activation shall in one atomic operation read latest live and draft,
+         * compose patches, remove redundant operations, apply tombstones, and
+         * validate complete effective state. Invalid activation preserves both
+         * and publishes findings. Valid effective activation creates one revision
+         * and clears draft. Valid redundant activation clears draft without a
+         * revision. Discard clears draft without canonical effect and absence is
+         * a no-op. Validation always returns current findings; no separate status
+         * operation or prior validation authority is required. Inspection appends
+         * activity. Validation backing publication and activity append are one
+         * atomic observational effect and change no canonical or draft content.
+         * Accepted draft change/inspection and completed validation carry their
+         * complete purpose payload. Other rejection omits it, except invalid
+         * activation, which returns validation totals, cleanliness, its first
+         * finding page, and a continuation when more findings remain.
          */
         }
     }
 
-    requirement def 'Replay Equivalence' {
+    requirement def 'Historical State And Canonical Ledger' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * Replay from an initial record or complete snapshot plus an optional
-         * contiguous later same-ledger tail shall reconstruct equivalent graph,
-         * active definitions, optional delta, and revision without activity
-         * history. A snapshot shall identify the exact record it captures and a
-         * tail shall identify the exact record it follows. A tail from another
-         * ledger shall be rejected even when its preceding revision number is
-         * equal. Initializing a fresh RTG shall seed its owned history with the
-         * reconstructed state at the resulting revision, without claiming
-         * earlier transitions. A gap, duplicate, reorder, invalid transition,
-         * or incompatible base shall fail without partially accepted canonical
-         * state. Replay and reconstruction shall use bounded incremental or
-         * set-based work and shall not return or require a resident whole state.
+         * Current, draft, established revision, and time reads shall report one
+         * evaluated revision. Time selects the greatest revision recorded at or
+         * before it, with greatest revision winning tied times; before revision
+         * zero is unresolved. Canonical commit times never decrease. Current and
+         * historical state shall be directly selectable through indexed version
+         * presence, never public replay. One contiguous corruption-evident
+         * canonical record per established revision shall expose time,
+         * provenance, transition kind, bounded summary, and affected identities,
+         * not a replay payload or snapshot. Removed definitions and graph objects
+         * remain historically queryable. Ordinary restart shall not traverse a
+         * ledger to reconstruct current state.
          */
         }
     }
 
-    requirement def 'Historical State Correctness' {
+    requirement def 'Activity Separation And Privacy' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * Graph queries, definition summary, and focused inspection shall use one
-         * current, prospective, revision, or time state selection. Revision and
-         * time selections change no canonical state and evaluate the selected committed
-         * revision with current-query semantics. A time resolves to the greatest
-         * committed revision at or before it. Definition summary and focused
-         * inspection shall return definitions
-         * active at the exact evaluated revision and delta presence at that state,
-         * and reject unresolved selections without partial content or evaluated
-         * revision. A caller may reuse a time-based summary's resolved revision
-         * for inspection and graph query. Definition-delta retrieval remains
-         * current-only.
+         * Activity shall remain observational and incapable of establishing
+         * canonical state. Semantic is the initial mode. An owner-selected
+         * semantic/verbose mode change appends configuration activity without a
+         * canonical revision; rejection or failure preserves the prior mode.
+         * Semantic mode records normalized requests needed for
+         * later owner analysis, truthful bounded result shape, complete findings,
+         * accepted mutation effects, and complete rejected mutation requests.
+         * Verbose mode additionally records full normalized request/response
+         * payloads separately. History reads shall not recursively copy selected
+         * entries, and shall select before recording themselves. Tokens,
+         * authorization headers, malformed transport content, environment,
+         * process arguments, v1 source content, and secrets shall never be
+         * captured. Setup/import starts with empty activity; backup, audit, and
+         * probing are read-only. Header/payload separation is the only retained
+         * seam for future explicitly enabled analysis or conversation events;
+         * neither feature nor automatic pruning exists now.
          */
         }
     }
 
-    requirement def 'Historical Restore Semantics' {
+    requirement def 'History Restore Audit And Backup' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * Restore shall require no in-flight delta and shall commit historical
-         * graph and active definitions with no delta as one new revision without
-         * rewriting earlier history. Its transition shall carry the explicit
-         * replay-sufficient difference from the prior current state. Computing
-         * and applying that difference may scan the selected and current state
-         * but shall use bounded incremental or set-based work and shall not
-         * construct either graph as one resident aggregate.
+         * History reads shall return one complete canonical or activity interval
+         * by inclusive time or by sequence range with an exclusive after and
+         * inclusive through boundary, report observed head, preserve
+         * ledger order, and reject whole beyond the caller maximum. Omitted range
+         * or a range with both bounds absent selects through the observed head;
+         * reversed time bounds reject and sequence after at or beyond through is
+         * accepted empty. Accepted history returns only its selected ledger family
+         * and kind-specific head; rejected history has no purpose payload. Restore shall
+         * refuse with a draft, validate selected historical graph/definitions,
+         * preserve intervening history and identity metadata, and append one new
+         * revision only when current meaning changes. Audit shall read-only verify
+         * lineage/schema identity, revision/time/hash continuity, version
+         * intervals, reservations, definitions, references, graph conformance,
+         * indexed projections/search, and activity/validation integrity. Backup
+         * shall work while serving, audit before publication, include complete
+         * database meaning including draft/settings/ledgers, exclude token and v1
+         * sidecars, refuse overwrite, and add no source activity. Initialization
+         * from backup requires an empty destination and preserves lineage.
          */
         }
     }
 
-    requirement def 'Dual Ledger Separation' {
+    requirement def 'Locality And Bounded Materialization' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * Activity history shall record permitted reads, validation, rejections,
-         * failures, snapshots, provenance, and summaries after the associated
-         * outcome has been determined. An invocation requiring such an
-         * observation shall complete only after its activity record is durably
-         * appended. If that append cannot complete, the invocation shall produce
-         * an unexpected execution failure and no completed domain result; that
-         * observation failure is not itself a safely reported domain outcome
-         * requiring recursive observation. An accepted canonical mutation is
-         * already represented by canonical history and shall not be duplicated
-         * as activity. An activity-history read shall select its
-         * result before its own record is appended and shall never include itself.
-         * Activity history shall remain observational, never be replayed, and
-         * never establish canonical state or trigger canonical reconstruction.
-         * Each activity summary shall identify capability, outcome category,
-         * provenance, evaluated revision when applicable, and bounded semantic
-         * scope without copying result rows, canonical payloads, or inferred
-         * intent. Owner-directed retention may change
-         * only activity history and shall not affect reconstruction.
+         * Ordinary current discovery, query, and active change shall not depend
+         * on excluded history or unrelated graph populations and shall not retain
+         * a complete graph or definition-set aggregate. Full validation,
+         * definition activation, restore, audit, import, and backup may scan all
+         * relevant state with bounded working memory. Historical selection shall
+         * avoid linear scans of excluded ledger prefixes. No numerical latency,
+         * throughput, startup, or storage target is selected before representative
+         * runtime, hardware, and owner data exist.
          */
         }
     }
 
-    requirement def 'Agent Definition Discoverability' {
+    requirement def 'MCP Boundary Integrity' {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * Every active type and rule definition shall have a non-empty,
-         * owner-readable description. Automatic assessment shall establish only
-         * presence and non-emptiness; owner review shall establish readability.
-         * A complete shallow read shall return every anchor type in the evaluated
-         * definition set for current, prospective, or selected historical state,
-         * its description, the evaluated
-         * revision, and delta presence at that state, or no summaries when it
-         * cannot return the complete vocabulary. A focused read shall return the
-         * complete relevant definition neighborhood at its own identified
-         * evaluated revision
-         * for each selected anchor and no unrelated definitions. A caller shall
-         * be able to detect an intervening definition change by comparing the
-         * summary and inspection revisions. Unknown, duplicate, or
-         * incompletely answerable selections shall return findings and no partial
-         * details or evaluated revision. The sole current proposal shall remain
-         * separately discoverable through its identity, bounded definition
-         * summary and inspection, overlay cardinalities, and latest assessment
-         * without returning one aggregate definition-set or overlay document.
-         * Historical discovery shall not change proposal discovery. All discovery
-         * shall change no canonical state or revision, while its operation attempt may be recorded
-         * observationally.
-         * A returned assessment shall be present exactly when the proposal has a
-         * current completed assessment; its evaluated revision and proposal
-         * identity shall equal those reported by proposal discovery.
+         * The selected initial MCP boundary shall expose stable type-summary,
+         * type-inspection, unified-query, active-change, draft-inspection,
+         * draft-change, validation, draft-activation, draft-discard, and history
+         * behaviors through ordinary typed JSON values. The inventory count is
+         * not RTG domain authority. Unknown wire members and malformed input form
+         * no domain request. Accepted reads carry evaluatedRevision and their
+         * complete purpose payload even when its collections are empty. Semantic
+         * rejection omits purpose payload unless invalid activation explicitly
+         * returns its validation page. A well-formed semantic refusal returns accepted or
+         * rejected outcome meaning with concise summary and typed findings.
+         * Unexpected runtime or transport failure is an MCP error. Complete
+         * response construction shall precede commit, and loss after commit shall
+         * never claim rollback. Tool descriptions shall guide cold discovery,
+         * direct identity use, bounded pattern narrowing, owner-approved active
+         * mutation, and inspect/query/validate/activate draft workflow without a
+         * mandatory match/get sequence or status call. RTG implements no role or
+         * approval engine. Omitted read state means current. One fixed public
+         * item limit of 1000 governs every explicitly bounded public collection,
+         * query maximum, page, and history maximum; no per-feature configurable
+         * limit exists. Set-like input rejects duplicates. Set-like output and
+         * findings use deterministic exact-key/UUID ordering, identity results
+         * preserve requested UUID order, and pattern rows order lexicographically
+         * by selector-order UUID bindings. Long scalar text has no undocumented
+         * truncation threshold.
          */
         }
     }
 
-    requirement def 'Explicit Graph Change Set' {
-        subject system : 'RTG System';
-        require constraint {
-        doc /*
-         * A graph change shall identify either active state or the sole
-         * definition delta and shall use complete-object upserts and explicit UUID
-         * removals for each graph-object kind. A delta change may also explicitly
-         * unstage a UUID. Direct associations shall change
-         * only through associated-data anchor references. Duplicate commands,
-         * upsert/removal conflicts, unknown removals, kind changes, invalid final
-         * references, and any assumed implicit cascade shall be rejected without
-         * canonical effect. An ordinary active change shall validate every
-         * invariant whose truth can change between old and proposed meaning,
-         * relying on the previously valid unaffected state. Structural validation
-         * subjects shall remain distinct from unchanged lookup identities.
-         * Multiplicity work shall be the distinct applicable rule, subject, and
-         * constrained-end combinations justified by changed relationship
-         * membership, subject membership, opposite membership, or rule meaning.
-         * Unchanged far endpoints shall remain lookup-only unless one of their
-         * own exact counts can change. Display-only graph edits, property-only
-         * graph edits, and rule-description-only edits shall create no
-         * multiplicity work. Ordinary change shall not perform a
-         * complete-graph conformance assessment.
-         * Delta staging may remain temporarily nonconforming until an explicit
-         * prospective assessment and shall change no active state. An edit that
-         * would remove the final semantic difference from active state is rejected
-         * atomically; only explicit discard removes the delta.
-         */
-        }
-    }
-
-    requirement def 'Bounded History Read' {
-        subject system : 'RTG System';
-        require constraint {
-        doc /*
-         * A history read shall select exactly one of canonical or activity
-         * records, accept an optional chronological interval and a positive
-         * maximum, and return one owner-facing entry for every record in the
-         * complete inclusive matching interval in the selected ledger's order,
-         * or reject it whole when the interval exceeds the caller's maximum or
-         * cannot be returned completely. Canonical entries shall expose time,
-         * provenance, revision, transition kind when applicable, and semantic
-         * summary without exposing canonical state or replay-sufficient changes.
-         * Activity entries shall expose time, provenance, capability, outcome
-         * category, optional evaluated revision, bounded
-         * semantic scope, and summary. A start after its end shall be invalid.
-         * A result shall never mix entry families, paginate silently, mutate
-         * canonical state, or treat activity as replay authority.
-         */
-        }
-    }
-
-    requirement def 'History Independent Current Work' {
-        subject system : 'RTG System';
-        require constraint {
-        doc /*
-         * Current definition summary and inspection, current graph query,
-         * current conformance assessment, proposal discovery, and ordinary change
-         * validation shall use the current canonical-state projection and shall
-         * not traverse canonical or activity history to rediscover current state.
-         * Their work may scale with the current state facets and candidate
-         * relationships their meaning requires, active or proposed definitions,
-         * requested return bounds, and proposed change size. Routine current work
-         * shall not require retaining the complete canonical-state tuple or complete
-         * graph in process memory between invocations. Definition-only summary and
-         * inspection shall not materialize graph objects. Current graph query shall
-         * obey Query Safety's candidate, hidden-witness, answer-identity, and
-         * hydration locality and shall not materialize unrelated graph objects
-         * merely because they are current.
-         * No production operation shall construct or retain a complete Graph,
-         * Canonical State, definition-set document, canonical-change document, or
-         * equivalent whole-state aggregate. Ordinary mutation shall obey Explicit
-         * Graph Change Set's exact structural-subject, lookup, and multiplicity-
-         * work locality. A definition cutover or
-         * explicit conformance assessment may scan every applicable semantic
-         * state entry when its meaning is state-wide, while keeping working memory bounded.
-         * Snapshot, replay, import, initialization, and restoration shall use
-         * bounded streaming, incremental, or set-based work. A value returned to a
-         * caller shall not share mutable canonical state retained by the system.
-         * No cache, database, serialization, indexing technology, or storage layout
-         * is selected.
-         * Canonical mutation and activity observation may perform constant
-         * terminal-position and append work but shall neither traverse nor
-         * rewrite the existing logical ledger prefix. Activity recording shall
-         * remain observational and shall not trigger canonical reconstruction.
-         */
-        }
-    }
-
-    requirement def 'Bounded Historical Selection Work' {
-        subject system : 'RTG System';
-        require constraint {
-        doc /*
-         * Resolving a revision or time selector shall not linearly scan the
-         * complete ledger. Selecting a bounded canonical or activity interval
-         * shall perform no linear scan of records preceding that interval; its
-         * expected semantic record-processing work shall be logarithmic selection
-         * plus the returned interval. Historical definition summary and focused
-         * inspection shall locate the revision and applicable definition-changing
-         * records without replaying unrelated graph-only transitions. Historical
-         * graph selection, explicit replay, restoration, and startup recovery may
-         * depend on their required rows or replay tail but shall remain bounded-
-         * memory and shall not construct a complete graph or canonical state.
-         * These constraints govern semantic record processing, not
-         * physical database pages or a selected indexing technology.
-         */
-        }
-    }
-
-    requirement def 'MCP Agent Tool Contract' {
-        subject system : 'RTG System';
-        require constraint {
-        doc /*
-         * The system shall expose exactly the selected ten stable, discoverable
-         * MCP tool names. Every completed invocation shall return typed object
-         * meaning; tools with semantic input shall accept typed object meaning.
-         * Definition summary, inspection, graph query, graph change, activation,
-         * and conformance shall carry their state selection, target, exact assessment identity, or
-         * assessment-page request through typed input. A genuinely parameterless
-         * tool shall introduce no empty domain request.
-         * Every tool shall preserve canonical RTG semantics and remain usable
-         * through core tool discovery and invocation without requiring any
-         * additional MCP capability.
-         */
-        }
-    }
-
-    requirement def 'MCP Outcome Integrity' {
-        subject system : 'RTG System';
-        require constraint {
-        doc /*
-         * Semantic rejection shall be represented as a typed result distinct
-         * from malformed input and unexpected execution failure. Read operations
-         * shall not mutate canonical state, and every promised rejection or
-         * failure non-effect shall hold at the MCP boundary. Accepted results shall
-         * carry exactly their purpose-specific success payloads. Rejected and
-         * safely reported failed outcomes shall carry no success payload unless a
-         * result definition explicitly states otherwise; malformed input shall
-         * form no domain request, and an unexpected tool failure shall produce no
-         * completed domain result. Tool invocation shall not be represented as
-         * establishing per-call authorization or owner approval.
-         * Structured and textual representations shall communicate equivalent
-         * typed meaning. Advisory tool annotations shall describe behavior only
-         * and shall never enforce authorization, validation, atomicity, or failure
-         * non-effects.
-         */
-        }
-    }
-
-    requirement def 'Owner Controlled Memory' {
+    requirement def 'Fresh And V1 Initialization' {
         subject system : 'Vellis System';
         require constraint {
         doc /*
-         * Vellis shall preserve owner control of personal-memory and activity
-         * disclosure and retention, memory correction and
-         * forgetting, graph-definition changes, snapshots, and restoration. Vellis
-         * shall submit a context proposal for mutation only after owner approval;
-         * declined, rejected, or failed context shall not be retained.
-         */
-        }
-    }
-
-    requirement def 'Observable Failure' {
-        subject system : 'Vellis System';
-        require constraint {
-        doc /*
-         * Semantic refusals and execution failures shall be observable to the
-         * affected owner or external agent while preserving promised canonical
-         * and observational non-effects.
-         */
-        }
-    }
-
-    requirement def 'V1 Snapshot Compatibility' {
-        subject system : 'Vellis System';
-        require constraint {
-        doc /*
-         * Only before any v2 canonical state exists, Vellis shall incrementally
-         * analyze one complete v1.0.0 JSON system snapshot into a staged target
-         * graph, active definition set, and report bound to that exact source
-         * without constructing one resident complete graph or definition set.
-         * Missing v1 system.live shall mean true. The candidate shall contain
-         * every live graph object and its closed live relationships, report every
-         * omitted non-live candidate, and preserve UUID, object kind, type key,
-         * display name, nested JSON, metadata, direct associations, link direction,
-         * and endpoints exactly. Only an absent anchor display name shall use
-         * "[recovered] {typeKey} {uuid}" from its exact stored values. After live
-         * filtering, the graph shall already be closed and valid; Vellis shall
-         * neither repair dangling relationships nor rewrite stored values.
-         *
-         * Active definitions shall translate by natural type and property
-         * identity, discarding v1 definition UUID and lifecycle metadata while
-         * exactly preserving representable type, property, endpoint, requiredness,
-         * range, permitted-value, multiplicity, and active-cardinality meaning.
-         * Unsupported refinements shall be removed, never replaced by invented
-         * meaning. A property shall be retained only when one v2 JSON kind follows
-         * from its v1 rule or all imported values. The report shall summarize
-         * preserved graph content and identify every narrowing, removed refinement,
-         * synthesized description, omitted unused
-         * property or type, omitted query-pattern or migration-oriented constraint,
-         * and untranslatable constraint. A definition may be omitted only when no
-         * imported object, relationship, or retained definition depends on it.
-         *
-         * Initialization shall refuse atomically when unchanged graph data cannot
-         * conform to translated definitions, including duplicate or kind-conflicting
-         * natural identities, dangling endpoints, unresolved used types, or mixed
-         * JSON kinds for one used v2 property. It shall omit v1 migrations, inactive
-         * candidates, definition lifecycle state, ledger history, transaction and
-         * storage/runtime metadata. V1 Everyday Life vocabulary shall retain its
-         * original keys and shall never be reinterpreted as or overlaid with the v2
-         * starter. The owner shall preview and confirm the exact candidate/report
-         * pair. Acceptance shall establish the unchanged graph, translated active
-         * definitions, no delta, revision 0, one initial record with import
-         * provenance and a bounded recovery summary, no transitions, and an empty
-         * activity ledger as a new v2 lineage. Decline, changed input, rejection,
-         * failure, or an existing v2 state shall establish no canonical or activity
-         * state; no merge or replacement behavior exists.
-         */
-        }
-    }
-
-    requirement def 'Simple Individual Operation' {
-        subject system : 'Vellis System';
-        require constraint {
-        doc /*
-         * From a clean supported local environment, one owner shall be able to
-         * follow supplied setup guidance to prepare one local Vellis system and
-         * connect one trusted owner-configured MCP agent. The owner shall be able
-         * to initialize blank, with the recommended Everyday Life starter, from a
-         * compatible v2 snapshot and tail, or from a confirmed compatible v1 JSON
-         * snapshot; use, query, preserve, restart, and govern the one cohesive
-         * system; and recover identical canonical memory for a later agent
-         * interaction. Setup and connection failures shall identify the failed
-         * stage, state whether initialization or established memory changed, and
-         * supply an available corrective action. A generic failure without that
-         * minimum guidance shall not be actionable. Such failures shall not corrupt
-         * any already established canonical state; initialization failure shall
-         * establish no partial canonical or activity state.
-         * None of this shall require tenant, organization, role, cluster,
-         * server-fleet, database, concurrent definition-delta, or enterprise-
-         * infrastructure administration.
-         */
-        }
-    }
-
-    requirement def 'Canonical Semantic Equality' {
-        subject system : 'RTG System';
-        require constraint {
-        doc /*
-         * Every no-op, definition-delta comparison, graph comparison, replay
-         * comparison, and permitted-value uniqueness decision shall use one
-         * canonical semantic equality. JSON equality shall be kind-sensitive;
-         * numbers shall compare by exact mathematical value, strings by exact
-         * Unicode code-point sequence without normalization, arrays recursively
-         * in order, and objects recursively without member-order significance,
-         * with missing distinct from null. Graph equality shall include every
-         * canonical object value, association, and directed
-         * endpoint while ignoring order in unordered collections. Definition
-         * equality shall use the modeled natural identities and include kind,
-         * descriptions, and every structured rule. Reordering unordered content
-         * shall be an effective no-op; changing canonical meaning shall not. Two
-         * canonical states shall additionally require equal revision and equal
-         * definition-delta presence, proposed-definition meaning, and keyed graph
-         * overlay meaning. This semantic equality does not require either state
-         * to exist as one physical aggregate.
-         */
-        }
-    }
-
-    requirement def 'Fresh Initialization' {
-        subject system : 'RTG System';
-        require constraint {
-        doc /*
-         * A fresh RTG initialized without prior state shall accept one internally
-         * valid initial definition set and establish revision 0 with an empty
-         * graph, exactly that active set, no definition delta, one matching
-         * initial-state record, no transitions, and an empty activity ledger.
-         * Refusal or failure shall establish no partial state. Snapshot-based
-         * initialization shall use only incrementally verified and reconstructed
-         * snapshot state and shall
-         * not overlay fresh-start definitions. Confirmed v1 initialization shall
-         * establish its semantically complete recovery candidate at revision 0 as
-         * a new owned history base with no transitions or activity records, using
-         * bounded streaming or set-based work rather than a resident whole state.
-         */
-        }
-    }
-
-    requirement def 'String Pattern Validation' {
-        subject system : 'RTG System';
-        require constraint {
-        doc /*
-         * An optional definition property pattern and a query matchesPattern
-         * comparison shall use Google RE2 syntax and Unicode
-         * semantics with whole-string FullMatch behavior. The system shall reject
-         * malformed or unsupported expressions and either form on non-string
-         * properties. Definition requiredness, shape, range, and pattern shall apply
-         * conjunctively to present values, without requiring general
-         * satisfiability analysis. Pattern expression text shall be discoverable
-         * exactly and shall participate exactly in definition equality. Pattern
-         * meaning shall neither define nor constrain how string comparisons order
-         * values. A definition pattern describes which stored values are valid;
-         * a query pattern filters present values without changing that validity;
-         * neither says how any two strings compare.
+         * Fresh initialization shall require an empty destination and explicit
+         * blank or recommended Everyday Life choice, establish revision zero,
+         * and publish atomically. V1 initialization shall stream one exact source
+         * with bounded memory. Missing live means true; non-live content is
+         * omitted and reported. Compatible scalar kinds and nullable values are
+         * retained; nested, unsafe, or incompatible property occurrences become
+         * canonical JSON text for that entire property without binary64 loss.
+         * Strings do not infer dates or timestamps. Nonempty legacy system
+         * metadata minus live is preserved. Only exactly reducible one-type local
+         * bounds map; other relationship rules are omitted and reported. Live
+         * unresolved references, kind conflicts, or preservation failure block.
+         * Deterministic reports and confirmation bind exact source and report
+         * digests. Success publishes candidate revision zero with its one
+         * initialization record, no imported predecessor transitions, no draft
+         * or activity, and one private report sidecar. Refusal,
+         * changed input, or failure publishes nothing and no existing-system merge
+         * exists.
          */
         }
     }
@@ -696,96 +359,75 @@ package VellisRequirements {
         subject system : 'Vellis System';
         require constraint {
         doc /*
-         * When no prior state exists, Vellis shall offer blank and Everyday Life
-         * fresh vocabulary choices, present Everyday Life as recommended and
-         * preselected, and require explicit owner confirmation before either
-         * initialization. Blank shall use an empty definition set; Everyday Life
-         * shall use exactly the modeled Everyday Life starter definition set.
-         * Neither choice shall create graph objects. Snapshot initialization
-         * and v1 initialization shall not offer or overlay the starter, and
-         * existing systems shall gain no separate starter-install behavior.
+         * Fresh setup shall offer blank and the recommended preselected Everyday
+         * Life vocabulary and require confirmation. The starter shall contain
+         * exactly the modeled twelve anchors, corresponding twelve details types
+         * with preserved property vocabulary, nine link types and endpoint sets,
+         * no graph data, details bounds 1..1 anchors per object and 0..1 objects
+         * per anchor, and link bounds 0..unbounded at both ends. Its selected date
+         * properties shall be true dates and all properties optional non-nullable.
+         * Backup and v1 initialization never overlay it; existing systems have no
+         * starter-install operation.
          */
         }
     }
 
-    requirement def 'Owner Visible Improvement Analysis' {
+    requirement def 'Simple Secure Individual Operation' {
         subject system : 'Vellis System';
         require constraint {
         doc /*
-         * Vellis shall support an external owner-configured agent in using
-         * explicit bounded canonical and activity intervals, evaluated historical
-         * definitions, and bounded historical or current graph queries to prepare
-         * traceable owner-visible findings about stale data, repeated failures,
-         * unused vocabulary, and cleanup opportunities. Scheduled analysis shall
-         * continue incrementally from its previously processed interval rather
-         * than repeatedly requesting all history. Before proposing a current
-         * graph change or definition delta, the agent shall rediscover current
-         * definitions. Vellis shall add no scheduler, job registry, worker, or
-         * inference authority. Automated analysis shall not bypass owner approval;
-         * declined proposals shall create no canonical mutation.
+         * One local owner shall initialize, serve, connect, configure activity,
+         * rotate an HTTP token, audit, back up, and restore one system without
+         * tenant, role, organization, cluster, service-manager, or infrastructure
+         * administration. STDIO and foreground HTTP are supported. Guided HTTP
+         * uses at least 256 random token bits; non-loopback requires an owner-
+         * private token and warns that plaintext HTTP needs a trusted network,
+         * tunnel, or external TLS. Tokens never appear in arguments, logs,
+         * activity, reports, or backups. Public client CLIs alone manage Codex and
+         * Claude registration, with probe-before-replace, explicit confirmation,
+         * truthful partial-failure reporting, and no configuration-file edits.
+         * Data, backups, activity, and reports are plaintext at rest and this is
+         * disclosed. Vellis implements no TLS, OAuth, users, roles, daemon,
+         * container, or service manager.
          */
         }
     }
 
     part vellis : 'Vellis System';
 
-    requirement <RTG001> graphInvariants : 'Graph Invariants';
-    requirement <RTG002> semanticQueryMeaning : 'Semantic Query Meaning';
-    requirement <RTG003> querySafety : 'Query Safety';
-    requirement <RTG004> atomicCanonicalRevision : 'Atomic Canonical Revision';
-    requirement <RTG005> definitionCardinality : 'Definition Cardinality';
-    requirement <RTG006> nonDisruptiveDefinitionWork : 'Non Disruptive Definition Work';
-    requirement <RTG007> validationCoverage : 'Validation Coverage';
-    requirement <RTG008> durableCanonicalHistory : 'Durable Canonical History';
-    requirement <RTG009> canonicalSnapshotCompleteness : 'Canonical Snapshot Completeness';
-    requirement <RTG010> replayEquivalence : 'Replay Equivalence';
-    requirement <RTG011> historicalStateCorrectness : 'Historical State Correctness';
-    requirement <RTG012> historicalRestoreSemantics : 'Historical Restore Semantics';
-    requirement <RTG013> dualLedgerSeparation : 'Dual Ledger Separation';
-    requirement <RTG014> agentDefinitionDiscoverability : 'Agent Definition Discoverability';
-    requirement <RTG015> explicitGraphChangeSet : 'Explicit Graph Change Set';
-    requirement <RTG016> boundedHistoryRead : 'Bounded History Read';
-    requirement <RTG017> mcpAgentToolContract : 'MCP Agent Tool Contract';
-    requirement <RTG018> mcpOutcomeIntegrity : 'MCP Outcome Integrity';
-    requirement <RTG019> canonicalSemanticEquality : 'Canonical Semantic Equality';
-    requirement <RTG020> freshInitialization : 'Fresh Initialization';
-    requirement <RTG021> stringPatternValidation : 'String Pattern Validation';
-    requirement <RTG022> historyIndependentCurrentWork : 'History Independent Current Work';
-    requirement <RTG023> boundedHistoricalSelectionWork : 'Bounded Historical Selection Work';
-    requirement <VEL001> ownerControlledMemory : 'Owner Controlled Memory';
-    requirement <VEL002> observableFailure : 'Observable Failure';
-    requirement <VEL003> v1SnapshotCompatibility : 'V1 Snapshot Compatibility';
-    requirement <VEL004> simpleIndividualOperation : 'Simple Individual Operation';
-    requirement <VEL005> recommendedEverydayLifeStart : 'Recommended Everyday Life Start';
-    requirement <VEL006> ownerVisibleImprovementAnalysis : 'Owner Visible Improvement Analysis';
+    requirement <RTG001> scalarDefinitions : 'Scalar And Definition Integrity';
+    requirement <RTG002> graphLineage : 'Graph And Lineage Integrity';
+    requirement <RTG003> localCardinality : 'Local Cardinality Integrity';
+    requirement <RTG004> unifiedQuery : 'Unified Query Meaning';
+    requirement <RTG005> queryPredicates : 'Query Predicate And Search Integrity';
+    requirement <RTG006> querySafety : 'Bounded Query Safety';
+    requirement <RTG007> atomicChange : 'Atomic Field Change';
+    requirement <RTG008> durableDraft : 'Durable Draft Governance';
+    requirement <RTG009> draftWorkflow : 'Draft Inspection Validation And Activation';
+    requirement <RTG010> historicalState : 'Historical State And Canonical Ledger';
+    requirement <RTG011> activitySeparation : 'Activity Separation And Privacy';
+    requirement <RTG012> lifecycle : 'History Restore Audit And Backup';
+    requirement <RTG013> locality : 'Locality And Bounded Materialization';
+    requirement <RTG014> mcpBoundary : 'MCP Boundary Integrity';
+    requirement <VEL001> initialization : 'Fresh And V1 Initialization';
+    requirement <VEL002> starter : 'Recommended Everyday Life Start';
+    requirement <VEL003> simpleOperation : 'Simple Secure Individual Operation';
 
-    satisfy graphInvariants by vellis.memory;
-    satisfy semanticQueryMeaning by vellis.memory;
+    satisfy scalarDefinitions by vellis.memory;
+    satisfy graphLineage by vellis.memory;
+    satisfy localCardinality by vellis.memory;
+    satisfy unifiedQuery by vellis.memory;
+    satisfy queryPredicates by vellis.memory;
     satisfy querySafety by vellis.memory;
-    satisfy atomicCanonicalRevision by vellis.memory;
-    satisfy definitionCardinality by vellis.memory;
-    satisfy nonDisruptiveDefinitionWork by vellis.memory;
-    satisfy validationCoverage by vellis.memory;
-    satisfy durableCanonicalHistory by vellis.memory;
-    satisfy canonicalSnapshotCompleteness by vellis.memory;
-    satisfy replayEquivalence by vellis.memory;
-    satisfy historicalStateCorrectness by vellis.memory;
-    satisfy historicalRestoreSemantics by vellis.memory;
-    satisfy dualLedgerSeparation by vellis.memory;
-    satisfy agentDefinitionDiscoverability by vellis.memory;
-    satisfy explicitGraphChangeSet by vellis.memory;
-    satisfy boundedHistoryRead by vellis.memory;
-    satisfy mcpAgentToolContract by vellis.memory;
-    satisfy mcpOutcomeIntegrity by vellis.memory;
-    satisfy canonicalSemanticEquality by vellis.memory;
-    satisfy freshInitialization by vellis.memory;
-    satisfy stringPatternValidation by vellis.memory;
-    satisfy historyIndependentCurrentWork by vellis.memory;
-    satisfy boundedHistoricalSelectionWork by vellis.memory;
-    satisfy ownerControlledMemory by vellis;
-    satisfy observableFailure by vellis;
-    satisfy v1SnapshotCompatibility by vellis;
-    satisfy simpleIndividualOperation by vellis;
-    satisfy recommendedEverydayLifeStart by vellis;
-    satisfy ownerVisibleImprovementAnalysis by vellis;
+    satisfy atomicChange by vellis.memory;
+    satisfy durableDraft by vellis.memory;
+    satisfy draftWorkflow by vellis.memory;
+    satisfy historicalState by vellis.memory;
+    satisfy activitySeparation by vellis.memory;
+    satisfy lifecycle by vellis.memory;
+    satisfy locality by vellis.memory;
+    satisfy mcpBoundary by vellis.memory;
+    satisfy initialization by vellis;
+    satisfy starter by vellis;
+    satisfy simpleOperation by vellis;
 }

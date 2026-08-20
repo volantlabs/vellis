@@ -2,7 +2,13 @@
 
 Vellis is an individually owned personal AI system and an open demonstration of model-first software engineering with textual SysML v2.
 
-The repository contains the Vellis system model, its development tooling, and the application that realizes it; see [Implementation status](#implementation-status) for what is built and what is not. The model covers owner-facing behavior, Reified Type Graph (RTG) graph and query meaning, ledger-authoritative state and scalable history access, canonical equality and string-shape constraints, cold-agent current or historical definition discovery, definition governance, blank or recommended Everyday Life initialization, confirmed first-use import from a Vellis v1 JSON snapshot, snapshots and replay, proactive owner-visible analysis support, a selected ten-tool MCP contract, cohesive system responsibility, requirements, satisfiers, analysis, and verification cases.
+The repository contains the Vellis system model, its development tooling, and an application being
+reworked to conform to that model; see [Implementation status](#implementation-status) for the
+currently runnable predecessor behavior. The accepted model defines scalar RTG facts, local
+cardinality, progressive discovery, one bounded identity-or-connected-pattern query, atomic field
+patches and removals, one durable draft, indexed current and historical state, separate canonical
+and activity ledgers, restore, audit, backup, streamed v1 initialization, and STDIO or protected HTTP
+access for one owner.
 
 ## What is here
 
@@ -15,8 +21,8 @@ The repository contains the Vellis system model, its development tooling, and th
 - [`model/config/`](model/config/): checksum pins for the specifications, model libraries, and validator. The searchable corpus is generated from them into an ignored cache, never committed.
 - [`.agents/skills/`](.agents/skills/): a portable SysML v2 MBSwE core plus Vellis-specific domain
   and repository extensions.
-- [`implementation-campaign.yaml`](implementation-campaign.yaml): the baseline-bound current plan
-  and execution/evidence index for the application build; it is not product authority.
+- [`implementation-campaign.yaml`](implementation-campaign.yaml): the completed historical build
+  campaign record; it is not the active rebaseline plan or product authority.
 - [`system-evolution.yaml`](system-evolution.yaml): the baseline-bound active post-build finding,
   decision, work, and rebaseline index; it is not product authority.
 - [`tools/`](tools/): the pinned validator, reference search, skill checks, campaign validation, and
@@ -73,11 +79,12 @@ end-to-end slice, and returns conformance evidence or precisely classified feedb
 navigation aid, not another contract; the branch's SysML remains authoritative.
 
 A useful handoff answers the question, states the changed or reviewed meaning, gives decisive evidence
-and checks, and names only the remaining decision or follow-up work. An agent unfamiliar with an RTG
-begins with the modeled definition summary for current, prospective, or selected historical state,
-then inspects only the evaluated anchor neighborhoods needed for its query or proposed change. When
-continuing definition work it retrieves the sole proposal's identities, overlay counts, and assessment
-status, then uses prospective summary and inspection for its focused definition meaning.
+and checks, and names only the remaining decision or follow-up work. Under the accepted v2 authority,
+an agent unfamiliar with an RTG begins with the complete current or historical anchor-type summary,
+then inspects only the focused anchor neighborhoods needed for its query or change. Known UUIDs use
+identity selection directly; connected questions use pattern selection. Definition work uses the one
+durable draft: inspect its raw deltas, query the effective draft state, validate current findings, then
+activate or discard it. The runnable predecessor remains explicitly identified above until reworked.
 
 ## Development setup
 

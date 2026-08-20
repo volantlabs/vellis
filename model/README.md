@@ -1,91 +1,50 @@
 # Vellis model
 
-The textual SysML v2 files here are the current product and system authority for Vellis. The current
-namespace map is:
+The textual SysML v2 files here are product and system authority for Vellis:
 
-1. `10-rtg-domain.sysml` — `RTG`: graph, owner-described definitions and constraints, canonical equality, progressive discovery views, bounded query and change meaning, validation results, snapshots, revision, and ledger vocabulary.
-2. `15-everyday-life-starter.sysml` — `EverydayLifeStarter`: the complete modeled optional Everyday Life fresh-start definition set, with no graph data or separate schema authority.
-3. `20-rtg-system.sysml` — `RTGSystem`: one cohesive RTG boundary, black-box use cases, and the selected MCP tool contract.
-4. `30-vellis.sysml` — `Vellis`: owner and external-agent context, product use cases, fresh vocabulary choice, confirmed v1 onboarding, proactive improvement analysis, and RTG composition.
-5. `40-requirements.sysml` — `VellisRequirements`: stakeholder requirements, scaling constraints, selected subjects, and explicit satisfying features.
-6. `50-verification.sysml` — `VellisVerification`: subject-bound verification cases, performance characterization, and decisive evidence.
+1. `10-rtg-domain.sysml` defines scalar values, graph objects, definitions, local cardinality,
+   state selection, unified query, field-level changes, the draft, outcomes, ledgers, and v1
+   compatibility meaning.
+2. `15-everyday-life-starter.sysml` defines the optional recommended fresh vocabulary. It contains
+   definitions only.
+3. `20-rtg-system.sysml` defines one cohesive RTG boundary, owner-visible behavior, and the selected
+   MCP operations.
+4. `30-vellis.sysml` places that boundary in the one-owner product and covers initialization,
+   connection, ordinary use, governance, history, restore, audit, backup, and v1 adoption.
+5. `40-requirements.sysml` states cross-cutting obligations and selected satisfiers.
+6. `50-verification.sysml` states decisive conformance evidence and nearest wrong systems.
 
-These packages are intentional namespaces, not validator-required file structure or runtime layers.
-RTG owns graph, definition, revision, and history state as one semantic and transactional boundary.
-Its canonical ledger is authoritative; one current canonical-state tuple containing graph, active
-definitions, optional delta, and revision is derived through the final canonical record rather than
-forming parallel authority.
-Query, validation, history, and recovery are capabilities rather than internal subsystem parts.
+The model deliberately describes a small compositional product. Anchors identify durable concepts;
+associated-data objects hold sparse typed scalar facts and identity-free anchor associations; links
+are directed identity-bearing relationships. Definitions are small owner-described contracts with
+local bounds. UUID and type-key kind reservations persist through the lineage.
 
-The current elements express selected Vellis meaning; they are not a template requiring every future
-feature to add a use case, action, result, requirement, and verification in matching counts. Extend
-only the affected semantic path and reuse existing authority where it already carries the claim.
+A cold agent discovers the shallow anchor vocabulary, inspects focused neighborhoods, and uses one
+bounded query. Known UUIDs are selected directly. Connected graph questions use a pattern, and the
+system establishes the bounded identity rows before hydrating requested values. There is no separate
+get step, projection language, aggregation server, hidden variable, or disconnected product.
 
-The model selects core MCP tool discovery and invocation as the first agent-access contract. It does
-not select a server part, FastMCP runtime, storage design, transport, deployment, importer utility,
-generator, or implementation language. Its discovery results, snapshots, and ledgers are semantic
-artifacts, not serialized formats.
+Active graph changes are atomic field upserts and explicit removals. Unmentioned fields survive,
+absence differs from null, no cascade is inferred, and the batch is judged against its final state
+independent of command order. One durable noncanonical draft composes complete definition
+replacements and the same field-level graph patches over changing live state. Agents inspect raw
+deltas, query effective draft state, validate current findings, and activate or discard. The draft
+has no public version, status, assessment identity, or activation token.
 
-The model requires a supported local owner to follow supplied setup guidance, connect one trusted
-MCP agent, recover identical memory after restart, and receive actionable setup or connection
-failure. Framework, script, client-configuration, storage, packaging, and transport mechanics remain
-realization choices; the campaign may select them without turning them into model structure.
+Current and historical state are indexed directly. The canonical ledger is corruption-evident
+owner-readable history, not public replay; the separate activity ledger is observational. Restore
+creates a new revision, backup preserves complete database meaning, and first-use v1 adoption streams
+into an explicitly reported revision-zero candidate. Snapshot, tail, replay, relationship-rule
+identities, arbitrary nested user JSON, server aggregation, and public assessment objects are absent.
 
-The modeled property vocabulary includes RE2 whole-string constraints for string shape without
-selecting a runtime regex engine. Fresh systems may begin blank or, after explicit confirmation,
-with the recommended Everyday Life starter. Snapshot initialization uses the snapshot's definitions;
-the starter is not a later installer and is never overlaid on existing state. Existing systems adapt
-vocabulary through ordinary owner-controlled definition governance, including an agent translating
-an owner prompt. A first-use owner may instead preview and confirm compatible graph and definition
-meaning translated from a complete Vellis v1 JSON snapshot. That path establishes a new revision-zero
-v2 lineage; it is never an existing-system merge or replacement and never overlays the v2 starter.
-Starter dates constrain lexical shape only, not calendar validity or ordering.
+The model selects observable STDIO/HTTP and owner-lifecycle consequences but does not prescribe
+Python modules, tables, SQL, FastMCP internals, deployment units, or service machinery. Ordinary
+current discovery, query, and change must remain independent of excluded history and unrelated
+populations. Full validation, activation, restore, audit, import, and backup may legitimately scan
+relevant state with bounded working memory. Numerical performance targets remain deferred until
+representative hardware and owner data exist.
 
-A cold agent first requests the complete shallow anchor summary for current, prospective, or an
-explicit revision/time-selected historical state, then inspects the relevant anchor neighborhoods at that evaluated revision.
-Each result identifies its evaluated revision; if those revisions differ, the agent repeats discovery
-rather than relying on stale vocabulary. A time-based summary's resolved revision can be reused for
-inspection and graph query. If a current definition delta exists, the agent discovers its identity,
-proposed-definition neighborhoods, staged-overlay counts, and latest assessment through bounded views
-and compares those with the focused current views; the system does not manufacture a second schema
-authority or a server-side diff. Proposal discovery remains current-only.
-
-The initial MCP boundary assumes one trusted owner-configured client; its tools do not decide
-per-call authorization or owner approval. History tools return bounded owner-facing entries rather
-than replay-bearing canonical payloads. Owner-directed activity retention and recovery behavior remain
-modeled but are not additional initial MCP tools.
-
-The model constrains every production operation to avoid a resident complete graph, canonical state,
-definition-set document, or canonical-change document. Ordinary mutations validate their complete
-affected invariant closure; explicit conformance and broad definition cutovers may scan all relevant
-semantic entries while retaining bounded working memory; lifecycle operations use incremental, streaming, or
-set-based work. Current positive-pattern query work may restrict identities, types, direct
-associations, directed relationships, and property values in any useful order. Disconnected,
-parallel, self-link, and cyclic relationship predicates are conjunctive over one joint selector
-assignment. Query work
-bounds distinct answer identities before hydration or arithmetic; RE2 whole-string predicates filter
-present string properties without becoming stored-value validity authority; and unreturned identities
-affect an answer only through existence rather than multiplying work after a joint witness is established. Ordinary
-mutation distinguishes changed objects, structural validation subjects, unchanged lookup identities,
-and exact applicable multiplicity rule-subject-end work. Bounded
-historical selection avoids scanning excluded ledger prefixes. The portable model does not select materialized
-projections, revision/time or relationship indexes, definition checkpoints, caches, snapshot cadence,
-databases, or storage layouts. Those are possible non-normative realizations whose conformance is
-shown with semantic record, state-materialization, candidate-join, and query-work evidence.
-Numerical latency, startup, throughput, and storage budgets remain deferred until the modeled
-performance analysis has representative runtime, hardware, and owner-data measurements.
-
-Realization remains open in the portable model. Vellis evolution records may select one concrete
-storage and execution realization from actual scale, startup, durability, and portability needs;
-that selection does not become language-neutral RTG authority. Do not add interchangeable
-persistence or runtime abstractions before demonstrated need.
-
-The SysML on a branch is that branch's current system definition. Review its diff like code and accept changes through the normal pull-request process. Official validation establishes language conformance; requirements closure, verification evidence, and engineering review establish design quality.
-
-Run `just model-check` for full-model validation. Use `$sysml-modeling` for the engineering workflow,
-`$sysml-reference` for language evidence, `$rtg-schema-design` for RTG meaning and governance,
-`$sysml-implementation-planning` to derive the complete implementation campaign,
-`$sysml-implementation` for one accepted semantic slice, `$sysml-implementation-campaign` to execute
-an approved campaign through system closure, `$sysml-evolution` for changes to an already
-implemented model-and-code baseline, and
-`$documentation-sync` after model or workflow changes.
+Run `just model-check` for the pinned official validator and repository policy checks. Use
+`$sysml-reference` for consequential language choices, `$sysml-modeling` for system meaning and
+simplification, `$rtg-schema-design` for RTG governance, `$sysml-evolution` for post-build changes,
+and `$documentation-sync` after model or public workflow changes.

@@ -1,1190 +1,633 @@
 package RTG {
-    /*
-     * Language-neutral RTG graph, definition, query, validation, revision,
-     * snapshot, and history vocabulary. Physical storage, serialization,
-     * executable query syntax, and recovery mechanisms remain open.
-     */
+    /* Language-neutral meaning for one personally owned reified type graph. */
 
     attribute def 'Graph UUID' :> ScalarValues::String {
-        doc /* The stable UUID of one identity-bearing graph object. */
+        doc /* A canonical lowercase hyphenated UUID for one graph object. */
     }
-
     attribute def 'Type Key' :> ScalarValues::String {
-        doc /* A non-empty key in the single namespace shared by all RTG types. */
+        doc /* A non-empty exact Unicode key in the namespace shared by all definition kinds. */
     }
-
-    attribute def 'Query Name' :> ScalarValues::String {
-        doc /* A non-empty query-local name for one group, link condition, data condition, projection, or aggregation. */
-    }
-
-    attribute def 'Revision Number' :> ScalarValues::Natural {
-        doc /* A position in the monotonically increasing total revision order. */
-    }
-
+    attribute def 'Property Name' :> ScalarValues::String;
+    attribute def 'Query Name' :> ScalarValues::String;
+    attribute def 'Revision Number' :> ScalarValues::Natural;
+    attribute def 'Activity Number' :> ScalarValues::Positive;
     attribute def 'Recorded Time' {
-        doc /* A language-neutral chronological instant; representation remains open. */
+        doc /* An offset-aware chronological instant normalized to UTC. */
+    }
+    attribute def 'Date Value' :> ScalarValues::String {
+        doc /* A valid proleptic-Gregorian date from year 0001 through 9999 in YYYY-MM-DD form. */
+    }
+    attribute def 'Timestamp Value' :> ScalarValues::String {
+        doc /* A UTC-normalized RFC 3339 instant with seconds and at most nanosecond precision. */
     }
 
-    attribute def 'Assessment ID' :> ScalarValues::String {
-        doc /* The stable identity of one completed validation assessment. */
+    enum def 'Scalar Kind' {
+        enum boolean; enum integer; enum number; enum text; enum date; enum timestamp;
     }
-
-    attribute def 'Canonical Record Identity' :> ScalarValues::String {
-        doc /* A content- and lineage-bound identity for one canonical record. */
-    }
-
-    attribute def 'Definition Set Identity' :> ScalarValues::String {
-        doc /* A canonical semantic identity for one complete graph definition set. */
-    }
-
-    attribute def 'Graph Overlay Identity' :> ScalarValues::String {
-        doc /* A canonical semantic identity for one keyed prospective graph overlay. */
-    }
-
-    attribute def 'JSON Value' {
-        doc /*
-         * Any JSON value preserved without loss of kind or nested content.
-         * Semantic equality is JSON-kind-sensitive. Numbers compare by exact
-         * mathematical value, strings by exact Unicode code-point sequence
-         * without normalization, arrays recursively in order, and objects
-         * recursively without member-order significance. A missing property
-         * remains distinct from a present JSON null value.
-         */
-    }
-
-    attribute def 'JSON Object' :> 'JSON Value' {
-        doc /* An object-valued collection of named JSON values. */
-    }
-
-    attribute def 'Value Shape' {
-        attribute minimumSize [0..1] : ScalarValues::Natural;
-        attribute maximumSize [0..1] : ScalarValues::Natural;
-        doc /*
-         * A closed size condition for a string, array, or object value. String
-         * size is the number of Unicode code points without normalization; array
-         * and object size are the number of elements and members respectively.
-         * At least one bound is present, and a present maximum is not less than a
-         * present minimum. Other JSON kinds cannot carry a value-shape condition.
-         */
-    }
-
-    attribute def 'String Pattern' {
-        attribute expression : ScalarValues::String;
-        doc /*
-         * A Google RE2 regular expression evaluated over a Unicode string with
-         * whole-string FullMatch semantics. RE2-supported inline flags are part
-         * of the expression; there is no separate flags value. An expression
-         * that RE2 rejects, including lookaround or a backreference, is invalid.
-         * The selected language and semantics do not select a runtime engine.
-         */
-    }
-
-    attribute def 'Value Range' {
-        attribute lowerBound [0..1] : 'JSON Value';
-        attribute upperBound [0..1] : 'JSON Value';
-        attribute permittedValues [*] : 'JSON Value';
-        doc /*
-         * A closed permitted-value condition. At least one bound or permitted
-         * value is present. Bounds are lossless numberValue values with a lower
-         * not greater than an upper; both bounds are inclusive.
-         * Permitted values have the governed property's JSON kind and are unique
-         * by lossless JSON equality. When bounds and permitted values coexist, a
-         * value must satisfy both.
-         */
-    }
-
-    enum def 'JSON Kind' {
-        enum nullValue;
-        enum booleanValue;
-        enum numberValue;
-        enum stringValue;
-        enum arrayValue;
-        enum objectValue;
-    }
-
-    enum def 'Operation Status' {
-        enum accepted;
-        enum rejected;
-        enum failed;
-        doc /*
-         * Accepted means the invoked domain operation completed, including an
-         * accepted no-op. Rejected means a well-formed semantic request was not
-         * accepted. Failed means an invoked operation did not complete but could
-         * safely report that status, and its promised failure non-effects hold.
-         * Input that cannot form
-         * the tool's typed domain object is malformed before an RTG operation
-         * outcome exists.
-         */
-    }
-
-    enum def 'Validation Scope' {
-        enum graphConformance;
-        enum definitionDelta;
-    }
-
-    enum def 'Graph Change Target' {
-        enum active;
-        enum definitionDelta;
-    }
-
-    enum def 'Validation Request Kind' {
-        enum assess;
-        enum readFindings;
-    }
-
-    enum def 'Property Comparison' {
-        enum equal;
-        enum notEqual;
-        enum lessThan;
-        enum lessThanOrEqual;
-        enum greaterThan;
-        enum greaterThanOrEqual;
-        enum matchesPattern;
-    }
-
-    enum def 'History Kind' {
-        enum canonical;
-        enum activity;
-    }
-
+    enum def 'Object Kind' { enum anchor; enum associatedData; enum link; }
+    enum def 'Pattern Node Kind' { enum anchor; enum associatedData; }
+    enum def 'Definition Kind' { enum anchor; enum associatedData; enum link; }
+    enum def 'Operation Status' { enum accepted; enum rejected; }
+    enum def 'Activity Outcome' { enum accepted; enum rejected; enum failed; }
+    enum def 'History Kind' { enum canonical; enum activity; }
     enum def 'Transition Kind' {
-        enum graphMutation;
-        enum definitionDeltaChange;
-        enum definitionActivation;
-        enum historicalRestoration;
+        enum initialization; enum graphChange; enum draftActivation; enum restore;
     }
-
+    enum def 'Activity Mode' { enum semantic; enum verbose; }
+    enum def 'Draft Category' {
+        enum definitions; enum anchors; enum associatedData; enum links;
+    }
+    enum def 'Draft Operation' { enum add; enum patch; enum replace; enum remove; }
+    enum def 'Finding Code' {
+        enum duplicate; enum missing; enum unknown; enum kindMismatch;
+        enum invalidValue; enum constraintViolation; enum cardinalityViolation;
+        enum conflict; enum staleRevision; enum expiredCursor;
+        enum resultLimitExceeded; enum integrityFailure;
+    }
+    enum def 'Predicate Operator' {
+        enum present; enum missing; enum isNull; enum isNotNull;
+        enum equal; enum notEqual; enum lessThan; enum lessThanOrEqual;
+        enum greaterThan; enum greaterThanOrEqual; enum anyOf;
+        enum contains; enum prefix; enum regex;
+        enum allTerms; enum anyTerms; enum phrase;
+    }
     enum def 'Recovery Finding Disposition' {
-        enum preserved;
-        enum simplified;
-        enum omitted;
-        enum blocking;
+        enum preserved; enum converted; enum omitted; enum blocking;
     }
 
-    enum def 'Definition Delta Disposition' {
-        enum unchanged;
-        enum present;
-        enum absent;
+    abstract attribute def 'Scalar Value' {
+        doc /* Exactly one non-null scalar value; absence and null are modeled separately. */
     }
-
-    enum def 'Link End' {
-        enum source;
-        enum target;
+    attribute def 'Boolean Value' :> 'Scalar Value' { attribute value : ScalarValues::Boolean; }
+    attribute def 'Integer Value' :> 'Scalar Value' {
+        attribute value : ScalarValues::Integer;
+        doc /* Between -9007199254740991 and 9007199254740991 inclusive. */
     }
-
-    enum def 'Direct Association End' {
-        enum anchor;
-        enum associatedData;
+    attribute def 'Number Value' :> 'Scalar Value' {
+        attribute value : ScalarValues::Real;
+        doc /* A finite IEEE-754 binary64 value with negative zero canonicalized to positive zero. */
     }
+    attribute def 'Text Value' :> 'Scalar Value' { attribute value : ScalarValues::String; }
+    attribute def 'Date Scalar' :> 'Scalar Value' { attribute value : 'Date Value'; }
+    attribute def 'Timestamp Scalar' :> 'Scalar Value' { attribute value : 'Timestamp Value'; }
 
-    attribute def 'System Metadata' :> 'JSON Object' {
-        attribute live : ScalarValues::Boolean default = true;
-
+    attribute def 'Property Value' {
+        attribute name : 'Property Name';
+        attribute value [0..1] : 'Scalar Value';
+        attribute isNull : ScalarValues::Boolean default = false;
         doc /*
-         * Canonical metadata has a Boolean live value. V1 translation normalizes
-         * a missing source value to true and preserves other JSON values.
+         * Exactly one of value or isNull=true applies. No occurrence means
+         * absence; isNull=true means a present null.
          */
+    }
+    attribute def 'System Envelope' {
+        attribute createdRevision : 'Revision Number';
+        attribute lastChangedRevision : 'Revision Number';
+        attribute legacyV1 [0..1] : ScalarValues::String;
+        doc /* Read-only Vellis-owned lifecycle data. legacyV1 is canonical JSON text. */
     }
 
     abstract item def 'Graph Object' {
-        doc /*
-         * An identity-bearing RTG object. UUIDs are globally unique across
-         * object kinds. A type key never changes an object's kind.
-         */
-
         attribute uuid : 'Graph UUID';
         attribute typeKey : 'Type Key';
-        attribute systemMetadata : 'System Metadata';
+        attribute system [0..1] : 'System Envelope';
+        doc /*
+         * Canonical current/historical objects have one system envelope. A
+         * never-live draft proposal has none until activation.
+         */
     }
-
     abstract item def 'Link Endpoint' :> 'Graph Object';
-
-    item def Anchor :> 'Link Endpoint' {
-        doc /*
-         * A stable, independently identifiable concept. Its required non-empty
-         * display name is an editable human and agent convenience; UUID remains
-         * identity and type key remains ontology.
-         */
-        attribute displayName : ScalarValues::String;
-    }
-
+    item def Anchor :> 'Link Endpoint' { attribute displayName : ScalarValues::String; }
     item def 'Associated Data Object' :> 'Link Endpoint' {
-        doc /*
-         * An identity-bearing typed fact group grounded by one or more
-         * anchors. The many-to-many references are identity-free direct
-         * associations, not links or graph objects.
-         */
-
         ref item anchors [1..*] : Anchor;
-        attribute properties : 'JSON Object';
+        attribute properties [*] : 'Property Value';
+        doc /* Anchor references form one duplicate-free identity-free direct-association set. */
     }
-
     item def Link :> 'Graph Object' {
-        doc /*
-         * An identity-bearing typed directed relationship. Source and target
-         * are independently existing anchors or associated data objects;
-         * links are never endpoints.
-         */
-
         ref item source : 'Link Endpoint';
         ref item target : 'Link Endpoint';
     }
-
     item def Graph {
-        doc /*
-         * Canonical graph state. Every direct association and link endpoint
-         * resolves to an object owned by this graph. Semantic equality compares
-         * graph-object UUID, kind, type key, display name when applicable,
-         * metadata, properties, direct anchor associations, and directed link
-         * endpoints. Owned graph-object collections and direct-association sets
-         * are unordered; reordering them does not change graph meaning.
-         */
-
         item anchors [*] : Anchor;
         item associatedData [*] : 'Associated Data Object';
         item links [*] : Link;
-    }
-
-    /* Definition and constraint governance. */
-
-    abstract item def 'Definition Object' {
-        attribute description [0..1] : ScalarValues::String;
         doc /*
-         * Governance state that is not an RTG graph object. Active definitions
-         * require one non-empty owner-readable description; proposed definitions
-         * may temporarily omit it and report an activation-blocking finding.
-         * Automatic assessment establishes presence and non-emptiness; the
-         * owner judges whether the wording communicates the intended meaning.
-         * Descriptions and all structured rules participate in semantic
-         * equality. Definition collections and referenced type sets are
-         * unordered unless explicitly declared ordered.
+         * UUIDs are unique across kinds for the full lineage. References resolve
+         * within the selected state. Collections are unordered sets; self-links
+         * are valid and links are never endpoints.
          */
     }
 
-    abstract item def 'Type Definition' :> 'Definition Object' {
+    item def 'Inclusive Cardinality' {
+        attribute minimum : ScalarValues::Natural;
+        attribute maximum [0..1] : ScalarValues::Natural;
+        doc /* An absent maximum is unbounded; a present maximum is not below minimum. */
+    }
+    item def 'Property Definition' {
+        attribute name : 'Property Name';
+        attribute description : ScalarValues::String;
+        attribute valueKind : 'Scalar Kind';
+        attribute required : ScalarValues::Boolean default = false;
+        attribute nullable : ScalarValues::Boolean default = false;
+        attribute allowedValues [*] ordered : 'Scalar Value';
+        attribute minimum [0..1] : 'Scalar Value';
+        attribute maximum [0..1] : 'Scalar Value';
+        attribute minimumLength [0..1] : ScalarValues::Natural;
+        attribute maximumLength [0..1] : ScalarValues::Natural;
+        attribute pattern [0..1] : ScalarValues::String;
+        doc /*
+         * One closed scalar rule. Allowed values are non-null and same-kind.
+         * Numeric, date, and timestamp bounds are inclusive. Text lengths count
+         * Unicode code points. A text pattern is a case-sensitive RE2 whole-string rule.
+         */
+    }
+    abstract item def 'Type Definition' {
         attribute typeKey : 'Type Key';
+        attribute description : ScalarValues::String;
+        attribute system [0..1] : 'System Envelope';
+        doc /*
+         * Canonical current/historical definitions have one system envelope. A
+         * never-live draft replacement has none until activation.
+         */
     }
-
     abstract item def 'Endpoint Type Definition' :> 'Type Definition';
-
     item def 'Anchor Type Definition' :> 'Endpoint Type Definition';
-
     item def 'Associated Data Type Definition' :> 'Endpoint Type Definition' {
-        item propertyConstraints [*] : 'Property Constraint';
-        ref item permittedAnchorTypes [1..*] : 'Anchor Type Definition';
-        doc /*
-         * Governs the complete allowed property vocabulary and the anchor types
-         * that may ground this associated-data type. A required property must be
-         * present; an optional property may be absent; an undeclared property is
-         * invalid for an object of this type.
-         */
+        ref item permittedAnchorTypes [1..*] ordered : 'Anchor Type Definition';
+        item properties [*] ordered : 'Property Definition';
+        item anchorsPerObject : 'Inclusive Cardinality';
+        item objectsPerAnchor : 'Inclusive Cardinality';
+        doc /* anchorsPerObject minimum is at least one. */
     }
-
     item def 'Link Type Definition' :> 'Type Definition' {
-        item endpointConstraint : 'Endpoint Constraint';
+        ref item permittedSourceTypes [1..*] ordered : 'Endpoint Type Definition';
+        ref item permittedTargetTypes [1..*] ordered : 'Endpoint Type Definition';
+        item linksPerSource : 'Inclusive Cardinality';
+        item linksPerTarget : 'Inclusive Cardinality';
     }
-
-    item def 'Property Constraint' :> 'Definition Object' {
-        doc /*
-         * Governs one associated-data property with requiredness, one JSON kind,
-         * and optional closed size, permitted-value, and string-pattern
-         * conditions. A pattern is valid only for stringValue and every listed
-         * permitted string must also match it. Present conditions apply
-         * conjunctively; no satisfiability proof between pattern and size is
-         * required. A condition incompatible with the selected JSON kind is
-         * invalid. No serialized schema or general constraint language is selected.
-         * The property name is non-empty and unique within its owning
-         * associated-data type definition. Its natural identity is that owning
-         * type key plus property name. Pattern expression text participates
-         * exactly in equality; equivalent expressions are not normalized.
-         */
-        attribute propertyName : ScalarValues::String;
-        attribute required : ScalarValues::Boolean;
-        attribute jsonKind : 'JSON Kind';
-        attribute valueShape [0..1] : 'Value Shape';
-        attribute range [0..1] : 'Value Range';
-        attribute pattern [0..1] : 'String Pattern';
-    }
-
-    item def 'Endpoint Constraint' :> 'Definition Object' {
-        doc /* States permitted source and target endpoint types. */
-        ref item permittedSourceTypes [1..*] : 'Endpoint Type Definition';
-        ref item permittedTargetTypes [1..*] : 'Endpoint Type Definition';
-    }
-
-    abstract item def 'Relationship Constraint' :> 'Definition Object';
-
-    abstract item def 'Multiplicity Constraint' :> 'Relationship Constraint' {
-        doc /*
-         * The lower bound is required. An absent upper bound is unbounded;
-         * otherwise the upper bound is not less than the lower bound.
-         */
-        attribute lowerBound : ScalarValues::Natural;
-        attribute upperBound [0..1] : ScalarValues::Natural;
-    }
-
-    item def 'Link Multiplicity Constraint' :> 'Multiplicity Constraint' {
-        doc /*
-         * Counts links of one type at a selected source or target end for
-         * constrained endpoint types and permitted opposite endpoint types. Its
-         * natural identity is the link type key, constrained end, and the two
-         * unordered participating type-key sets.
-         */
-        ref item linkType : 'Link Type Definition';
-        attribute constrainedEnd : 'Link End';
-        ref item constrainedEndpointTypes [1..*] : 'Endpoint Type Definition';
-        ref item oppositeEndpointTypes [1..*] : 'Endpoint Type Definition';
-    }
-
-    item def 'Direct Association Multiplicity Constraint' :> 'Multiplicity Constraint' {
-        doc /*
-         * Counts identity-free anchor/data associations at the selected end
-         * between the stated anchor and associated-data type populations. Its
-         * natural identity is the constrained end and the two unordered
-         * participating type-key sets.
-         */
-        attribute constrainedEnd : 'Direct Association End';
-        ref item anchorTypes [1..*] : 'Anchor Type Definition';
-        ref item associatedDataTypes [1..*] : 'Associated Data Type Definition';
-    }
-
     item def 'Graph Definition Set' {
+        item anchorTypes [*] ordered : 'Anchor Type Definition';
+        item associatedDataTypes [*] ordered : 'Associated Data Type Definition';
+        item linkTypes [*] ordered : 'Link Type Definition';
         doc /*
-         * Complete graph vocabulary and constraint content. An active set and a
-         * proposal accepted for activation require type keys unique in one
-         * namespace and every reference resolved within the set. An in-progress
-         * proposal may temporarily violate those conditions so its assessment can
-         * expose the complete repair need.
-         * A type definition's natural identity is its type key; its definition
-         * kind is semantic content. Endpoint constraints are identified by their
-         * owning link type. Property and multiplicity constraints use their
-         * stated natural identities. Duplicate natural identities and duplicate
-         * members of any set are invalid. Distinct overlapping multiplicity
-         * constraints apply conjunctively. Unordered definition and referenced
-         * type collections compare without order significance.
+         * Type keys are unique across definition kinds for the full lineage.
+         * Every description is non-empty and every reference resolves. Different
+         * cardinality meaning requires a distinct data or link type.
          */
-        item anchorTypes [*] : 'Anchor Type Definition';
-        item associatedDataTypes [*] : 'Associated Data Type Definition';
-        item linkTypes [*] : 'Link Type Definition';
-        item relationshipConstraints [*] : 'Relationship Constraint';
     }
 
-    item def 'Definition Delta' {
-        doc /*
-         * The sole prospective next definition set and keyed graph overlay.
-         * Complete-object upserts replace the effective value at their UUID and
-         * explicit removals are tombstones; identities absent from the overlay
-         * retain active meaning. The overlay is proposed state, not an ordered
-         * edit log or a second active graph. When present in canonical state, its
-         * effective proposed definitions and graph differ semantically from the
-         * active definitions and graph.
-         */
-        item proposedDefinitions : 'Graph Definition Set';
-        item graphOverlay : 'Graph Change';
+    abstract item def 'State Selection';
+    item def 'Current Selection' :> 'State Selection';
+    item def 'Draft Selection' :> 'State Selection';
+    item def 'Revision Selection' :> 'State Selection' {
+        attribute revision : 'Revision Number';
     }
-
-    /* Agent-oriented definition discovery. */
-
-    item def 'Anchor Type Summary' {
-        ref item definition : 'Anchor Type Definition';
-        doc /* Projects the authoritative type key and description without copying their authority. */
+    item def 'Time Selection' :> 'State Selection' {
+        attribute timestamp : 'Timestamp Value';
     }
-
+    item def 'Anchor Type Summary' { ref item definition : 'Anchor Type Definition'; }
     item def 'Definition Summary Request' {
-        item 'state' : 'Evaluated State Selection';
-        doc /*
-         * Selects current, prospective, revision, or time meaning. An omitted
-         * external state value means current. Prospective selection requires a
-         * current definition delta; revision and time selections evaluate active
-         * definitions at their resolved committed revision.
-         */
+        item 'state' [0..1] : 'State Selection';
+        doc /* Omitted state selects current. */
     }
-
-    item def 'Definition Inspection Request' :> 'Definition Summary Request' {
-        attribute anchorTypeKeys [1..*] : 'Type Key';
-        doc /*
-         * Selects a non-empty unique set of anchor keys from the definitions
-         * selected by the request state.
-         */
+    item def 'Definition Inspection Request' {
+        item 'state' [0..1] : 'State Selection';
+        attribute anchorTypeKeys [1..*] ordered : 'Type Key';
+        attribute includeLegacySystem : ScalarValues::Boolean default = false;
+        doc /* Omitted state selects current. */
     }
-
-    item def 'Anchor Definition Detail' {
+    item def 'Anchor Definition Neighborhood' {
         ref item anchorType : 'Anchor Type Definition';
-        ref item associatedDataTypes [*] : 'Associated Data Type Definition';
-        ref item linkTypes [*] : 'Link Type Definition';
-        ref item relationshipConstraints [*] : 'Relationship Constraint';
+        ref item associatedDataTypes [*] ordered : 'Associated Data Type Definition';
+        ref item linkTypes [*] ordered : 'Link Type Definition';
         doc /*
-         * A complete evaluated-definition neighborhood for one selected anchor.
-         * Current and historical scopes evaluate active definitions; prospective
-         * scope evaluates the delta's proposed definitions.
-         * Associated-data property and link endpoint constraints are carried by
-         * their referenced type definitions. Link roles include those involving
-         * the anchor or its permitted associated-data types. Unrelated
-         * definitions are omitted.
+         * Complete focused meaning: data types that permit the anchor and link
+         * types involving the anchor or those data types. Unrelated definitions
+         * are not recursively copied.
          */
     }
 
-    item def 'Link Multiplicity Selection' {
-        attribute linkTypeKey : 'Type Key';
-        attribute constrainedEnd : 'Link End';
-        attribute constrainedEndpointTypeKeys [1..*] : 'Type Key';
-        attribute oppositeEndpointTypeKeys [1..*] : 'Type Key';
-        doc /* Selects one link-multiplicity natural identity without carrying its rule value. */
+    item def 'Property Selection' {
+        attribute 'all' : ScalarValues::Boolean default = false;
+        attribute names [*] : 'Property Name';
+        doc /* Omission requests no properties; all and names are mutually exclusive. */
     }
-
-    item def 'Direct Association Multiplicity Selection' {
-        attribute constrainedEnd : 'Direct Association End';
-        attribute anchorTypeKeys [1..*] : 'Type Key';
-        attribute associatedDataTypeKeys [1..*] : 'Type Key';
-        doc /* Selects one direct-association-multiplicity natural identity without carrying its rule value. */
+    item def 'Identity Object Selection' {
+        attribute uuid : 'Graph UUID';
+        item properties [0..1] : 'Property Selection';
+        attribute includeLegacySystem : ScalarValues::Boolean default = false;
     }
-
-    item def 'Definition Change' {
-        item anchorTypeUpserts [*] : 'Anchor Type Definition';
-        item associatedDataTypeUpserts [*] : 'Associated Data Type Definition';
-        item linkTypeUpserts [*] : 'Link Type Definition';
-        item relationshipConstraintUpserts [*] : 'Relationship Constraint';
-        attribute typeRemovals [*] : 'Type Key';
-        item linkMultiplicityRemovals [*] : 'Link Multiplicity Selection';
-        item directAssociationMultiplicityRemovals [*] : 'Direct Association Multiplicity Selection';
+    abstract item def 'Query Selection';
+    item def 'Identity Selection' :> 'Query Selection' {
+        item objects [1..*] ordered : 'Identity Object Selection';
+    }
+    abstract item def 'Predicate Field';
+    item def 'Display Name Field' :> 'Predicate Field';
+    item def 'Property Field' :> 'Predicate Field' { attribute name : 'Property Name'; }
+    item def Predicate {
+        item field : 'Predicate Field';
+        attribute operator : 'Predicate Operator';
+        attribute value [0..1] : 'Scalar Value';
+        attribute values [*] : 'Scalar Value';
+        attribute text [0..1] : ScalarValues::String;
+        attribute terms [*] : ScalarValues::String;
+        attribute caseSensitive : ScalarValues::Boolean default = false;
         doc /*
-         * One bounded keyed edit of proposed definitions. Upserts carry complete
-         * values at their natural identities; removals carry only natural identity.
-         * Duplicate commands and upsert/removal conflicts are rejected. Several
-         * accepted edits may build one temporarily invalid proposal incrementally.
-         * With no delta, the first effective edit applies over complete active
-         * definition meaning without requiring its physical materialization; with
-         * a delta, it applies over current proposed-definition meaning. Definitions
-         * untouched by an edit retain their prior effective meaning.
-         * With a present delta, an edit that would make the effective proposal
-         * semantically equal to active state is rejected and preserves the prior
-         * delta; explicit discard is the only operation that removes it. With no
-         * delta, an active-equivalent edit is an accepted no-op and creates none.
+         * Payload presence follows exactly the selected operator: presence/null
+         * operators carry none; equality/order carries one value; anyOf carries
+         * one nonempty values set; contains/prefix/regex carries text; term
+         * operators carry a nonempty term set; phrase carries text. Other payload
+         * members are absent. Full-text input is structured, never raw FTS syntax.
          */
     }
-
-    item def 'Set Definition Delta Request' {
-        item change : 'Definition Change';
-    }
-
-    item def 'Activate Definition Delta Request' {
-        attribute assessmentID : 'Assessment ID';
-        doc /* Selects the exact completed prospective assessment authorizing activation. */
-    }
-
-    /* Simple semantic query vocabulary. */
-
-    item def 'UUID Filter' {
-        attribute uuids [1..*] : 'Graph UUID';
-        doc /*
-         * Narrows one selector to a non-empty set of unique known identities of
-         * its required object kind and type. Any unknown, wrong-kind, or
-         * wrong-type member rejects the whole query. A valid data identity that
-         * does not satisfy association or property conditions simply does not match.
-         * A present empty member collection is a semantic invalidity that rejects
-         * the whole query; an external representation that cannot form this typed
-         * value remains an input-boundary error.
-         */
-    }
-
-    abstract item def 'Endpoint Group' {
+    item def 'Pattern Node' {
         attribute name : 'Query Name';
-        doc /* A named candidate set whose members may participate as link endpoints. */
+        attribute kind : 'Pattern Node Kind';
+        attribute typeKeys [*] : 'Type Key';
+        attribute uuids [*] : 'Graph UUID';
+        item predicates [*] : Predicate;
+        item properties [0..1] : 'Property Selection';
+        attribute includeLegacySystem : ScalarValues::Boolean default = false;
+        doc /* Empty type-key or UUID collections mean that filter is omitted. */
     }
-
-    item def 'Anchor Group' :> 'Endpoint Group' {
-        attribute anchorTypes [1..*] : 'Type Key';
-        item uuidFilter [0..1] : 'UUID Filter';
-        doc /*
-         * A named anchor candidate set of one or more types in the definitions
-         * governing the evaluated state. An anchor belongs to the set when its
-         * type is any of the named ones, so one group can ask about work that
-         * takes several shapes without the caller issuing a query for each. The
-         * named types are unordered and each is named once; every one of them
-         * must be an active anchor type. Where a group takes part in a required
-         * link, every type it names must be permitted in the endpoint role it
-         * plays there, so a link can never quietly mean less than the group says.
-         * An
-         * absent UUID filter considers all anchors of those types.
-         */
+    item def 'Direct Association Predicate' {
+        ref item anchorNode : 'Pattern Node';
+        ref item associatedDataNode : 'Pattern Node';
     }
-
-    item def 'Required Link' {
+    item def 'Pattern Link' {
         attribute name : 'Query Name';
-        ref item sourceGroup : 'Endpoint Group';
-        ref item targetGroup : 'Endpoint Group';
-        attribute linkType : 'Type Key';
-        item uuidFilter [0..1] : 'UUID Filter';
-        doc /*
-         * Requires a directed link of one type in the definitions governing the
-         * evaluated state from a source-group
-         * candidate to a target-group candidate. Groups may select anchors or
-         * directly associated data. An optional UUID filter restricts the
-         * matching identity-bearing links.
-         */
+        ref item sourceNode : 'Pattern Node';
+        ref item targetNode : 'Pattern Node';
+        attribute typeKeys [*] : 'Type Key';
+        attribute uuids [*] : 'Graph UUID';
+        attribute includeLegacySystem : ScalarValues::Boolean default = false;
+        doc /* Empty type-key or UUID collections mean that filter is omitted. */
     }
-
-    item def 'Data Property Condition' {
-        doc /*
-         * A structured comparison against one present property value. A missing
-         * property does not satisfy the condition. The property definition in
-         * the definitions governing the evaluated state remains authoritative for JSON kind, shape,
-         * permitted range, and stored-value pattern validation. Equal and
-         * notEqual compare lossless JSON values;
-         * ordered comparisons are valid for numberValue properties, compared by
-         * exact mathematical value, and for stringValue properties, compared by
-         * exact Unicode code-point sequence without normalization, which is the
-         * same basis equality already uses. Ordered comparison of a
-         * nullValue, booleanValue, arrayValue, or objectValue property, and any
-         * ordered comparison whose expected value is of a different JSON kind
-         * from the property, are rejected. matchesPattern requires a stringValue
-         * property and string expected value containing a valid Google RE2
-         * expression; it uses Unicode whole-string FullMatch behavior.
-         */
-        attribute propertyName : ScalarValues::String;
-        attribute comparison : 'Property Comparison';
-        attribute expectedValue : 'JSON Value';
-    }
-
-    item def 'Associated Data Condition' :> 'Endpoint Group' {
-        ref item anchorGroup : 'Anchor Group';
-        attribute associatedDataType : 'Type Key';
-        item uuidFilter [0..1] : 'UUID Filter';
-        item propertyConditions [*] : 'Data Property Condition';
-        doc /*
-         * Selects directly associated data of the evaluated type that satisfies
-         * every stated property condition. With no property conditions, the
-         * condition expresses existence of directly associated data of that
-         * type. Its selected objects may participate as required-link endpoints.
-         */
-    }
-
-    abstract item def 'Return Projection' {
-        attribute name : 'Query Name';
-    }
-
-    item def 'Anchor Projection' :> 'Return Projection' {
-        ref item anchorGroup : 'Anchor Group';
-    }
-
-    item def 'Link Projection' :> 'Return Projection' {
-        ref item requiredLink : 'Required Link';
-    }
-
-    item def 'Associated Data Projection' :> 'Return Projection' {
-        ref item dataCondition : 'Associated Data Condition';
-    }
-
-    item def 'Data Property Projection' :> 'Return Projection' {
-        ref item dataCondition : 'Associated Data Condition';
-        attribute propertyName : ScalarValues::String;
-    }
-
-    abstract item def 'Query Output';
-
-    item def 'Row Query Output' :> 'Query Output' {
-        item projections [1..*] : 'Return Projection';
-        attribute maximumRows : ScalarValues::Positive;
-        doc /*
-         * Selects a non-empty set of named anchor, link, associated-data, and
-         * property bindings and one positive complete-result bound.
-         * Every projection references a selector owned by its graph query, and
-         * every projection name is unique within that query.
-         */
-    }
-
-    enum def 'Aggregation Operator' {
-        enum count;
-        enum sum;
-        enum minimum;
-        enum maximum;
-    }
-
-    item def 'Query Aggregation' {
-        attribute name : 'Query Name';
-        attribute operator : 'Aggregation Operator';
-        attribute propertyName [0..1] : ScalarValues::String;
-        doc /*
-         * One arithmetic answer about the aggregate output's matching target
-         * objects, returned instead of those objects.
-         *
-         * Count takes no property and counts matches. Sum, minimum, and maximum
-         * name a present property of the condition's type and read only the
-         * matches that carry it: sum requires a numberValue property; minimum
-         * and maximum accept numberValue or stringValue and order values exactly
-         * as an ordered comparison does. An operator naming no property where one
-         * is required, a property the condition's type does not define, or a
-         * property whose kind the operator cannot order, is rejected.
-         *
-         * Every operation uses the one aggregate output target population.
-         */
-    }
-
-    item def 'Aggregate Query Output' :> 'Query Output' {
-        ref item dataCondition : 'Associated Data Condition';
-        item aggregations [1..*] : 'Query Aggregation';
+    item def 'Pattern Selection' :> 'Query Selection' {
         attribute maximumMatches : ScalarValues::Positive;
+        item nodes [1..*] ordered : 'Pattern Node';
+        item directAssociations [*] : 'Direct Association Predicate';
+        item links [*] ordered : 'Pattern Link';
         doc /*
-         * Selects one associated-data condition as the sole visible aggregate
-         * population, one or more arithmetic answers over its distinct matching
-         * object identities, and one positive complete-selection bound.
+         * A single node is valid; otherwise the undirected pattern is connected.
+         * Names are unique across nodes and links. Distinct names bind distinct
+         * identities. Conditions are conjunctive. Cycles, parallel links, and a
+         * true self-link expressed by reusing one endpoint node are valid.
          */
     }
-
     item def 'Graph Query' {
-        item anchorGroups [1..*] : 'Anchor Group';
-        item requiredLinks [*] : 'Required Link';
-        item dataConditions [*] : 'Associated Data Condition';
-        item output : 'Query Output';
-        item 'state' : 'Evaluated State Selection';
+        item 'state' [0..1] : 'State Selection';
+        item selection : 'Query Selection';
+        doc /* Omitted state selects current. */
+    }
+    item def 'Pattern Binding' {
+        attribute name : 'Query Name';
+        attribute uuid : 'Graph UUID';
+    }
+    item def 'Pattern Match' { item bindings [1..*] ordered : 'Pattern Binding'; }
+    item def 'Hydrated Object' {
+        attribute uuid : 'Graph UUID';
+        attribute kind : 'Object Kind';
+        attribute typeKey : 'Type Key';
+        attribute displayName [0..1] : ScalarValues::String;
+        attribute anchorUuids [*] ordered : 'Graph UUID';
+        attribute sourceUuid [0..1] : 'Graph UUID';
+        attribute targetUuid [0..1] : 'Graph UUID';
+        attribute system [0..1] : 'System Envelope';
+        attribute selectedProperties [*] ordered : 'Property Value';
+        attribute includeLegacySystem : ScalarValues::Boolean default = false;
         doc /*
-         * Named anchor selection, required-link restriction, associated-data
-         * filtering, and projection define meaning, not evaluation order. All
-         * group, link-condition, data-condition, projection, and aggregation names are
-         * unique within the query. Every reference resolves to an element owned
-         * by the same query. Anchor groups and associated-data conditions are
-         * selector variables; each direct association and required link is a
-         * positive relationship predicate over those variables. The finite
-         * pattern has no topology restriction: disconnected variables, repeated
-         * predicates, parallel predicates, self-link predicates, and cyclic
-         * predicate paths are valid conjunctions. Every predicate shall hold
-         * under the same joint assignment. Distinct selector or required-
-         * link aliases may bind the same graph object when their constraints
-         * allow it; aliases do not imply inequality. A required link whose
-         * source and target name the same selector requires an actual self-link
-         * on that bound object. Projected variables in disconnected portions
-         * produce genuine combinations of their bindings. A disconnected
-         * portion with no projected variable affects an answer only through
-         * whether one satisfying assignment for that portion exists.
-         * Current selection evaluates active state; prospective selection
-         * evaluates active state with the sole definition delta's graph overlay
-         * and proposed definitions. Revision or time selection evaluates the
-         * resolved historical active state with identical query meaning. The
-         * caller may discover
-         * the definitions active at that selected state and reuse its exact
-         * evaluated revision for this query. An omitted external state value
-         * means current. Exactly one row or aggregate output is present. Its
-         * positive maximum bounds one complete result rather than requesting a
-         * page. Sorting, pagination, traversal, computed expressions, and grouping
-         * are outside this query model.
+         * Kind selects the compatible structural fields. Current/historical and
+         * live-backed draft objects carry canonical system metadata. A draft-only
+         * addition or reactivation carries none until activation.
          */
     }
 
-    item def 'Anchor Binding' {
-        ref item projection : 'Anchor Projection';
-        ref item anchor : Anchor;
+    abstract item def 'Object Upsert' {
+        attribute uuid : 'Graph UUID';
+        attribute typeKey [0..1] : 'Type Key';
     }
-
-    item def 'Link Binding' {
-        ref item projection : 'Link Projection';
-        ref item link : Link;
+    item def 'Anchor Upsert' :> 'Object Upsert' {
+        attribute displayName [0..1] : ScalarValues::String;
     }
-
-    item def 'Associated Data Binding' {
-        ref item projection : 'Associated Data Projection';
-        ref item associatedData : 'Associated Data Object';
+    item def 'Property Set' {
+        attribute name : 'Property Name';
+        attribute value [0..1] : 'Scalar Value';
+        attribute isNull : ScalarValues::Boolean default = false;
+        doc /* Exactly one of a value or isNull=true is present. */
     }
-
-    item def 'Returned Property' {
-        ref item projection : 'Data Property Projection';
-        ref item associatedData : 'Associated Data Object';
-        attribute value [0..1] : 'JSON Value';
+    item def 'Complete Anchor UUID Set' {
+        attribute values [1..*] : 'Graph UUID';
+        doc /* One supplied nonempty duplicate-free complete anchor set. */
+    }
+    item def 'Associated Data Upsert' :> 'Object Upsert' {
+        item anchorUuids [0..1] : 'Complete Anchor UUID Set';
+        attribute addAnchorUuids [*] : 'Graph UUID';
+        attribute removeAnchorUuids [*] : 'Graph UUID';
+        item setProperties [*] : 'Property Set';
+        attribute removeProperties [*] : 'Property Name';
         doc /*
-         * Identifies the source associated-data object. Absence means its
-         * projected optional property is missing; present null remains JSON null.
+         * Creation uses one complete non-empty anchorUuids set and forbids
+         * add/remove. Update omits anchorUuids and changes only named operations.
+         * The same anchor cannot be added and removed and the same property cannot
+         * be set and removed in one upsert; either conflict rejects the request.
+         * Supplying anchorUuids, even empty, is distinct from omitting it and is
+         * invalid for update; creation requires it to be nonempty.
+         */
+    }
+    item def 'Link Upsert' :> 'Object Upsert' {
+        attribute sourceUuid [0..1] : 'Graph UUID';
+        attribute targetUuid [0..1] : 'Graph UUID';
+    }
+    item def 'Graph Change' {
+        item upserts [*] : 'Object Upsert';
+        attribute removeUuids [*] : 'Graph UUID';
+        doc /*
+         * One UUID occurs in at most one command. The batch is interpreted
+         * atomically against its final combined state, independent of command
+         * order. Absence removals and duplicate additions are accepted no-ops.
+         * No cascade is inferred.
+         */
+    }
+    item def 'Active Change Request' {
+        attribute expectedRevision : 'Revision Number';
+        item change : 'Graph Change';
+    }
+
+    item def 'Definition Replacement' {
+        attribute kind : 'Definition Kind';
+        attribute typeKey : 'Type Key';
+        attribute description : ScalarValues::String;
+        attribute permittedAnchorTypeKeys [*] : 'Type Key';
+        attribute permittedSourceTypeKeys [*] : 'Type Key';
+        attribute permittedTargetTypeKeys [*] : 'Type Key';
+        item properties [*] ordered : 'Property Definition';
+        item anchorsPerObject [0..1] : 'Inclusive Cardinality';
+        item objectsPerAnchor [0..1] : 'Inclusive Cardinality';
+        item linksPerSource [0..1] : 'Inclusive Cardinality';
+        item linksPerTarget [0..1] : 'Inclusive Cardinality';
+        doc /*
+         * Complete owner-supplied content for one definition kind. Valid feature
+         * combinations follow kind; no system-envelope member is writable.
          */
     }
 
-    item def 'Graph Query Row' {
-        item anchors [*] : 'Anchor Binding';
-        item links [*] : 'Link Binding';
-        item associatedData [*] : 'Associated Data Binding';
-        item properties [*] : 'Returned Property';
+    abstract item def 'Draft Entry';
+    item def 'Draft Definition Entry' :> 'Draft Entry' {
+        attribute typeKey : 'Type Key';
+        item replacement [0..1] : 'Definition Replacement';
+        attribute remove : ScalarValues::Boolean default = false;
+    }
+    item def 'Draft Object Entry' :> 'Draft Entry' {
+        attribute uuid : 'Graph UUID';
+        item patch [0..1] : 'Object Upsert';
+        attribute remove : ScalarValues::Boolean default = false;
+    }
+    item def Draft {
+        item definitionEntries [*] : 'Draft Definition Entry';
+        item objectEntries [*] : 'Draft Object Entry';
         doc /*
-         * One jointly satisfying assignment of every selector needed by row
-         * output. The row contains exactly one binding for each projection
-         * and no unrequested binding. Matching objects that are not projected do
-         * not appear. Row identity includes every projection name and projected
-         * object identity; a property binding also includes its source object,
-         * presence, and canonical value. Equal property values from different
-         * source objects therefore remain different rows. Hidden satisfying
-         * witnesses do not distinguish rows.
+         * The sole durable noncanonical bucket. Repeated edits merge by type key
+         * or UUID. Staged fields win over corresponding latest live fields;
+         * unstaged live fields follow live state. A tombstone wins over the whole
+         * object. Draft presence is derived from nonempty entries.
          */
     }
-
-    /* Outcomes and validation. */
-
-    item def 'Operation Outcome' {
-        attribute status : 'Operation Status';
-        attribute summary : ScalarValues::String;
-        item findings [*] : 'Validation Finding';
+    item def 'Draft Change' {
+        item definitionUpserts [*] : 'Definition Replacement';
+        attribute definitionRemovals [*] : 'Type Key';
+        attribute unstageDefinitionKeys [*] : 'Type Key';
+        item objectUpserts [*] : 'Object Upsert';
+        attribute objectRemovals [*] : 'Graph UUID';
+        attribute unstageObjectUuids [*] : 'Graph UUID';
         doc /*
-         * A completed semantic operation always has one status. An accepted
-         * outcome carries the success payload defined by its specialization. A
-         * rejected or failed outcome carries no success payload unless that
-         * specialization explicitly states otherwise. Malformed input forms no
-         * domain request, and an unexpected tool failure produces no completed
-         * domain outcome.
+         * A type key or UUID occurs in at most one command collection in one
+         * request. Duplicate or cross-collection occurrence rejects the whole
+         * request; command order has no meaning.
          */
     }
-
-    item def 'Revisioned Outcome' :> 'Operation Outcome' {
-        attribute resultingRevision [0..1] : 'Revision Number';
+    item def 'Draft Inspection Request' {
+        attribute categories [*] : 'Draft Category';
+        attribute operations [*] : 'Draft Operation';
+        attribute typeKeys [*] : 'Type Key';
+        attribute uuids [*] : 'Graph UUID';
+        attribute limit [0..1] : ScalarValues::Positive;
+        attribute cursor [0..1] : ScalarValues::String;
         doc /*
-         * The resulting revision is present only when an accepted operation
-         * changes canonical state. An accepted effective no-op has no resulting
-         * revision or canonical transition.
+         * A fresh request omits cursor, requires limit, and treats every empty
+         * filter collection as unfiltered. A continuation supplies only cursor;
+         * filters and limit are bound by that cursor and must be omitted.
          */
+    }
+    item def 'Draft Inspection Entry' {
+        ref item 'entry' : 'Draft Entry';
+        attribute operation : 'Draft Operation';
+        ref item currentDefinition [0..1] : 'Type Definition';
+        ref item currentObject [0..1] : 'Graph Object';
+        ref item proposedDefinition [0..1] : 'Type Definition';
+        ref item proposedObject [0..1] : 'Graph Object';
+        attribute hasEffect : ScalarValues::Boolean;
+        doc /* The referenced raw entry exposes exact staged definition or graph operations. */
     }
 
     item def 'Validation Finding' {
+        attribute code : 'Finding Code';
+        attribute path [0..1] : ScalarValues::String;
         attribute summary : ScalarValues::String;
-        ref item implicatedDefinitions [*] : 'Definition Object';
-        ref item implicatedObjects [*] : 'Graph Object';
+        attribute typeKeys [*] ordered : 'Type Key';
+        attribute uuids [*] ordered : 'Graph UUID';
     }
-
-    item def 'Validation Assessment' {
-        attribute identity : 'Assessment ID';
-        attribute scope : 'Validation Scope';
-        attribute conforms : ScalarValues::Boolean;
-        attribute evaluatedRevision : 'Revision Number';
-        attribute proposedDefinitionIdentity [0..1] : 'Definition Set Identity';
-        attribute graphOverlayIdentity [0..1] : 'Graph Overlay Identity';
+    item def 'Operation Outcome' {
+        attribute status : 'Operation Status';
+        attribute summary : ScalarValues::String;
         item findings [*] ordered : 'Validation Finding';
-        doc /*
-         * One immutable completed assessment contains every finding for its
-         * exact evaluated active or prospective state. Prospective assessment
-         * identity includes the evaluated active revision and exact definition
-         * and graph-overlay meaning, whose identities are present exactly for a
-         * prospective assessment. It is observational evidence, not canonical
-         * state. A false conforms value is not an execution failure.
-         */
-    }
-
-    item def 'Validation Request' {
-        attribute kind : 'Validation Request Kind';
-        attribute scope : 'Validation Scope';
-        attribute assessmentID [0..1] : 'Assessment ID';
-        attribute startOrdinal [0..1] : ScalarValues::Positive;
-        attribute maximumFindings : ScalarValues::Positive;
-        doc /*
-         * An assess request forbids assessmentID and startOrdinal, computes one
-         * complete assessment, and returns its first bounded finding interval.
-         * A readFindings request requires both and reads another interval without
-         * re-running assessment. Unknown, expired, scope-mismatched, or out-of-
-         * range selections are rejected without partial findings. Ordinals are
-         * one-based, matching the ordered assessment finding collection.
-         */
-    }
-
-    item def 'Validation Report' :> 'Operation Outcome' {
-        ref item assessment [0..1] : 'Validation Assessment';
-        attribute findingCount [0..1] : ScalarValues::Natural;
-        attribute returnedStartOrdinal [0..1] : ScalarValues::Positive;
-        attribute moreFindings [0..1] : ScalarValues::Boolean;
-        ref item returnedFindings [*] ordered : 'Validation Finding';
-        doc /*
-         * An accepted report identifies one complete assessment and returns one
-         * contiguous bounded ordered interval of references to its findings using
-         * one-based ordinals. findingCount is the complete assessment count;
-         * moreFindings says whether a later interval exists. For a zero-finding
-         * assessment, returnedStartOrdinal is absent, returnedFindings is empty,
-         * and moreFindings is false. For a non-empty interval, returnedStartOrdinal
-         * is present and every returned reference preserves assessment order.
-         * Rejected or failed operations carry no assessment metadata or findings.
-         */
-    }
-
-    item def 'Aggregate Binding' {
-        ref item aggregation : 'Query Aggregation';
-        attribute value [0..1] : 'JSON Value';
-        doc /*
-         * One aggregation's answer. A count is always present and is zero when
-         * nothing matched. Sum, minimum, and maximum are absent when no match
-         * carried the named property, because no value is the honest answer to
-         * "the largest of none" and zero would be a different claim.
-         */
-    }
-
-    item def 'Graph Query Result' :> 'Operation Outcome' {
-        ref item query : 'Graph Query';
         attribute evaluatedRevision [0..1] : 'Revision Number';
-        item rows [*] : 'Graph Query Row';
-        item aggregates [*] : 'Aggregate Binding';
+        attribute resultingRevision [0..1] : 'Revision Number';
         doc /*
-         * Accepted results contain either exactly the rows requested by row
-         * output and no aggregates, or one aggregate for each operation in
-         * aggregate output and no rows, together with the evaluated revision. Rejected
-         * or failed queries contain no rows, aggregates, or evaluated revision. Invalid
-         * queries contain findings and change no canonical state. A
-         * result that would exceed its output maximum, or cannot be returned
-         * completely, is rejected whole and never truncated. The operation
-         * attempt may still produce observational activity.
+         * Malformed wire input forms no domain request. Unexpected execution or
+         * transport failure forms no fabricated rejection. resultingRevision is
+         * present only for an effective accepted canonical change. A semantic
+         * rejection carries its decisive findings. Purpose payload presence is
+         * fixed by each result subtype rather than inferred from empty lists.
          */
     }
-
+    item def 'Definition Summary Payload' {
+        item anchorTypes [*] ordered : 'Anchor Type Summary';
+    }
     item def 'Definition Summary Result' :> 'Operation Outcome' {
-        attribute evaluatedRevision [0..1] : 'Revision Number';
-        attribute deltaPresent [0..1] : ScalarValues::Boolean;
-        item anchorTypes [*] : 'Anchor Type Summary';
-        doc /*
-         * Contains every anchor type in the evaluated definition set exactly once. Each summary refers to
-         * its authoritative type key and description. The result is complete
-         * for the definitions evaluated at current, prospective, or historical
-         * state. Prospective evaluates proposed definitions; current and
-         * historical evaluate active definitions. It changes no canonical state. Evaluated revision and delta
-         * presence are present exactly for an accepted result. A rejected or failed result
-         * returns no summaries, evaluated revision, or delta-presence value. The
-         * operation attempt may still produce observational activity.
-         */
+        item payload [0..1] : 'Definition Summary Payload';
+        doc /* Accepted has payload and evaluatedRevision; rejected omits payload. */
     }
-
+    item def 'Definition Inspection Payload' {
+        item neighborhoods [*] ordered : 'Anchor Definition Neighborhood';
+    }
     item def 'Definition Inspection Result' :> 'Operation Outcome' {
-        ref item request : 'Definition Inspection Request';
-        attribute evaluatedRevision [0..1] : 'Revision Number';
-        item anchorDetails [*] : 'Anchor Definition Detail';
+        item payload [0..1] : 'Definition Inspection Payload';
+        doc /* Accepted has request-ordered payload and evaluatedRevision; rejected omits payload. */
+    }
+    abstract item def 'Graph Query Payload' {
+        item objects [*] ordered : 'Hydrated Object';
+    }
+    item def 'Identity Query Payload' :> 'Graph Query Payload' {
+        attribute foundUuids [*] ordered : 'Graph UUID';
+        attribute missingUuids [*] ordered : 'Graph UUID';
+    }
+    item def 'Pattern Query Payload' :> 'Graph Query Payload' {
+        item matches [*] ordered : 'Pattern Match';
+    }
+    item def 'Graph Query Result' :> 'Operation Outcome' {
+        item payload [0..1] : 'Graph Query Payload';
         doc /*
-         * An accepted result contains one complete detail for every requested
-         * anchor type in the request's evaluated current, prospective, or historical
-         * definition set and no unrelated definitions. An unknown or
-         * duplicate key or inability to answer completely produces findings,
-         * no evaluated revision, and no details. The operation changes no
-         * canonical state but may produce observational activity.
+         * Accepted has evaluatedRevision and exactly the payload subtype matching
+         * the request selection. Identity UUIDs preserve request order. Pattern
+         * matches are bounded before hydration and ordered by selector-order UUID
+         * tuples. Rejection omits payload. Hydrated objects are unique by UUID.
          */
     }
-
-    item def 'Definition Delta Result' :> 'Revisioned Outcome' {
-        attribute evaluatedRevision [0..1] : 'Revision Number';
-        attribute proposedDefinitionIdentity [0..1] : 'Definition Set Identity';
-        attribute graphOverlayIdentity [0..1] : 'Graph Overlay Identity';
-        ref item assessment [0..1] : 'Validation Assessment';
-        attribute stagedAnchorCount [0..1] : ScalarValues::Natural;
-        attribute stagedAssociatedDataCount [0..1] : ScalarValues::Natural;
-        attribute stagedLinkCount [0..1] : ScalarValues::Natural;
-        attribute stagedRemovalCount [0..1] : ScalarValues::Natural;
+    item def 'Draft Change Payload' {
+        attribute draftPresent : ScalarValues::Boolean;
+        attribute rawEntryCount : ScalarValues::Natural;
+        attribute effectiveChangeCount : ScalarValues::Natural;
+    }
+    item def 'Draft Change Result' :> 'Operation Outcome' {
+        item payload [0..1] : 'Draft Change Payload';
+        doc /* Accepted has payload and evaluatedRevision; rejected omits payload. */
+    }
+    item def 'Draft Inspection Payload' :> 'Draft Change Payload' {
+        item entries [*] ordered : 'Draft Inspection Entry';
+        attribute returnedCount : ScalarValues::Natural;
+        attribute cursor [0..1] : ScalarValues::String;
+    }
+    item def 'Draft Inspection Result' :> 'Operation Outcome' {
+        item payload [0..1] : 'Draft Inspection Payload';
+        doc /* Accepted has payload and evaluatedRevision; rejected omits payload. */
+    }
+    enum def 'Validation Scope' { enum current; enum draft; }
+    item def 'Validation Request' {
+        attribute scope : 'Validation Scope';
+        attribute limit [0..1] : ScalarValues::Positive;
+        attribute cursor [0..1] : ScalarValues::String;
         doc /*
-         * An accepted result always identifies its evaluated revision. Absence
-         * of a delta is a normal accepted result. When a delta is present, the
-         * result identifies its proposed definitions and graph overlay by
-         * canonical identity, graph-overlay cardinality,
-         * and latest completed definitionDelta assessment when one is current.
-         * Proposed definitions are discovered through prospective summary and
-         * focused inspection; staged graph objects are queried prospectively and
-         * are not copied into this result. The two identities and all staged
-         * counts are present exactly with a delta. A stale or absent assessment is absent.
-         * A resulting revision, when present, is also this evaluated revision.
+         * A fresh request requires limit and omits cursor. A continuation requires
+         * cursor and the same scope, omits limit, and pages the stored assessment
+         * without reassessment. Any other combination rejects as malformed.
          */
     }
-
-    item def 'Graph Change' {
-        item anchorUpserts [*] : Anchor;
-        item associatedDataUpserts [*] : 'Associated Data Object';
-        item linkUpserts [*] : Link;
-        attribute anchorRemovals [*] : 'Graph UUID';
-        attribute associatedDataRemovals [*] : 'Graph UUID';
-        attribute linkRemovals [*] : 'Graph UUID';
-        doc /*
-         * Explicit complete-object upserts and UUID removals. Direct
-         * associations change only through complete associated-data anchor
-         * references. Duplicate commands, upsert/removal conflicts, unknown
-         * removals, object-kind changes, invalid final references, and any
-         * change that depends on an implicit cascade are rejected. Complete
-         * resulting-graph conformance is a semantic obligation and does not
-         * require constructing one complete graph value.
-         */
+    item def 'Validation Payload' {
+        attribute totalFindings : ScalarValues::Natural;
+        attribute clean : ScalarValues::Boolean;
+        attribute rawDraftEntryCount [0..1] : ScalarValues::Natural;
+        attribute effectiveDraftChangeCount [0..1] : ScalarValues::Natural;
+        attribute cursor [0..1] : ScalarValues::String;
     }
-
-    item def 'Graph Change Request' {
-        attribute target : 'Graph Change Target';
-        item change : 'Graph Change';
-        attribute anchorUnstaging [*] : 'Graph UUID';
-        attribute associatedDataUnstaging [*] : 'Graph UUID';
-        attribute linkUnstaging [*] : 'Graph UUID';
+    item def 'Validation Report' :> 'Operation Outcome' {
+        item payload [0..1] : 'Validation Payload';
         doc /*
-         * Active-target requests forbid unstaging and atomically apply one
-         * conforming graph change. Definition-delta-target requests replace
-         * staged entries by UUID; explicit unstaging removes those entries from
-         * the overlay without changing active state. Within one request, a UUID
-         * may appear in exactly one upsert, tombstone, or unstaging command.
-         * A request that would make the effective proposal semantically equal to
-         * active state is rejected and preserves the delta; explicit discard is
-         * the only operation that removes a present delta.
+         * Completed validation is accepted with payload even when non-clean.
+         * Invalid draft activation is rejected with payload and its first finding
+         * page. Other rejection, including draft absence or cursor expiry, omits
+         * payload. Draft counts occur only for draft scope; cursor only when more
+         * findings remain.
          */
-    }
-
-    /* Canonical state, snapshots, and history. */
-
-    item def Provenance {
-        attribute initiator : ScalarValues::String;
-        attribute source [0..1] : ScalarValues::String;
-        doc /* Identifies who initiated a record and, when applicable, its bounded source provenance. */
     }
 
     item def 'Canonical State' {
         item graph : Graph;
-        item activeDefinitions : 'Graph Definition Set';
-        item definitionDelta [0..1] : 'Definition Delta';
+        item definitions : 'Graph Definition Set';
         attribute revision : 'Revision Number';
-        doc /*
-         * Two canonical states are semantically equal exactly when their
-         * revisions, graphs, active definitions, and delta presence agree and,
-         * when present, their proposed definition sets and graph overlays are
-         * semantically equal.
-         */
+        doc /* Current and historical state is directly selectable, never reconstructed by public replay. */
     }
-
-    item def 'Canonical Change' {
-        doc /*
-         * Replay-sufficient meaning for one transition. A graph mutation carries
-         * the accepted graph change. Activation carries the assessed prospective
-         * graph change, and historical restoration carries the complete explicit
-         * difference that establishes the selected state. An absent graph change
-         * or active-definition value means unchanged. Delta disposition
-         * distinguishes unchanged, present, and absent. Present requires a delta
-         * value; unchanged and absent forbid one.
-         */
-        item graphChange [0..1] : 'Graph Change';
-        item activeDefinitions [0..1] : 'Graph Definition Set';
-        attribute deltaDisposition : 'Definition Delta Disposition';
-        item definitionDelta [0..1] : 'Definition Delta';
+    item def Provenance {
+        attribute initiator : ScalarValues::String;
+        attribute source [0..1] : ScalarValues::String;
     }
-
-    abstract item def 'History Record' {
+    item def 'Canonical Record' {
+        attribute revision : 'Revision Number';
         attribute recordedAt : 'Recorded Time';
         item provenance : Provenance;
-    }
-
-    abstract item def 'Canonical Record' :> 'History Record' {
-        attribute establishedRevision : 'Revision Number';
-        doc /*
-         * Establishes exactly one canonical revision: the contained revision
-         * for an initial record and the resulting revision for a transition.
-         */
-    }
-
-    item def 'Initial State Record' :> 'Canonical Record' {
-        item canonicalState : 'Canonical State';
-        attribute initializationSummary : ScalarValues::String;
-        bind establishedRevision = canonicalState.revision;
-        doc /*
-         * Establishes the owned history base. Its revision may be greater than
-         * zero when a fresh RTG is seeded from reconstructed snapshot state;
-         * the record makes no claim about transitions before that base. Its
-         * bounded summary describes how the base was established without copying
-         * complete source, candidate, report, or canonical payloads.
-         */
-    }
-
-    item def 'Canonical Transition Record' :> 'Canonical Record' {
-        attribute priorRevision : 'Revision Number';
-        attribute resultingRevision : 'Revision Number';
-        attribute kind : 'Transition Kind';
-        item change : 'Canonical Change';
-        bind establishedRevision = resultingRevision;
-        doc /*
-         * Establishes one contiguous canonical transition. The record carries
-         * enough semantic change to replay without activity history but does
-         * not prescribe event, snapshot, checkpoint, or hybrid storage.
-         *
-         * A graph mutation supplies graphChange and leaves the delta unchanged.
-         * A definition-delta change supplies only a present or absent delta. An
-         * activation supplies its prospective graphChange, active definitions,
-         * and an absent delta. Historical restoration supplies the explicit
-         * graphChange establishing the selected graph, active definitions, and
-         * an absent delta. Other combinations are invalid and cannot be replayed.
-         */
-    }
-
-    item def 'State Change Ledger' {
-        item initial : 'Initial State Record';
-        item transitions [*] ordered : 'Canonical Transition Record';
-        doc /*
-         * The complete, durable, ordered authority from its owned initial base
-         * forward. Replay through its final canonical record establishes the
-         * current canonical state.
-         */
-    }
-
-    item def 'Activity Record' :> 'History Record' {
-        attribute capability : ScalarValues::String;
-        attribute outcomeCategory : 'Operation Status';
-        attribute evaluatedRevision [0..1] : 'Revision Number';
-        attribute semanticScope : ScalarValues::String;
+        attribute transitionKind : 'Transition Kind';
         attribute summary : ScalarValues::String;
+        attribute affectedTypeKeys [*] ordered : 'Type Key';
+        attribute affectedUuids [*] ordered : 'Graph UUID';
+        doc /* One contiguous corruption-evident owner-readable record, not a replay payload. */
+    }
+    item def 'Canonical Ledger' { item records [1..*] ordered : 'Canonical Record'; }
+    item def 'Activity Record' {
+        attribute sequence : 'Activity Number';
+        attribute recordedAt : 'Recorded Time';
+        attribute capability : ScalarValues::String;
+        attribute outcome : 'Activity Outcome';
+        item provenance : Provenance;
+        attribute evaluatedRevision [0..1] : 'Revision Number';
+        attribute resultingRevision [0..1] : 'Revision Number';
+        attribute summary : ScalarValues::String;
+        attribute semanticDetail : ScalarValues::String;
+        attribute verboseDetail [0..1] : ScalarValues::String;
+        doc /* Observational state that cannot establish canonical state and contains no secrets. */
+    }
+    item def 'Activity Ledger' { item records [*] ordered : 'Activity Record'; }
+    abstract item def 'History Range';
+    item def 'History Time Range' :> 'History Range' {
+        attribute startTime [0..1] : 'Timestamp Value';
+        attribute endTime [0..1] : 'Timestamp Value';
+        doc /* Both absent means unbounded through head; start after end rejects. */
+    }
+    item def 'History Sequence Range' :> 'History Range' {
+        attribute afterSequence [0..1] : ScalarValues::Natural;
+        attribute throughSequence [0..1] : ScalarValues::Natural;
         doc /*
-         * The bounded owner-facing summary identifies capability, outcome,
-         * provenance, evaluated revision when applicable, and semantic scope.
-         * It copies no result rows, canonical payloads, or inferred intent.
+         * Both absent means unbounded through head. after is exclusive and through
+         * inclusive; after greater than or equal to through selects an empty interval.
          */
     }
-
-    item def 'Activity Ledger' {
-        item records [*] ordered : 'Activity Record';
-        doc /*
-         * Observational history that is never replayed and cannot establish
-         * canonical state. A history read is evaluated against the activity
-         * ledger before the record of that read is appended, so its result never
-         * includes its own observation.
-         */
-    }
-
-    item def 'Canonical Snapshot' {
-        item canonicalState : 'Canonical State';
-        ref item capturedThrough : 'Canonical Record';
-        bind canonicalState.revision = capturedThrough.establishedRevision;
-        doc /*
-         * A self-contained, lossless capture of complete canonical state at its
-         * revision, bound to the exact authoritative record that establishes
-         * that revision. Completeness is semantic and does not require one
-         * resident aggregate. Physical artifact and serialization remain open.
-         */
-    }
-
-    item def 'Ledger Tail' {
-        ref item precedingRecord : 'Canonical Record';
-        ref item transitions [1..*] ordered : 'Canonical Transition Record';
-        doc /*
-         * References a contiguous sequence from the same authoritative ledger.
-         * Its first transition immediately follows the exact preceding record;
-         * revision-number equality alone cannot establish compatibility.
-         */
-    }
-
-    item def 'Replay Request' {
-        ref item initial [0..1] : 'Initial State Record';
-        ref item capturedSnapshot [0..1] : 'Canonical Snapshot';
-        ref item tail [0..1] : 'Ledger Tail';
-        doc /*
-         * Uses exactly one base: an initial record or a snapshot. When a tail is
-         * present, its preceding record is exactly that initial record or the
-         * selected snapshot's captured-through record. The tail may then advance
-         * that base through later canonical revisions from the same ledger.
-         */
-    }
-
-    item def 'Historical State' :> 'Canonical State' {
-        doc /* Read-only canonical state reconstructed at one committed revision. */
-    }
-
-    item def 'Replay Outcome' :> 'Operation Outcome' {
-        attribute reconstructedRevision [0..1] : 'Revision Number';
-        attribute reconstructedThrough [0..1] : 'Canonical Record Identity';
-        doc /*
-         * Accepted replay identifies the completely verified reconstructed
-         * revision and final record without returning a resident whole state.
-         */
-    }
-
-    item def 'Snapshot Outcome' :> 'Operation Outcome' {
-        item capturedSnapshot [0..1] : 'Canonical Snapshot';
-        doc /* A snapshot is present exactly when capture is accepted. */
-    }
-
     item def 'History Query' {
         attribute kind : 'History Kind';
-        attribute startTime [0..1] : 'Recorded Time';
-        attribute endTime [0..1] : 'Recorded Time';
+        item range [0..1] : 'History Range';
         attribute maximumRecords : ScalarValues::Positive;
+        attribute includeVerbose : ScalarValues::Boolean default = false;
         doc /*
-         * Selects one record family and an optional chronological interval. The
-         * start and end bounds are inclusive. The
-         * positive maximum bounds one complete result rather than requesting a
-         * page. Query notation and evaluation representation remain open.
+         * Omitted range selects through the observed head. includeVerbose is
+         * valid only for activity history.
          */
     }
-
-    abstract item def 'History Entry' {
-        attribute recordedAt : 'Recorded Time';
-        item provenance : Provenance;
-        attribute summary : ScalarValues::String;
-        doc /*
-         * An owner-facing projection of one authoritative record. It carries
-         * enough meaning for review without becoming replay authority or copying
-         * canonical state and replay payloads into an agent response.
-         */
+    abstract item def 'History Payload' {
+        attribute headSequence : ScalarValues::Natural;
     }
-
-    item def 'Canonical History Entry' :> 'History Entry' {
-        attribute revision : 'Revision Number';
-        attribute priorRevision [0..1] : 'Revision Number';
-        attribute transitionKind [0..1] : 'Transition Kind';
-        doc /*
-         * Projects an initial record when priorRevision and transitionKind are
-         * both absent. A transition entry has both present, and revision is its
-         * resulting revision. The replay-sufficient canonical change is not an
-         * inline history-query result.
-         */
+    item def 'Canonical History Payload' :> 'History Payload' {
+        ref item canonicalEntries [*] ordered : 'Canonical Record';
     }
-
-    item def 'Activity History Entry' :> 'History Entry' {
-        attribute capability : ScalarValues::String;
-        attribute outcomeCategory : 'Operation Status';
-        attribute evaluatedRevision [0..1] : 'Revision Number';
-        attribute semanticScope : ScalarValues::String;
+    item def 'Activity History Payload' :> 'History Payload' {
+        ref item activityEntries [*] ordered : 'Activity Record';
     }
-
     item def 'History Result' :> 'Operation Outcome' {
-        ref item query : 'History Query';
-        attribute evaluatedRevision [0..1] : 'Revision Number';
-        item canonicalEntries [*] ordered : 'Canonical History Entry';
-        item activityEntries [*] ordered : 'Activity History Entry';
+        item payload [0..1] : 'History Payload';
         doc /*
-         * An accepted result identifies its evaluated revision. An accepted
-         * canonical query contains one canonical entry for every
-         * selected canonical record and no activity entries. An accepted
-         * activity query contains one activity entry for every selected activity
-         * record and no canonical entries. Entries preserve the complete
-         * requested inclusive interval and selected ledger order without
-         * exposing canonical replay payloads. An over-broad request or one that
-         * cannot be returned completely is rejected with no entries or evaluated
-         * revision. A failed operation likewise returns no success payload;
-         * activity entries are never replayed.
+         * Accepted has exactly the payload subtype selected by history kind;
+         * canonical headSequence is revision and activity headSequence is activity
+         * number. Rejected omits payload.
          */
     }
 
-    abstract item def 'Evaluated State Selection';
-
-    item def 'Current Selection' :> 'Evaluated State Selection';
-
-    item def 'Prospective Selection' :> 'Evaluated State Selection';
-
-    abstract item def 'Historical State Selection' :> 'Evaluated State Selection';
-
-    item def 'Revision Selection' :> 'Historical State Selection' {
-        attribute revision : 'Revision Number';
+    item def 'V1 Snapshot' {
+        doc /* One complete predecessor JSON snapshot selected only for first-use initialization. */
     }
-
-    item def 'Time Selection' :> 'Historical State Selection' {
-        attribute time : 'Recorded Time';
-    }
-
     item def 'Recovery Candidate' {
-        doc /*
-         * Transient normalized v1 graph meaning and complete target active
-         * definitions. It may be incrementally formed and assessed in bounded
-         * work; semantic completeness does not require one resident value. While
-         * forming this candidate, a v1
-         * anchor without a display name is assigned the clearly synthetic value
-         * "[recovered] {typeKey} {uuid}" using that anchor's exact type-key and
-         * UUID strings. The candidate is validated before first-use initialization
-         * and never becomes an existing-system mutation.
-         */
         item graph : Graph;
-        item activeDefinitions : 'Graph Definition Set';
+        item definitions : 'Graph Definition Set';
+        doc /* Transient complete meaning formed with bounded memory; not canonical state. */
     }
-
     item def 'Recovery Finding' {
         attribute disposition : 'Recovery Finding Disposition';
+        attribute sourcePointer : ScalarValues::String;
         attribute summary : ScalarValues::String;
+        attribute targetUuid [0..1] : 'Graph UUID';
+        attribute targetTypeKey [0..1] : 'Type Key';
+        attribute targetProperty [0..1] : 'Property Name';
     }
-
     item def 'Recovery Report' {
+        ref item source : 'V1 Snapshot';
         ref item candidate : 'Recovery Candidate';
-        item findings [*] : 'Recovery Finding';
-        doc /*
-         * A transient, complete preview of preserved graph meaning and every
-         * simplified, omitted, or blocking definition condition for the exact
-         * candidate. It is not canonical or activity state.
-         */
+        item findings [*] ordered : 'Recovery Finding';
+        doc /* Complete deterministic dispositions bound to the exact source and candidate. */
     }
 }
