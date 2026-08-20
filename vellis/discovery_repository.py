@@ -17,17 +17,17 @@ from vellis.state_repository import interval_parameters, interval_sql
 
 
 def load_anchor_summary(
-    connection: sqlite3.Connection, state: ResolvedState
+    connection: sqlite3.Connection, state: ResolvedState, maximum: int | None = None
 ) -> tuple[AnchorTypeDefinition, ...]:
     rows = connection.execute(
         f"""
         SELECT type_key
         FROM definition_version AS v
         WHERE {interval_sql("v")} AND v.kind = 'anchor'
-        ORDER BY type_key
+        ORDER BY type_key LIMIT ?
         """,
-        interval_parameters(state),
-    ).fetchall()
+        (*interval_parameters(state), -1 if maximum is None else maximum),
+    )
     keys = tuple(str(row["type_key"]) for row in rows)
     definitions = load_definitions(connection, state, keys)
     if any(not isinstance(value, AnchorTypeDefinition) for value in definitions):

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import struct
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Final
@@ -187,6 +188,53 @@ def canonical_record_hash(
     payload += _descriptors(introduced)
     payload += _descriptors(retired)
     return hashlib.sha256(payload).digest()
+
+
+def ordered_values_hash(values: Callable[[], Iterable[CanonicalValue]]) -> bytes:
+    """Hash one canonically ordered collection without retaining all encoded members."""
+    payload_length = sum(8 + len(encode(value)) for value in values())
+    digest = hashlib.sha256()
+    digest.update(_tag(_Tag.ORDERED))
+    digest.update(struct.pack(">Q", payload_length))
+    for value in values():
+        digest.update(_frame(encode(value)))
+    return digest.digest()
+
+
+def descriptor_member(value: RowDescriptor) -> tuple[bytes, bytes]:
+    """Return the stable sort identity and framed member bytes for one row descriptor."""
+    identity = encode(value.identity)
+    member = (
+        _frame(value.relation_name.encode("utf-8")) + _frame(identity) + _frame(value.row_digest)
+    )
+    return identity, member
+
+
+def canonical_record_hash_members(
+    previous_hash: bytes,
+    header: CanonicalHeader,
+    introduced_length: int,
+    introduced: Iterable[bytes],
+    retired_length: int,
+    retired: Iterable[bytes],
+) -> bytes:
+    """Hash preordered descriptor members streamed from connection-local working state."""
+    if len(previous_hash) != 32:
+        raise ValueError("previous canonical hash must contain 32 bytes")
+    digest = hashlib.sha256()
+    digest.update(_frame(CANONICAL_CONTEXT.encode("ascii")))
+    digest.update(previous_hash)
+    digest.update(_frame(encode(header.as_record())))
+    _update_ordered_members(digest, introduced_length, introduced)
+    _update_ordered_members(digest, retired_length, retired)
+    return digest.digest()
+
+
+def _update_ordered_members(digest, payload_length, members):
+    digest.update(_tag(_Tag.ORDERED))
+    digest.update(struct.pack(">Q", payload_length))
+    for member in members:
+        digest.update(_frame(member))
 
 
 def _encode_scalar(value: ScalarValue) -> bytes:

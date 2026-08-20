@@ -20,6 +20,16 @@ from vellis.domain import (
     SystemEnvelope,
     TypeDefinition,
 )
+from vellis.draft_read_operations import (
+    draft_effective_headers,
+    draft_identity_headers,
+    draft_neighborhoods,
+    query_draft_identity,
+    query_draft_pattern_sql,
+)
+from vellis.draft_repository import load_draft_definitions, load_draft_graph
+from vellis.draft_sql_overlay import install_draft_graph_overlay
+from vellis.graph_repository import load_graph_objects
 from vellis.query_domain import (
     PUBLIC_ITEM_LIMIT,
     DefinitionNeighborhood,
@@ -29,6 +39,7 @@ from vellis.query_domain import (
     IdentitySelection,
     PatternQueryPayload,
     PatternSelection,
+    PredicateOperator,
     QueryResult,
     TypeInspectionResult,
     TypeSummaryResult,
@@ -38,10 +49,15 @@ from vellis.query_repository import (
     hydration_requests_for_matches,
     load_hydrated_objects,
     load_object_headers,
+    pattern_execution_finding,
     pattern_identity_findings,
     select_pattern_bindings,
 )
-from vellis.query_validation import query_findings
+from vellis.query_validation import (
+    query_findings,
+    relationship_compatibility_findings,
+    structured_predicate_findings,
+)
 from vellis.state_repository import (
     StateNotFoundError,
     interval_parameters,
@@ -59,12 +75,29 @@ def type_summary(
         connection.execute("BEGIN")
         try:
             state = resolve_state(connection, state_selection)
-            _require_canonical_overlay(state.includes_draft)
-            values = tuple(
-                _definition_without_legacy(value)
-                for value in load_anchor_summary(connection, state)
-            )
-            if len(values) > PUBLIC_ITEM_LIMIT:
+            over_limit = False
+            if state.includes_draft:
+                over_limit = _draft_anchor_type_count(connection) > PUBLIC_ITEM_LIMIT
+                if over_limit:
+                    values = ()
+                else:
+                    anchor_keys = _draft_anchor_type_keys(connection, PUBLIC_ITEM_LIMIT)
+                    definitions = load_draft_definitions(
+                        connection,
+                        load_definitions(connection, state, anchor_keys),
+                        anchor_keys,
+                    )
+                    values = tuple(
+                        _definition_without_legacy(value)
+                        for value in definitions
+                        if isinstance(value, AnchorTypeDefinition)
+                    )
+            else:
+                values = tuple(
+                    _definition_without_legacy(value)
+                    for value in load_anchor_summary(connection, state, PUBLIC_ITEM_LIMIT + 1)
+                )
+            if over_limit or len(values) > PUBLIC_ITEM_LIMIT:
                 finding = _finding(
                     FindingCode.RESULT_LIMIT_EXCEEDED,
                     "/anchorTypes",
@@ -124,8 +157,14 @@ def type_inspect(
         connection.execute("BEGIN")
         try:
             state = resolve_state(connection, state_selection)
-            _require_canonical_overlay(state.includes_draft)
-            selected = load_definitions(connection, state, anchor_type_keys)
+            if state.includes_draft:
+                keys = _draft_neighborhood_type_keys(connection, anchor_type_keys)
+                definitions = load_draft_definitions(
+                    connection, load_definitions(connection, state, keys), keys
+                )
+            else:
+                definitions = load_definitions(connection, state, anchor_type_keys)
+            selected = tuple(value for value in definitions if value.type_key in anchor_type_keys)
             unknown = _unknown_anchor_findings(anchor_type_keys, selected)
             if unknown:
                 result = TypeInspectionResult(
@@ -136,7 +175,11 @@ def type_inspect(
                     None,
                 )
             else:
-                neighborhoods = load_neighborhoods(connection, state, anchor_type_keys)
+                neighborhoods = (
+                    draft_neighborhoods(definitions, anchor_type_keys)
+                    if state.includes_draft
+                    else load_neighborhoods(connection, state, anchor_type_keys)
+                )
                 projected = tuple(
                     _neighborhood_legacy(value, include_legacy_system) for value in neighborhoods
                 )
@@ -171,18 +214,22 @@ def query_graph(database_path: Path, query: GraphQuery) -> QueryResult:
         connection.execute("BEGIN")
         try:
             state = resolve_state(connection, query.state)
-            _require_canonical_overlay(state.includes_draft)
+            if state.includes_draft:
+                result = _draft_query(connection, state, query)
+                connection.commit()
+                return result
             definitions = load_definitions(connection, state, _referenced_type_keys(query))
-            definitions = _query_definition_closure(connection, state, definitions, query.selection)
-            findings = query_findings(query, definitions)
-            if findings:
-                result = _rejected_query(
-                    "query meaning was rejected", findings, state.evaluated_revision
-                )
-            elif isinstance(query.selection, IdentitySelection):
-                result = _identity_query(connection, state, query.selection, definitions)
-            else:
+            if isinstance(query.selection, PatternSelection):
                 result = _pattern_query(connection, state, query.selection, definitions)
+            else:
+                findings = query_findings(query, definitions)
+                result = (
+                    _rejected_query(
+                        "query meaning was rejected", findings, state.evaluated_revision
+                    )
+                    if findings
+                    else _identity_query(connection, state, query.selection, definitions)
+                )
         except StateNotFoundError as error:
             result = _rejected_query(
                 "state was not found", (_finding(FindingCode.MISSING, "/state", str(error)),), None
@@ -231,42 +278,70 @@ def _identity_query(connection, state, selection: IdentitySelection, definitions
     )
 
 
+def _draft_query(connection, state, query: GraphQuery) -> QueryResult:
+    if isinstance(query.selection, IdentitySelection):
+        request_findings = query_findings(query, ())
+        if request_findings:
+            return _rejected_query(
+                "query meaning was rejected", request_findings, state.evaluated_revision
+            )
+        uuids = tuple(value.uuid for value in query.selection.objects)
+        headers = draft_identity_headers(
+            connection, uuids, load_object_headers(connection, state, uuids)
+        )
+        type_keys = tuple(sorted({value.type_key for value in headers.values()}))
+        definitions = load_draft_definitions(
+            connection, load_definitions(connection, state, type_keys), type_keys
+        )
+        property_findings = _identity_property_findings(
+            query.selection.objects,
+            headers,
+            {value.type_key: value for value in definitions},
+        )
+        if property_findings:
+            return _rejected_query(
+                "identity hydration was rejected",
+                property_findings,
+                state.evaluated_revision,
+            )
+        current = load_graph_objects(connection, state, uuids)
+        graph, unmaterializable = load_draft_graph(connection, current, uuids)
+    else:
+        headers, staged_partial_uuids, header_findings = _pattern_headers(
+            connection, state, query.selection
+        )
+        definition_keys = _draft_pattern_definition_keys(query, headers)
+        definitions = load_draft_definitions(
+            connection,
+            load_definitions(connection, state, definition_keys),
+            definition_keys,
+        )
+        findings = _pattern_preflight(
+            connection,
+            state,
+            query.selection,
+            definitions,
+            headers=headers,
+            staged_partial_uuids=staged_partial_uuids,
+            header_findings=header_findings,
+        )
+        if findings:
+            return _rejected_query(
+                "pattern preflight was rejected", findings, state.evaluated_revision
+            )
+        install_draft_graph_overlay(connection, search_scopes=_full_text_scopes(query.selection))
+        return query_draft_pattern_sql(connection, state, query.selection)
+    return query_draft_identity(state, query, graph, unmaterializable)
+
+
 def _pattern_query(connection, state, selection: PatternSelection, definitions) -> QueryResult:
-    requested = tuple(
-        dict.fromkeys(
-            uuid for selector in (*selection.nodes, *selection.links) for uuid in selector.uuids
-        )
-    )
-    headers = load_object_headers(connection, state, requested)
-    identity_findings = pattern_identity_findings(headers, selection)
-    if identity_findings:
-        return _rejected_query(
-            "pattern identity filters were rejected", identity_findings, state.evaluated_revision
-        )
-    compatibility_selection = _selection_with_identity_types(selection, headers)
-    compatibility_keys = _referenced_type_keys(GraphQuery(compatibility_selection)) or ()
-    loaded = {value.type_key: value for value in definitions}
-    missing = tuple(key for key in compatibility_keys if key not in loaded)
-    if missing:
-        loaded.update(
-            (value.type_key, value) for value in load_definitions(connection, state, missing)
-        )
-    compatibility_definitions = _query_definition_closure(
-        connection, state, tuple(loaded.values()), compatibility_selection
-    )
-    compatibility_findings = query_findings(
-        GraphQuery(compatibility_selection), compatibility_definitions
-    )
-    if compatibility_findings:
-        return _rejected_query(
-            "pattern endpoints were rejected",
-            compatibility_findings,
-            state.evaluated_revision,
-        )
+    findings = _pattern_preflight(connection, state, selection, definitions)
+    if findings:
+        return _rejected_query("pattern preflight was rejected", findings, state.evaluated_revision)
     try:
         matches = select_pattern_bindings(connection, state, selection)
     except ValueError as error:
-        finding = _finding(FindingCode.INVALID_VALUE, "/selection", str(error))
+        finding = pattern_execution_finding(error)
         return _rejected_query(
             "pattern predicate was rejected", (finding,), state.evaluated_revision
         )
@@ -287,6 +362,73 @@ def _pattern_query(connection, state, selection: PatternSelection, definitions) 
     )
 
 
+def _pattern_preflight(
+    connection,
+    state,
+    selection,
+    definitions,
+    *,
+    headers=None,
+    staged_partial_uuids=frozenset(),
+    header_findings=(),
+):
+    if headers is None:
+        headers, staged_partial_uuids, header_findings = _pattern_headers(
+            connection, state, selection
+        )
+    request_findings = query_findings(
+        GraphQuery(selection),
+        definitions,
+        include_relationship_compatibility=False,
+    )
+    if request_findings:
+        return request_findings
+    runtime_findings = structured_predicate_findings(connection, selection)
+    if runtime_findings:
+        return runtime_findings
+    identity_findings = pattern_identity_findings(headers, selection)
+    identity_findings = tuple(
+        finding
+        for finding in identity_findings
+        if not (
+            finding.code is FindingCode.UNKNOWN and staged_partial_uuids.intersection(finding.uuids)
+        )
+    )
+    identity_findings = _ordered_findings([*header_findings, *identity_findings])
+    if identity_findings:
+        return identity_findings
+    compatibility_selection = _selection_with_identity_types(selection, headers)
+    compatibility_keys = _referenced_type_keys(GraphQuery(compatibility_selection)) or ()
+    loaded = {value.type_key: value for value in definitions}
+    missing = tuple(key for key in compatibility_keys if key not in loaded)
+    if missing:
+        loaded.update(
+            (value.type_key, value)
+            for value in _load_effective_definitions(connection, state, missing)
+        )
+    compatibility_definitions = _query_definition_closure(
+        connection, state, tuple(loaded.values()), compatibility_selection
+    )
+    return relationship_compatibility_findings(compatibility_selection, compatibility_definitions)
+
+
+def _pattern_headers(connection, state, selection):
+    requested = tuple(
+        dict.fromkeys(
+            uuid for selector in (*selection.nodes, *selection.links) for uuid in selector.uuids
+        )
+    )
+    headers = load_object_headers(connection, state, requested)
+    if not state.includes_draft:
+        return headers, frozenset(), ()
+    return draft_effective_headers(connection, selection, requested, headers)
+
+
+def _load_effective_definitions(connection, state, keys):
+    current = load_definitions(connection, state, keys)
+    return load_draft_definitions(connection, current, keys) if state.includes_draft else current
+
+
 def _identity_property_findings(
     selections: tuple[IdentityObjectSelection, ...],
     headers,
@@ -305,8 +447,17 @@ def _identity_property_findings(
                 )
             )
             continue
-        definition = definitions[header.type_key]
-        assert isinstance(definition, AssociatedDataTypeDefinition)
+        definition = definitions.get(header.type_key)
+        if not isinstance(definition, AssociatedDataTypeDefinition):
+            findings.append(
+                _finding(
+                    FindingCode.UNKNOWN,
+                    path,
+                    "object type is unavailable in the selected state",
+                    type_keys=(header.type_key,),
+                )
+            )
+            continue
         known = {value.name for value in definition.properties}
         for position, name in enumerate(selection.properties.names):
             if name not in known:
@@ -414,28 +565,8 @@ def _query_definition_closure(
     loaded = {value.type_key: value for value in definitions}
     if not isinstance(selection, PatternSelection):
         return tuple(loaded[key] for key in sorted(loaded))
-    if any(not link.type_keys for link in selection.links):
-        missing_link_keys = tuple(
-            key for key in _definition_keys(connection, state, "link") if key not in loaded
-        )
-        loaded.update(
-            (value.type_key, value)
-            for value in load_definitions(connection, state, missing_link_keys)
-        )
-    nodes = {value.name: value for value in selection.nodes}
-    if any(
-        (node := nodes.get(value.associated_data)) is not None and not node.type_keys
-        for value in selection.direct_associations
-    ):
-        missing_data_keys = tuple(
-            key
-            for key in _definition_keys(connection, state, "associatedData")
-            if key not in loaded
-        )
-        loaded.update(
-            (value.type_key, value)
-            for value in load_definitions(connection, state, missing_data_keys)
-        )
+    for value in _relationship_witnesses(connection, state, selection):
+        loaded[value.type_key] = value
     endpoint_keys = {
         key
         for value in loaded.values()
@@ -446,7 +577,9 @@ def _query_definition_closure(
     if endpoint_keys:
         loaded.update(
             (value.type_key, value)
-            for value in load_definitions(connection, state, tuple(sorted(endpoint_keys)))
+            for value in _load_effective_definitions(
+                connection, state, tuple(sorted(endpoint_keys))
+            )
         )
     anchor_keys = {
         key
@@ -458,32 +591,100 @@ def _query_definition_closure(
     if anchor_keys:
         loaded.update(
             (value.type_key, value)
-            for value in load_definitions(connection, state, tuple(sorted(anchor_keys)))
+            for value in _load_effective_definitions(connection, state, tuple(sorted(anchor_keys)))
         )
     return tuple(loaded[key] for key in sorted(loaded))
 
 
-def _definition_keys(connection, state, kind: str) -> tuple[str, ...]:
+def _relationship_witnesses(connection, state, selection):
+    nodes = {value.name: value for value in selection.nodes}
+    for link in selection.links:
+        if link.type_keys:
+            continue
+        source = nodes.get(link.source)
+        target = nodes.get(link.target)
+        source_keys = () if source is None else source.type_keys
+        target_keys = () if target is None else target.type_keys
+        if source_keys and target_keys:
+            source_set, target_set = set(source_keys), set(target_keys)
+            witness = _definition_witness(
+                connection,
+                state,
+                "link",
+                lambda value, source_set=source_set, target_set=target_set: (
+                    isinstance(value, LinkTypeDefinition)
+                    and bool(source_set.intersection(value.permitted_source_type_keys))
+                    and bool(target_set.intersection(value.permitted_target_type_keys))
+                ),
+            )
+            if witness is not None:
+                yield witness
+    for association in selection.direct_associations:
+        anchor = nodes.get(association.anchor)
+        data = nodes.get(association.associated_data)
+        anchor_keys = () if anchor is None else anchor.type_keys
+        if anchor_keys and data is not None and not data.type_keys:
+            anchor_set = set(anchor_keys)
+            witness = _definition_witness(
+                connection,
+                state,
+                "associatedData",
+                lambda value, anchor_set=anchor_set: (
+                    isinstance(value, AssociatedDataTypeDefinition)
+                    and bool(anchor_set.intersection(value.permitted_anchor_type_keys))
+                ),
+            )
+            if witness is not None:
+                yield witness
+
+
+def _definition_witness(connection, state, kind, compatible):
+    first = None
+    parameters = interval_parameters(state)
     rows = connection.execute(
-        f"""
-        SELECT type_key FROM definition_version AS v
-        WHERE {interval_sql("v")} AND v.kind = ? ORDER BY type_key
-        """,
-        (*interval_parameters(state), kind),
-    ).fetchall()
-    return tuple(str(row["type_key"]) for row in rows)
+        f"""SELECT v.type_key FROM definition_version AS v
+            WHERE {interval_sql("v")} AND v.kind = ? ORDER BY v.type_key""",
+        (*parameters, kind),
+    )
+    for row in rows:
+        key = str(row[0])
+        current = load_definitions(connection, state, (key,))
+        values = (
+            load_draft_definitions(connection, current, (key,)) if state.includes_draft else current
+        )
+        if not values:
+            continue
+        value = values[0]
+        first = value if first is None else first
+        if compatible(value):
+            return value
+    if state.includes_draft:
+        for row in connection.execute(
+            """SELECT type_key FROM draft_definition_entry
+               WHERE operation = 'replace' AND kind = ? ORDER BY type_key""",
+            (kind,),
+        ):
+            key = str(row[0])
+            values = load_draft_definitions(connection, (), (key,))
+            if not values:
+                continue
+            value = values[0]
+            first = value if first is None else first
+            if compatible(value):
+                return value
+    return first
 
 
 def _selection_with_identity_types(selection: PatternSelection, headers) -> PatternSelection:
     nodes = tuple(
         replace(node, type_keys=_identity_type_keys(node.uuids, node.type_keys, headers))
-        if node.uuids
+        if node.uuids and all(uuid in headers for uuid in node.uuids)
         else node
         for node in selection.nodes
     )
     links = tuple(
         replace(link, type_keys=_identity_type_keys(link.uuids, link.type_keys, headers))
-        if link.uuids
+        if link.uuids and all(uuid in headers for uuid in link.uuids)
         else link
         for link in selection.links
     )
@@ -506,6 +707,105 @@ def _definition_without_legacy(value: TypeDefinition) -> TypeDefinition:
     )
 
 
+def _draft_anchor_type_keys(connection, maximum):
+    rows = connection.execute(
+        """SELECT type_key FROM definition_version
+           WHERE valid_to_revision IS NULL AND kind = 'anchor'
+             AND NOT EXISTS (
+               SELECT 1 FROM draft_definition_entry AS d
+               WHERE d.type_key = definition_version.type_key
+             )
+           UNION
+           SELECT type_key FROM draft_definition_entry
+           WHERE operation = 'replace' AND kind = 'anchor'
+           ORDER BY type_key LIMIT ?""",
+        (maximum,),
+    )
+    return tuple(str(row[0]) for row in rows)
+
+
+def _draft_anchor_type_count(connection):
+    return int(
+        connection.execute(
+            """SELECT count(*) FROM (
+               SELECT v.type_key FROM definition_version AS v
+               WHERE v.valid_to_revision IS NULL AND v.kind = 'anchor'
+                 AND NOT EXISTS (
+                   SELECT 1 FROM draft_definition_entry AS d
+                   WHERE d.type_key = v.type_key
+                 )
+               UNION
+               SELECT d.type_key FROM draft_definition_entry AS d
+               WHERE d.operation = 'replace' AND d.kind = 'anchor')"""
+        ).fetchone()[0]
+    )
+
+
+def _draft_neighborhood_type_keys(connection, anchor_type_keys):
+    encoded = tuple(anchor_type_keys)
+    placeholders = ",".join("?" for _ in encoded)
+    data_rows = connection.execute(
+        f"""SELECT DISTINCT p.type_key FROM definition_permitted_type AS p
+            WHERE p.valid_to_revision IS NULL AND p.role = 'anchor'
+              AND p.permitted_type_key IN ({placeholders})
+              AND NOT EXISTS (
+                SELECT 1 FROM draft_definition_entry AS d WHERE d.type_key = p.type_key)
+            UNION
+            SELECT DISTINCT p.type_key FROM draft_definition_permitted_type AS p
+            JOIN draft_definition_entry AS d USING (type_key)
+            WHERE d.operation = 'replace' AND d.kind = 'associatedData'
+              AND p.role = 'anchor' AND p.permitted_type_key IN ({placeholders})""",
+        (*encoded, *encoded),
+    ).fetchall()
+    data_keys = tuple(str(row[0]) for row in data_rows)
+    participating = tuple(dict.fromkeys((*anchor_type_keys, *data_keys)))
+    participant_placeholders = ",".join("?" for _ in participating)
+    link_rows = connection.execute(
+        f"""SELECT DISTINCT p.type_key FROM definition_permitted_type AS p
+            WHERE p.valid_to_revision IS NULL AND p.role IN ('source', 'target')
+              AND p.permitted_type_key IN ({participant_placeholders})
+              AND NOT EXISTS (
+                SELECT 1 FROM draft_definition_entry AS d WHERE d.type_key = p.type_key)
+            UNION
+            SELECT DISTINCT p.type_key FROM draft_definition_permitted_type AS p
+            JOIN draft_definition_entry AS d USING (type_key)
+            WHERE d.operation = 'replace' AND d.kind = 'link'
+              AND p.role IN ('source', 'target')
+              AND p.permitted_type_key IN ({participant_placeholders})""",
+        (*participating, *participating),
+    ).fetchall()
+    return tuple(
+        dict.fromkeys((*anchor_type_keys, *data_keys, *(str(row[0]) for row in link_rows)))
+    )
+
+
+def _draft_pattern_definition_keys(query, headers):
+    selection = query.selection
+    keys = {value.type_key for value in headers.values()}
+    for selector in (*selection.nodes, *selection.links):
+        keys.update(selector.type_keys)
+    return tuple(sorted(keys))
+
+
+def _full_text_scopes(selection):
+    operators = {
+        PredicateOperator.ALL_TERMS,
+        PredicateOperator.ANY_TERMS,
+        PredicateOperator.PHRASE,
+    }
+    return tuple(
+        (
+            node.kind.value,
+            node.type_keys,
+            node.uuids,
+            "displayName" if predicate.field.kind == "displayName" else predicate.field.name,
+        )
+        for node in selection.nodes
+        for predicate in node.predicates
+        if predicate.operator in operators
+    )
+
+
 def _neighborhood_legacy(
     value: DefinitionNeighborhood, include_legacy_system: bool
 ) -> DefinitionNeighborhood:
@@ -516,11 +816,6 @@ def _neighborhood_legacy(
         tuple(_definition_without_legacy(item) for item in value.associated_data_types),
         tuple(_definition_without_legacy(item) for item in value.link_types),
     )
-
-
-def _require_canonical_overlay(includes_draft: bool) -> None:
-    if includes_draft:
-        raise NotImplementedError("draft definition/query overlay is implemented in Phase 4")
 
 
 def _rejected_query(
@@ -535,8 +830,9 @@ def _finding(
     summary: str,
     *,
     type_keys: tuple[str, ...] = (),
+    uuids: tuple[str, ...] = (),
 ) -> Finding:
-    return Finding(code, summary, path, type_keys)
+    return Finding(code, summary, path, type_keys, uuids)
 
 
 def _ordered_findings(findings: list[Finding]) -> tuple[Finding, ...]:

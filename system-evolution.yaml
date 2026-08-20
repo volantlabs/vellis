@@ -84,9 +84,9 @@ findings:
     classification: model gap
     consequence: A small change requires reconstructing unrelated content and creates a silent-loss footgun.
     authority_refs: [owner-plan:sections-2.8-and-3.7]
-    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix]
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase4-evidence.md#evidence-status]
     disposition: implementation-work
-    owner_work_item_id: W004
+    owner_work_item_id: W008
     implementation_status: conflicting
     nearest_wrong_system: An upsert-shaped adapter still replaces an entire persisted object.
     compatibility_effect: Mutation becomes field-level with explicit removal and no cascade.
@@ -95,9 +95,9 @@ findings:
     classification: model gap
     consequence: A bucket of deltas acquires an unnecessary public lifecycle and persisted identities.
     authority_refs: [owner-plan:sections-2.9-and-3.8-through-3.12]
-    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix]
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase4-evidence.md#evidence-status]
     disposition: implementation-work
-    owner_work_item_id: W004
+    owner_work_item_id: W008
     implementation_status: conflicting
     nearest_wrong_system: Draft terminology changes while version, stale status, or assessment identity remains.
     compatibility_effect: Prototype proposal and assessment contracts are removed.
@@ -220,8 +220,8 @@ decisions:
     reversible: true
     owner_work_item_id: W004
     evidence_intent: [Live writes preserve unstaged fields., Cursors expire correctly., Activation revalidates.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_draft_fields_win_while_unstaged_live_fields_follow_live, path:tests/vellis/test_change_draft_v2.py#test_inspection_pages_and_expires_on_live_or_draft_change, path:tests/vellis/test_change_draft_v2.py#test_activation_revalidates_invalid_valid_and_redundant_drafts, path:docs/v2-simplification-phase4-evidence.md#evidence-status]
   - id: D010
     summary: Use field-level graph patches and one unversioned durable draft.
     authority_refs: [owner-plan:sections-2.8-through-2.9]
@@ -229,8 +229,8 @@ decisions:
     reversible: false
     owner_work_item_id: W004
     evidence_intent: [One-field changes preserve unseen data., Draft overlay follows live fields without public version or assessment identity.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_field_patches_preserve_unmentioned_content_and_distinguish_null, path:tests/vellis/test_change_draft_v2.py#test_draft_only_addition_has_no_system_until_activation, path:tests/vellis/test_change_draft_v2.py#test_repeated_draft_edits_merge_tombstone_restart_and_unstage, path:docs/v2-simplification-phase4-evidence.md#evidence-status]
   - id: D006
     summary: Use version intervals, a canonical hash chain, separate activity, SQL restore, and online backup.
     authority_refs: [owner-plan:sections-4.5-and-4.10-through-4.11]
@@ -375,16 +375,16 @@ work_items:
     kind: implementation
     dependencies: [W003]
     planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: [F003, F004]
+    finding_ids: []
     decision_ids: [D005, D010]
     authority: [{refs: [owner-plan:phase-4], coverage: full, remaining_work_item_ids: []}]
     approval: {status: not-required, reason: The approved plan fixes patches and the draft bucket., checkpoint: null}
     nearest_wrong_system: Patches lose data, removal cascades, activation needs a stale assessment identity, or concurrent mutations share connection state.
-    compatibility_effect: Replacement, proposal version, assessment, and conflict-list paths are removed.
+    compatibility_effect: The Phase 4 successor service semantics replace complete-object mutation and proposal/assessment meaning; predecessor public adapter paths remain reachable until W008 removes them.
     non_effects: [No cascade., No draft version., No whole-state active validation., No shared operation connection or cross-operation temporary population.]
     lifecycle: active
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:docs/v2-simplification-phase4-evidence.md#implemented-distinction, path:docs/v2-simplification-phase4-evidence.md#evidence-status, command:uv run pytest -q tests/vellis/test_domain_v2.py tests/vellis/test_canonical_encoding_v2.py tests/vellis/test_storage_v2.py tests/vellis/test_query_v2_successor.py tests/vellis/test_change_draft_v2.py, command:just lint, command:just typecheck, command:just model-check, command:just model-reference-check, command:just system-evolution-check]
     blocker: null
     checkpoint: null
   - id: W005
@@ -447,7 +447,7 @@ work_items:
     kind: closure
     dependencies: [W007]
     planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: [F002, F010]
+    finding_ids: [F002, F003, F004, F010]
     decision_ids: [D009]
     authority: [{refs: [owner-plan:phase-8], coverage: full, remaining_work_item_ids: []}]
     approval: {status: not-required, reason: Closure removes superseded paths and aligns claims., checkpoint: null}

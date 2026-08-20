@@ -80,6 +80,20 @@ def graph_findings(
     *,
     require_system: bool,
 ) -> tuple[Finding, ...]:
+    return _ordered(
+        (
+            *graph_structure_findings(objects, definitions, require_system=require_system),
+            *graph_cardinality_findings(objects, definitions),
+        )
+    )
+
+
+def graph_structure_findings(
+    objects: Iterable[GraphObject],
+    definitions: Iterable[TypeDefinition],
+    *,
+    require_system: bool,
+) -> tuple[Finding, ...]:
     graph = tuple(objects)
     definition_map = {definition.type_key: definition for definition in definitions}
     object_map: dict[str, GraphObject] = {}
@@ -98,7 +112,34 @@ def graph_findings(
             object_map[canonical] = value
     for index, value in enumerate(graph):
         _validate_object_content(value, definition_map, object_map, f"/objects/{index}", findings)
-    _validate_complete_cardinality(graph, definition_map, findings)
+    return _ordered(findings)
+
+
+def graph_cardinality_findings(
+    objects: Iterable[GraphObject], definitions: Iterable[TypeDefinition]
+) -> tuple[Finding, ...]:
+    findings: list[Finding] = []
+    _validate_complete_cardinality(
+        tuple(objects), {value.type_key: value for value in definitions}, findings
+    )
+    return _ordered(findings)
+
+
+def graph_object_findings(
+    value: GraphObject,
+    definitions: Iterable[TypeDefinition],
+    referents: Iterable[GraphObject],
+    *,
+    require_system: bool,
+) -> tuple[Finding, ...]:
+    """Validate one object using only its directly referenced objects."""
+    definition_map = {definition.type_key: definition for definition in definitions}
+    object_map = {item.uuid: item for item in referents}
+    object_map[value.uuid] = value
+    findings: list[Finding] = []
+    path = f"/objects/{value.uuid}"
+    _validate_object_header(value, definition_map, path, require_system, findings)
+    _validate_object_content(value, definition_map, object_map, path, findings)
     return _ordered(findings)
 
 

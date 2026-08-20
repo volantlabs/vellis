@@ -15,6 +15,8 @@ from vellis.canonical_encoding import (
     RowDescriptor,
     SetValues,
     canonical_record_hash,
+    canonical_record_hash_members,
+    descriptor_member,
     encode,
     row_digest,
 )
@@ -85,3 +87,25 @@ def test_record_hash_sorts_descriptors_but_detects_header_and_row_changes() -> N
         summary="Different summary",
     )
     assert baseline != canonical_record_hash(ZERO_HASH, changed_header, (row_a, row_b), ())
+
+
+def test_streamed_descriptor_members_preserve_the_frozen_record_hash() -> None:
+    rows = (
+        RowDescriptor("property_version", Record((("uuid", "b"),)), bytes.fromhex("02" * 32)),
+        RowDescriptor("definition_version", Record((("typeKey", "a"),)), bytes.fromhex("01" * 32)),
+    )
+    header = CanonicalHeader(
+        "12345678-1234-4234-8234-123456789abc",
+        2,
+        parse_timestamp("2026-08-20T00:00:00Z"),
+        "owner",
+        None,
+        "draftActivation",
+        "streamed",
+    )
+    encoded = tuple((row.relation_name, *descriptor_member(row)) for row in rows)
+    members = tuple(member for _, _, member in sorted(encoded, key=lambda value: value[:2]))
+    length = sum(8 + len(member) for member in members)
+    assert canonical_record_hash(ZERO_HASH, header, rows, ()) == canonical_record_hash_members(
+        ZERO_HASH, header, length, iter(members), 0, iter(())
+    )

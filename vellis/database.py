@@ -688,7 +688,8 @@ CREATE TABLE draft_property_operation (
     timestamp_text TEXT,
     CHECK (
         operation = 'remove'
-        OR (operation = 'set' AND value_kind IS NOT NULL AND is_null IS NOT NULL)
+        OR (operation = 'set' AND is_null = 1 AND value_kind IS NULL)
+        OR (operation = 'set' AND is_null = 0 AND value_kind IS NOT NULL)
     ),
     CHECK (
         operation = 'remove' OR is_null = 1 OR (
@@ -722,8 +723,11 @@ CREATE TABLE validation_run (
     evaluated_revision INTEGER NOT NULL,
     draft_fingerprint BLOB,
     total_findings INTEGER NOT NULL,
+    raw_draft_entry_count INTEGER,
+    effective_draft_change_count INTEGER,
     cursor_hash BLOB,
-    next_offset INTEGER
+    next_offset INTEGER,
+    page_limit INTEGER CHECK (page_limit IS NULL OR page_limit BETWEEN 1 AND 1000)
 ) STRICT;
 CREATE TABLE validation_finding (
     scope TEXT NOT NULL REFERENCES validation_run(scope) ON DELETE CASCADE,

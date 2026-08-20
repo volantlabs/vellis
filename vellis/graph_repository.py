@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections import defaultdict
 
@@ -88,6 +89,53 @@ def load_graph(connection: sqlite3.Connection, state: ResolvedState) -> tuple[Gr
     associations = _load_associations(connection, state)
     properties = _load_properties(connection, state)
     return tuple(_object_from_row(row, associations, properties) for row in rows)
+
+
+def load_graph_objects(
+    connection: sqlite3.Connection, state: ResolvedState, uuids: tuple[str, ...]
+) -> tuple[GraphObject, ...]:
+    """Load only explicitly selected identities, including their owned values."""
+    if not uuids:
+        return ()
+    encoded = json.dumps(uuids, ensure_ascii=False, separators=(",", ":"))
+    rows = connection.execute(
+        f"""
+        SELECT v.*, i.created_revision, i.legacy_v1
+        FROM graph_object_version AS v
+        JOIN graph_object_identity AS i USING (uuid)
+        WHERE {interval_sql("v")}
+          AND v.uuid IN (SELECT value FROM json_each(?))
+        ORDER BY v.uuid
+        """,
+        (*interval_parameters(state), encoded),
+    ).fetchall()
+    associations = _load_selected_associations(connection, state, encoded)
+    properties = _load_selected_properties(connection, state, encoded)
+    return tuple(_object_from_row(row, associations, properties) for row in rows)
+
+
+def close_graph_versions(
+    connection: sqlite3.Connection, uuids: tuple[str, ...], revision: int
+) -> tuple[RowDescriptor, ...]:
+    """Close current structural and owned versions and return retirement descriptors."""
+    if not uuids:
+        return ()
+    encoded = json.dumps(uuids, ensure_ascii=False, separators=(",", ":"))
+    descriptors = _current_graph_descriptors(connection, encoded)
+    for relation, column in (
+        ("direct_association_version", "object_uuid"),
+        ("property_version", "object_uuid"),
+        ("graph_object_version", "uuid"),
+    ):
+        connection.execute(
+            f"""
+            UPDATE {relation} SET valid_to_revision = ?
+            WHERE valid_to_revision IS NULL
+              AND {column} IN (SELECT value FROM json_each(?))
+            """,
+            (revision, encoded),
+        )
+    return descriptors
 
 
 def _reserve_identity(connection: sqlite3.Connection, value: GraphObject, revision: int) -> None:
@@ -254,16 +302,86 @@ def _load_properties(
     return {uuid: tuple(properties) for uuid, properties in values.items()}
 
 
+def _load_selected_associations(
+    connection: sqlite3.Connection, state: ResolvedState, encoded: str
+) -> dict[str, tuple[str, ...]]:
+    rows = connection.execute(
+        f"""
+        SELECT object_uuid, anchor_uuid FROM direct_association_version AS a
+        WHERE {interval_sql("a")}
+          AND object_uuid IN (SELECT value FROM json_each(?))
+        ORDER BY object_uuid, anchor_uuid
+        """,
+        (*interval_parameters(state), encoded),
+    ).fetchall()
+    values: dict[str, list[str]] = defaultdict(list)
+    for row in rows:
+        values[str(row["object_uuid"])].append(str(row["anchor_uuid"]))
+    return {key: tuple(value) for key, value in values.items()}
+
+
+def _load_selected_properties(
+    connection: sqlite3.Connection, state: ResolvedState, encoded: str
+) -> dict[str, tuple[tuple[str, ScalarValue | None], ...]]:
+    rows = connection.execute(
+        f"""
+        SELECT * FROM property_version AS p
+        WHERE {interval_sql("p")}
+          AND object_uuid IN (SELECT value FROM json_each(?))
+        ORDER BY object_uuid, property_name
+        """,
+        (*interval_parameters(state), encoded),
+    ).fetchall()
+    values: dict[str, list[tuple[str, ScalarValue | None]]] = defaultdict(list)
+    for row in rows:
+        values[str(row["object_uuid"])].append((str(row["property_name"]), property_from_row(row)))
+    return {key: tuple(value) for key, value in values.items()}
+
+
+def _current_graph_descriptors(
+    connection: sqlite3.Connection, encoded: str
+) -> tuple[RowDescriptor, ...]:
+    specs = (
+        ("graph_object_version", ("uuid",)),
+        ("direct_association_version", ("object_uuid", "anchor_uuid")),
+        ("property_version", ("object_uuid", "property_name")),
+    )
+    from vellis.canonical_encoding import Record
+
+    descriptors: list[RowDescriptor] = []
+    for relation, keys in specs:
+        owner = "uuid" if relation == "graph_object_version" else "object_uuid"
+        rows = connection.execute(
+            f"""SELECT * FROM {relation} WHERE valid_to_revision IS NULL
+                AND {owner} IN (SELECT value FROM json_each(?))""",
+            (encoded,),
+        ).fetchall()
+        for row in rows:
+            fields = tuple((_camel(key), row[key]) for key in keys)
+            identity = Record((*fields, ("validFromRevision", int(row["valid_from_revision"]))))
+            descriptors.append(RowDescriptor(relation, identity, bytes(row["row_digest"])))
+    return tuple(descriptors)
+
+
+def _camel(value: str) -> str:
+    head, *tail = value.split("_")
+    return head + "".join(part.title() for part in tail)
+
+
 def _object_from_row(
     row: sqlite3.Row,
     associations: dict[str, tuple[str, ...]],
     properties: dict[str, tuple[tuple[str, ScalarValue | None], ...]],
 ) -> GraphObject:
     uuid = str(row["uuid"])
-    system = SystemEnvelope(
-        int(row["created_revision"]),
-        int(row["last_changed_revision"]),
-        None if row["legacy_v1"] is None else str(row["legacy_v1"]),
+    system = (
+        None
+        if row["created_revision"] is None
+        else SystemEnvelope(
+            int(row["created_revision"]),
+            int(row["last_changed_revision"]),
+            None if row["legacy_v1"] is None else str(row["legacy_v1"]),
+        )
     )
     kind = ObjectKind(str(row["kind"]))
     if kind is ObjectKind.ANCHOR:

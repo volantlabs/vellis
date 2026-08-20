@@ -50,6 +50,10 @@ class ObjectHeader:
     type_key: str
 
 
+def pattern_execution_finding(error: ValueError) -> Finding:
+    return Finding(FindingCode.INVALID_VALUE, str(error), "/selection")
+
+
 def load_object_headers(
     connection: sqlite3.Connection,
     state: ResolvedState,
@@ -663,7 +667,9 @@ def _hydrate(
         str(row["source_uuid"]) if kind is ObjectKind.LINK else None,
         str(row["target_uuid"]) if kind is ObjectKind.LINK else None,
         properties.get(uuid) if kind is ObjectKind.ASSOCIATED_DATA and uuid in properties else None,
-        SystemEnvelope(
+        None
+        if row["created_revision"] is None
+        else SystemEnvelope(
             int(row["created_revision"]),
             int(row["last_changed_revision"]),
             legacy.get(uuid),

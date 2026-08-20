@@ -24,6 +24,7 @@ from vellis.domain import (
     parse_timestamp,
 )
 from vellis.domain_validation import definition_set_findings
+from vellis.draft_repository import load_draft_definitions, load_draft_graph
 from vellis.graph_repository import load_graph
 from vellis.state_repository import resolve_state
 
@@ -120,10 +121,15 @@ def read_state(database_path: Path, selection: StateSelection | None = None) -> 
         require_supported_database(connection)
         connection.execute("BEGIN")
         state = resolve_state(connection, selection)
+        definitions = load_definitions(connection, state)
+        graph = load_graph(connection, state)
+        if state.includes_draft:
+            definitions = load_draft_definitions(connection, definitions)
+            graph, _ = load_draft_graph(connection, graph)
         result = StateResult(
             state.evaluated_revision,
-            load_definitions(connection, state),
-            load_graph(connection, state),
+            definitions,
+            graph,
         )
         _serialize_result(result)
         connection.commit()

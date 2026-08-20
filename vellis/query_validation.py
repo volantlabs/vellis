@@ -30,6 +30,7 @@ from vellis.query_domain import (
     PropertyField,
     PropertySelection,
 )
+from vellis.search_repository import structured_fts_expression
 
 _NO_PAYLOAD = {
     PredicateOperator.PRESENT,
@@ -55,11 +56,45 @@ _ORDERABLE = {
 
 
 def query_findings(
-    query: GraphQuery, definitions: tuple[TypeDefinition, ...]
+    query: GraphQuery,
+    definitions: tuple[TypeDefinition, ...],
+    *,
+    include_relationship_compatibility: bool = True,
 ) -> tuple[Finding, ...]:
     if isinstance(query.selection, IdentitySelection):
         return _identity_findings(query.selection)
-    return _pattern_findings(query.selection, definitions)
+    return _pattern_findings(query.selection, definitions, include_relationship_compatibility)
+
+
+def relationship_compatibility_findings(
+    selection: PatternSelection, definitions: tuple[TypeDefinition, ...]
+) -> tuple[Finding, ...]:
+    """Check only endpoint compatibility after request meaning is known valid."""
+    definition_map = {definition.type_key: definition for definition in definitions}
+    nodes = {node.name: node for node in selection.nodes}
+    findings: list[Finding] = []
+    for index, association in enumerate(selection.direct_associations):
+        _association_compatibility(association, index, nodes, definition_map, findings)
+    for index, link in enumerate(selection.links):
+        _link_compatibility(link, index, nodes, definition_map, findings)
+    return _ordered(findings)
+
+
+def structured_predicate_findings(connection, selection: PatternSelection) -> tuple[Finding, ...]:
+    searchable = {
+        PredicateOperator.ALL_TERMS,
+        PredicateOperator.ANY_TERMS,
+        PredicateOperator.PHRASE,
+    }
+    for node in selection.nodes:
+        for predicate in node.predicates:
+            if predicate.operator not in searchable:
+                continue
+            try:
+                structured_fts_expression(connection, predicate)
+            except ValueError as error:
+                return (_finding(FindingCode.INVALID_VALUE, "/selection", str(error)),)
+    return ()
 
 
 def _identity_findings(selection: IdentitySelection) -> tuple[Finding, ...]:
@@ -82,7 +117,9 @@ def _identity_findings(selection: IdentitySelection) -> tuple[Finding, ...]:
 
 
 def _pattern_findings(
-    selection: PatternSelection, definitions: tuple[TypeDefinition, ...]
+    selection: PatternSelection,
+    definitions: tuple[TypeDefinition, ...],
+    include_relationship_compatibility: bool,
 ) -> tuple[Finding, ...]:
     findings: list[Finding] = []
     if not 1 <= selection.maximum_matches <= PUBLIC_ITEM_LIMIT:
@@ -123,6 +160,9 @@ def _pattern_findings(
         _association_findings(association, index, nodes, definition_map, findings)
     for index, link in enumerate(selection.links):
         _link_findings(link, index, nodes, definition_map, findings)
+    findings.extend(
+        _optional_relationship_findings(selection, definitions, include_relationship_compatibility)
+    )
     if len(nodes) > 1 and not _connected(selection):
         findings.append(
             _finding(
@@ -132,6 +172,10 @@ def _pattern_findings(
             )
         )
     return _ordered(findings)
+
+
+def _optional_relationship_findings(selection, definitions, include):
+    return relationship_compatibility_findings(selection, definitions) if include else ()
 
 
 def _node_findings(
@@ -540,6 +584,20 @@ def _association_findings(
         )
     if anchor is None or data is None:
         return
+
+
+def _association_compatibility(
+    association: DirectAssociation,
+    index: int,
+    nodes: dict[str, PatternNode],
+    definitions: dict[str, TypeDefinition],
+    findings: list[Finding],
+) -> None:
+    path = f"/selection/directAssociations/{index}"
+    anchor = nodes.get(association.anchor)
+    data = nodes.get(association.associated_data)
+    if anchor is None or data is None:
+        return
     anchor_keys = _candidate_node_keys(anchor, definitions)
     data_definitions = tuple(
         value
@@ -580,11 +638,6 @@ def _link_findings(
         findings.append(_finding(FindingCode.UNKNOWN, f"{path}/source", "unknown source node"))
     if target is None:
         findings.append(_finding(FindingCode.UNKNOWN, f"{path}/target", "unknown target node"))
-    selected_links: list[LinkTypeDefinition] = []
-    if not link.type_keys:
-        selected_links.extend(
-            value for value in definitions.values() if isinstance(value, LinkTypeDefinition)
-        )
     for position, key in enumerate(link.type_keys):
         definition = definitions.get(key)
         if definition is None:
@@ -605,8 +658,27 @@ def _link_findings(
                     type_keys=(key,),
                 )
             )
-        else:
-            selected_links.append(definition)
+
+
+def _link_compatibility(
+    link: PatternLink,
+    index: int,
+    nodes: dict[str, PatternNode],
+    definitions: dict[str, TypeDefinition],
+    findings: list[Finding],
+) -> None:
+    path = f"/selection/links/{index}"
+    source = nodes.get(link.source)
+    target = nodes.get(link.target)
+    selected_links = (
+        tuple(value for value in definitions.values() if isinstance(value, LinkTypeDefinition))
+        if not link.type_keys
+        else tuple(
+            value
+            for key in link.type_keys
+            if isinstance((value := definitions.get(key)), LinkTypeDefinition)
+        )
+    )
     if source is None or target is None or not selected_links:
         return
     source_keys = _candidate_node_keys(source, definitions)

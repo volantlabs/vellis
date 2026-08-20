@@ -97,6 +97,31 @@ def load_definitions(
     return tuple(_definition_from_row(row, permitted, properties) for row in rows)
 
 
+def close_definition_versions(
+    connection: sqlite3.Connection, type_keys: tuple[str, ...], revision: int
+) -> tuple[RowDescriptor, ...]:
+    """Close cohesive current definitions and return their retirement descriptors."""
+    if not type_keys:
+        return ()
+    encoded = json.dumps(type_keys, ensure_ascii=False, separators=(",", ":"))
+    descriptors = _current_definition_descriptors(connection, encoded)
+    for relation in (
+        "definition_permitted_type",
+        "property_definition_allowed_value",
+        "property_definition_version",
+        "definition_version",
+    ):
+        connection.execute(
+            f"""
+            UPDATE {relation} SET valid_to_revision = ?
+            WHERE valid_to_revision IS NULL
+              AND type_key IN (SELECT value FROM json_each(?))
+            """,
+            (revision, encoded),
+        )
+    return descriptors
+
+
 def _insert_definition_version(
     connection: sqlite3.Connection, definition: TypeDefinition, revision: int
 ) -> list[RowDescriptor]:
@@ -494,3 +519,33 @@ def _natural_text(value: int | None) -> str | None:
 
 def _canonical_natural_text(value: str) -> bool:
     return value == "0" or (value.isascii() and value.isdigit() and not value.startswith("0"))
+
+
+def _current_definition_descriptors(
+    connection: sqlite3.Connection, encoded: str
+) -> tuple[RowDescriptor, ...]:
+    from vellis.canonical_encoding import Record
+
+    specs = (
+        ("definition_version", ("type_key",)),
+        ("definition_permitted_type", ("type_key", "role", "permitted_type_key")),
+        ("property_definition_version", ("type_key", "property_name")),
+        ("property_definition_allowed_value", ("type_key", "property_name", "ordinal")),
+    )
+    descriptors: list[RowDescriptor] = []
+    for relation, keys in specs:
+        rows = connection.execute(
+            f"""SELECT * FROM {relation} WHERE valid_to_revision IS NULL
+                AND type_key IN (SELECT value FROM json_each(?))""",
+            (encoded,),
+        ).fetchall()
+        for row in rows:
+            fields = tuple((_camel(key), row[key]) for key in keys)
+            identity = Record((*fields, ("validFromRevision", int(row["valid_from_revision"]))))
+            descriptors.append(RowDescriptor(relation, identity, bytes(row["row_digest"])))
+    return tuple(descriptors)
+
+
+def _camel(value: str) -> str:
+    head, *tail = value.split("_")
+    return head + "".join(part.title() for part in tail)
