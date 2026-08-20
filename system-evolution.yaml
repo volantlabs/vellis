@@ -18,13 +18,13 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:5196bb01fedb90c815ae15f40cddb041fc915d01
-  target: &phase2_target
+  target: &phase3_target
     model: sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794
-    implementation: git:677fb3ecdb7823f9ec22f92a394ade4d864fd580
+    implementation: git:0c7940fd3677322222d9bafebe48fa9661b874a5
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:677fb3ecdb7823f9ec22f92a394ade4d864fd580
-  observed: *phase2_target
+    checkpoint: git:0c7940fd3677322222d9bafebe48fa9661b874a5
+  observed: *phase3_target
 scope:
   authority_scope:
     - owner-plan:Vellis-v2-Simplification-Rebaseline
@@ -356,11 +356,19 @@ work_items:
     nearest_wrong_system: Renamed tools retain projection, aggregation, hidden selectors, or unbounded hydration.
     compatibility_effect: Old query requests and results are unsupported.
     non_effects: [No aggregation., No fuzzy or semantic search., No query AST.]
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs: [path:docs/v2-simplification-phase3-evidence.md#implemented-distinction, path:docs/v2-simplification-phase3-evidence.md#focused-evidence, path:docs/v2-simplification-phase3-evidence.md#subtraction-and-locality-review, command:uv run pytest -q tests/vellis/test_domain_v2.py tests/vellis/test_canonical_encoding_v2.py tests/vellis/test_storage_v2.py tests/vellis/test_query_v2_successor.py, command:just lint, command:just typecheck, command:just model-check, command:just model-reference-check, command:just system-evolution-check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:0c7940fd3677322222d9bafebe48fa9661b874a5
+  # Phase 3 clean review pair inspected shared staged tree token
+  # 5d9b49bc70dae1dca31d58afd137f32af42c5ee8, preserved by checkpoint
+  # git:0c7940fd3677322222d9bafebe48fa9661b874a5.
+  # /root/phase3_authority_review_8 — authority and conformance — clean.
+  # /root/phase3_engineering_review_8 — engineering and evidence — clean.
+  # Both independently confirmed 94 focused tests, successor C901 and diff checks;
+  # manager gates also confirmed lint/type/model/reference/evolution and only the two
+  # documented F010/W008 full-suite failures among 1,329 tests.
   - id: W004
     order: 5
     label: Implement active changes, draft, validation, and activation
@@ -374,7 +382,7 @@ work_items:
     nearest_wrong_system: Patches lose data, removal cascades, activation needs a stale assessment identity, or concurrent mutations share connection state.
     compatibility_effect: Replacement, proposal version, assessment, and conflict-list paths are removed.
     non_effects: [No cascade., No draft version., No whole-state active validation., No shared operation connection or cross-operation temporary population.]
-    lifecycle: pending
+    lifecycle: active
     implementation_status: absent
     evidence_refs: []
     blocker: null
