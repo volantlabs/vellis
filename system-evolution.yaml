@@ -62,10 +62,10 @@ findings:
     classification: model gap
     consequence: Agents must reason about nested values and independently identified constraints instead of scalar facts and local type cardinality.
     authority_refs: [owner-plan:sections-2.1-through-2.6]
-    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix]
-    disposition: implementation-work
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase2-evidence.md#implemented-distinction, path:docs/v2-simplification-phase2-evidence.md#focused-evidence]
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: The model renames predecessor concepts while retaining recursive values or participant-rule identities.
     compatibility_effect: The unreleased prototype model and database are intentionally incompatible.
   - id: F002
@@ -106,10 +106,10 @@ findings:
     classification: implementation defect
     consequence: Temporary populations persist, tests reach private state, and concurrent HTTP operations cannot isolate connections.
     authority_refs: [owner-plan:sections-4.2-through-4.7]
-    evidence_refs: []
-    disposition: implementation-work
+    evidence_refs: [path:docs/v2-simplification-phase2-evidence.md#implemented-distinction, path:docs/v2-simplification-phase2-evidence.md#focused-evidence, path:docs/v2-simplification-phase2-evidence.md#subtraction-and-locality-review]
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Forwarding classes retain the global store, connection, and duplicate loaders.
     compatibility_effect: Fresh VEL2 storage replaces the unreleased prototype schema without migration.
   - id: F006
@@ -184,8 +184,8 @@ decisions:
     reversible: false
     owner_work_item_id: W002
     evidence_intent: [The implementation distinguishes scalar kinds and enforces local bounds without relationship-rule identities.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_domain_v2.py#test_definition_references_and_complete_graph_cardinality_are_validated, path:tests/vellis/test_domain_v2.py#test_all_four_local_cardinality_roles_cover_exact_minimum_maximum_and_unbounded, path:tests/vellis/test_storage_v2.py#test_scalar_versions_round_trip_null_and_all_nonnull_kinds, path:docs/v2-simplification-phase2-evidence.md#focused-evidence]
   - id: D002
     summary: Expose one query with identity and connected-pattern selections and post-bound hydration.
     authority_refs: [owner-plan:section-3]
@@ -202,8 +202,8 @@ decisions:
     reversible: true
     owner_work_item_id: W002
     evidence_intent: [One connection per operation., One definition resolver., No framework imports in domain.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_storage_v2.py#test_current_resolution_and_reads_do_not_traverse_canonical_history, path:tests/vellis/test_storage_v2.py#test_failure_after_temporary_creation_publishes_nothing, path:docs/v2-simplification-phase2-evidence.md#subtraction-and-locality-review]
   - id: D004
     summary: Compile flat bounded queries to parameterized SQL CTEs with version-aware FTS and an independent oracle.
     authority_refs: [owner-plan:section-4.8]
@@ -332,8 +332,8 @@ work_items:
     compatibility_effect: Fresh VEL2 only; prototype databases receive an actionable refusal.
     non_effects: [No compatibility layer., No MCP yet., No alternate store abstraction.]
     lifecycle: active
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:docs/v2-simplification-phase2-evidence.md#implemented-distinction, path:docs/v2-simplification-phase2-evidence.md#third-pair-root-cause-audit, path:docs/v2-simplification-phase2-evidence.md#focused-evidence, path:docs/v2-simplification-phase2-evidence.md#subtraction-and-locality-review, command:uv run pytest -q tests/vellis/test_domain_v2.py tests/vellis/test_canonical_encoding_v2.py tests/vellis/test_storage_v2.py, command:just lint, command:just typecheck, command:just model-check, command:just model-reference-check, command:just system-evolution-check]
     blocker: null
     checkpoint: null
   - id: W003
@@ -364,9 +364,9 @@ work_items:
     decision_ids: [D005, D010]
     authority: [{refs: [owner-plan:phase-4], coverage: full, remaining_work_item_ids: []}]
     approval: {status: not-required, reason: The approved plan fixes patches and the draft bucket., checkpoint: null}
-    nearest_wrong_system: Patches lose data, removal cascades, or activation needs a stale assessment identity.
+    nearest_wrong_system: Patches lose data, removal cascades, activation needs a stale assessment identity, or concurrent mutations share connection state.
     compatibility_effect: Replacement, proposal version, assessment, and conflict-list paths are removed.
-    non_effects: [No cascade., No draft version., No whole-state active validation.]
+    non_effects: [No cascade., No draft version., No whole-state active validation., No shared operation connection or cross-operation temporary population.]
     lifecycle: pending
     implementation_status: absent
     evidence_refs: []
