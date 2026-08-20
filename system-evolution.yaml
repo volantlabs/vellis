@@ -5,9 +5,9 @@ evolution:
   observable_distinction: Owners can query, change, draft, recover, migrate, and connect without recursive JSON, replacement updates, replay, private hooks, or implementation-shaped governance.
   lifecycle: active
   approval:
-    status: pending
+    status: accepted
     reason: The owner supplied and approved the decision-complete rebaseline plan; this checkpoint makes that accepted consequence reconstructible.
-    checkpoint: null
+    checkpoint: git:d2723f131a11ae6b339c36311b4dabcc632c6bf5
   blocker: null
   checkpoint: null
 baselines:
@@ -145,10 +145,10 @@ findings:
     classification: plan gap
     consequence: A valid successor can break unrelated tests, while one function mixes schema, invariants, Git, and presentation.
     authority_refs: [AGENTS.md, owner-plan:phase-0]
-    evidence_refs: []
-    disposition: implementation-work
+    evidence_refs: [path:tests/test_system_evolution.py#test_committed_evolution_record_is_valid, path:tests/test_system_evolution.py#test_complete_record_must_be_committed, path:docs/v2-simplification-baseline.md#size-and-complexity, command:uv run pytest tests/test_system_evolution.py, command:just system-evolution-check]
+    disposition: resolved
     owner_work_item_id: W000
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: The live record passes while synthetic topologies or later record shapes fail unrelated tests.
     compatibility_effect: Evolution meaning remains unchanged while workflow evidence becomes shape independent.
   - id: F010
@@ -170,8 +170,8 @@ decisions:
     reversible: true
     owner_work_item_id: W000
     evidence_intent: [Synthetic records exercise invariants., One explicit test validates the committed record., Pure checks run without Git.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/test_system_evolution.py#test_pure_invariants_do_not_consult_git_or_repository_state, path:tests/test_system_evolution.py#test_schema_requires_work_and_at_least_one_finding_or_decision, path:tests/test_system_evolution.py#test_an_accepted_approval_binds_and_seals_owned_meaning, path:tests/test_system_evolution.py#test_evolution_approval_allows_later_not_required_internal_decision, path:docs/v2-simplification-baseline.md#portable-forward-test-disposition, command:just skills-check, command:just lint, command:just typecheck]
   - id: D001
     summary: Use scalar values, local cardinality, field patches, and one unversioned draft.
     authority_refs: [owner-plan:section-2]
@@ -268,8 +268,8 @@ work_items:
     compatibility_effect: No product or model behavior changes.
     non_effects: [No model edit., No product patch., No protected user-data access., No stale campaign reconstruction.]
     lifecycle: active
-    implementation_status: partial
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:docs/v2-simplification-baseline.md#size-and-complexity, path:docs/v2-simplification-baseline.md#portable-forward-test-disposition, path:docs/v2-simplification-baseline.md#phase-0-review-convergence-audit, path:tests/test_system_evolution.py#test_schema_requires_work_and_at_least_one_finding_or_decision, path:tests/test_system_evolution.py#test_pure_invariants_do_not_consult_git_or_repository_state, path:tests/test_system_evolution.py#test_committed_evolution_record_is_valid, path:tests/test_system_evolution.py#test_complete_record_must_be_committed, path:tests/test_system_evolution.py#test_an_accepted_approval_binds_and_seals_owned_meaning, path:tests/test_system_evolution.py#test_evolution_approval_allows_later_not_required_internal_decision, command:uv run pytest tests/test_system_evolution.py, command:just system-evolution-check, command:just skills-check, command:just lint, command:just typecheck]
     blocker: null
     checkpoint: null
   - id: W001
@@ -281,7 +281,7 @@ work_items:
     finding_ids: [F001, F002, F003, F004]
     decision_ids: [D001, D002]
     authority: [{refs: [owner-plan:sections-1-through-3], coverage: full, remaining_work_item_ids: []}]
-    approval: {status: pending, reason: "The owner approved this plan as the changed-meaning gate, subject to a conforming Phase 1 model.", checkpoint: null}
+    approval: {status: accepted, reason: "The owner approved this plan as the changed-meaning gate, subject to a conforming Phase 1 model.", checkpoint: git:d2723f131a11ae6b339c36311b4dabcc632c6bf5}
     nearest_wrong_system: Vocabulary changes while predecessor identity, query, mutation, or proposal semantics remain.
     compatibility_effect: Unreleased prototype-v2 behavior and storage assumptions break intentionally.
     non_effects: [No product implementation before model acceptance., No deferred feature., No v1 storage access.]
