@@ -1,120 +1,428 @@
 schema_version: "1.0"
 evolution:
-  id: vellis-2-active-work-lifetime
-  objective: Clear population-sized active-mutation validation work at the end of every public validation attempt.
-  observable_distinction: A successful, rejected, or failed active graph change leaves every reusable multiplicity work relation empty rather than retaining rows proportional to the prior change.
-  lifecycle: complete
-  approval: {status: not-required, reason: "Accepted bounded-work authority already decides this internal resource-lifetime correction without changing public meaning.", checkpoint: null}
+  id: vellis-2-simplification-rebaseline
+  objective: Rebaseline Vellis v2 around a small scalar RTG, field-level changes, one draft, indexed history, and simple public boundaries.
+  observable_distinction: Owners can query, change, draft, recover, migrate, and connect without recursive JSON, replacement updates, replay, private hooks, or implementation-shaped governance.
+  lifecycle: active
+  approval:
+    status: pending
+    reason: The owner supplied and approved the decision-complete rebaseline plan; this checkpoint makes that accepted consequence reconstructible.
+    checkpoint: null
   blocker: null
-  checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5
+  checkpoint: null
 baselines:
   status: current
-  source:
+  source: &source
     model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:29e60d41199a1810b0d758715066717cb987c4a9
+    implementation: git:5196bb01fedb90c815ae15f40cddb041fc915d01
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:29e60d41199a1810b0d758715066717cb987c4a9
-  target:
-    model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:d1c91842fcf97a38771926a547033e4f3f842bf5
-    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5
-  observed:
-    model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:d1c91842fcf97a38771926a547033e4f3f842bf5
-    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5
+    checkpoint: git:5196bb01fedb90c815ae15f40cddb041fc915d01
+  target: null
+  observed: *source
 scope:
-  authority_scope: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::explicitGraphChangeSet, VellisVerification::currentWorkScaling, AGENTS.md]
-  implementation_scope: [vellis/store.py, tests/vellis/test_semantic_work_locality.py, tests/test_system_evolution.py, README.md, docs/mcp-realization.md, system-evolution.yaml]
+  authority_scope:
+    - owner-plan:Vellis-v2-Simplification-Rebaseline
+    - model/10-rtg-domain.sysml
+    - model/15-everyday-life-starter.sysml
+    - model/20-rtg-system.sysml
+    - model/30-vellis.sysml
+    - model/40-requirements.sysml
+    - model/50-verification.sysml
+    - AGENTS.md
+  implementation_scope:
+    - system-evolution.yaml
+    - model/
+    - vellis/
+    - tests/
+    - tools/system_evolution.py
+    - README.md
+    - CONTRIBUTING.md
+    - SECURITY.md
+    - docs/
+    - justfile
+    - pyproject.toml
+    - uv.lock
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
-    - Change graph-change validity, findings, revision, transaction, activity, persistence, snapshot, replay, restore, query, or MCP meaning.
-    - Add a generic temporary-table registry, cleanup framework, persistent cache, schema migration, or public API.
-    - Change the package-private JSON equality-key interface or unrelated temporary-work families.
+    - Prototype-v2 database or API compatibility.
+    - Fuzzy, semantic, embedding, aggregation, dimensional-analysis, or alternative-database features.
+    - OAuth, roles, tenants, TLS termination, daemonization, service management, or encryption at rest.
+    - Activity pruning, built-in analysis agents, conversation capture, or speculative extension frameworks.
+    - Portable implementation-campaign engine redesign.
+    - Numerical performance promises without representative owner data and hardware.
 findings:
   - id: F001
-    summary: Successful active validation retains multiplicity seed rows proportional to the completed graph change.
-    classification: implementation defect
-    consequence: A long-lived connection retains rows from the largest prior active mutation until a later mutation or assessment happens to clear them.
-    authority_refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::explicitGraphChangeSet]
-    evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_active_graph_change_clears_multiplicity_work_after_every_exit]
-    disposition: resolved
+    summary: Recursive JSON and relationship-rule identities make the RTG larger than the owner problem.
+    classification: model gap
+    consequence: Agents must reason about nested values and independently identified constraints instead of scalar facts and local type cardinality.
+    authority_refs: [owner-plan:sections-2.1-through-2.6]
+    evidence_refs: []
+    disposition: model-change
     owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Active validation performs exact local work but commits while its reusable population rows remain resident.
-    compatibility_effect: Active outcomes and canonical effects remain unchanged; only completed transient rows are cleared sooner.
+    implementation_status: conflicting
+    nearest_wrong_system: The model renames predecessor concepts while retaining recursive values or participant-rule identities.
+    compatibility_effect: The unreleased prototype model and database are intentionally incompatible.
   - id: F002
-    summary: Assessment cleanup evidence relies on nonempty residue from a completed active mutation.
-    classification: plan gap
-    consequence: Fixing active cleanup breaks a test precondition, while no permanent evidence directly requires empty active-mutation work after every exit.
-    authority_refs: [VellisVerification::currentWorkScaling]
-    evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_active_graph_change_clears_multiplicity_work_after_every_exit, path:tests/vellis/test_semantic_work_locality.py#test_assessment_and_restore_clear_population_work_after_success_and_failure]
-    disposition: resolved
+    summary: Projection, aggregation, and match/get-shaped query behavior exceed the connected bounded questions required.
+    classification: model gap
+    consequence: The compiler carries a general query language where identity lookup and connected pattern matching suffice.
+    authority_refs: [owner-plan:sections-3.3-through-3.6]
+    evidence_refs: []
+    disposition: model-change
     owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Assessment cleanup remains tested while active mutation can retain work indefinitely without a failing regression.
-    compatibility_effect: Evidence changes from depending on residue to rejecting it; system meaning is unchanged.
+    implementation_status: conflicting
+    nearest_wrong_system: A unified tool name hides existing projection, aggregation, hidden-selector, or two-step machinery.
+    compatibility_effect: Prototype query requests and results are unsupported.
   - id: F003
-    summary: Evolution-validator tests assume the live evolution contains a dependent work item.
+    summary: Complete-object updates can discard owner data that an agent did not retrieve.
+    classification: model gap
+    consequence: A small change requires reconstructing unrelated content and creates a silent-loss footgun.
+    authority_refs: [owner-plan:sections-2.8-and-3.7]
+    evidence_refs: []
+    disposition: model-change
+    owner_work_item_id: W001
+    implementation_status: conflicting
+    nearest_wrong_system: An upsert-shaped adapter still replaces an entire persisted object.
+    compatibility_effect: Mutation becomes field-level with explicit removal and no cascade.
+  - id: F004
+    summary: Proposal versions, status, assessments, and tokens duplicate draft inspection and validation.
+    classification: model gap
+    consequence: A bucket of deltas acquires an unnecessary public lifecycle and persisted identities.
+    authority_refs: [owner-plan:sections-2.9-and-3.8-through-3.12]
+    evidence_refs: []
+    disposition: model-change
+    owner_work_item_id: W001
+    implementation_status: conflicting
+    nearest_wrong_system: Draft terminology changes while version, stale status, or assessment identity remains.
+    compatibility_effect: Prototype proposal and assessment contracts are removed.
+  - id: F005
+    summary: The shared-connection monolithic store and duplicate definition resolution are correctness hazards.
+    classification: implementation defect
+    consequence: Temporary populations persist, tests reach private state, and concurrent HTTP operations cannot isolate connections.
+    authority_refs: [owner-plan:sections-4.2-through-4.7]
+    evidence_refs: []
+    disposition: implementation-work
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: Forwarding classes retain the global store, connection, and duplicate loaders.
+    compatibility_effect: Fresh VEL2 storage replaces the unreleased prototype schema without migration.
+  - id: F006
+    summary: Replay, snapshots, tails, and event-family tables duplicate indexed version history.
+    classification: implementation defect
+    consequence: Recovery and historical reads carry several state authorities for a local SQLite product.
+    authority_refs: [owner-plan:sections-4.10-and-4.11]
+    evidence_refs: []
+    disposition: implementation-work
+    owner_work_item_id: W005
+    implementation_status: conflicting
+    nearest_wrong_system: Version tables are added while replay remains authoritative or public.
+    compatibility_effect: SQLite history, restore, audit, and backup replace snapshot and replay.
+  - id: F007
+    summary: V1 initialization must preserve legacy meaning without predecessor architecture or whole-graph memory.
+    classification: realization decision
+    consequence: A naive importer can silently coerce mixed values, lose metadata, or scale with the source graph.
+    authority_refs: [owner-plan:section-4.12]
+    evidence_refs: []
+    disposition: implementation-work
+    owner_work_item_id: W006
+    implementation_status: partial
+    nearest_wrong_system: Import succeeds but loses or binary64-rounds values, or materializes the snapshot in memory.
+    compatibility_effect: One confirmed v1 JSON snapshot initializes revision zero; v1 storage and history remain unsupported.
+  - id: F008
+    summary: Private FastMCP hooks, monkeypatching, schema rewriting, and deep client parsing make the boundary fragile.
+    classification: implementation defect
+    consequence: Dependency changes and concurrent HTTP requests can break behavior outside supported APIs.
+    authority_refs: [owner-plan:sections-5.1-through-5.4]
+    evidence_refs: []
+    disposition: implementation-work
+    owner_work_item_id: W007
+    implementation_status: conflicting
+    nearest_wrong_system: Tools work while private server internals or literal client secrets remain in the path.
+    compatibility_effect: Only selected CLI commands, STDIO, HTTP, and public client onboarding remain.
+  - id: F009
+    summary: Evolution validation is overcomplex and tests derive fixtures from the live record.
     classification: plan gap
-    consequence: A valid single-item successor fails the full gate before exercising the validator rule each test names.
-    authority_refs: [AGENTS.md]
-    evidence_refs: [path:tests/test_system_evolution.py#test_only_one_work_item_may_be_active, path:tests/test_system_evolution.py#test_executable_work_requires_complete_dependencies]
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Tests claim record-shape independence while using positional or mandatory-dependent access to the live record.
-    compatibility_effect: Validator behavior is unchanged; tests synthesize the dependency topology their individual rule requires.
+    consequence: A valid successor can break unrelated tests, while one function mixes schema, invariants, Git, and presentation.
+    authority_refs: [AGENTS.md, owner-plan:phase-0]
+    evidence_refs: []
+    disposition: implementation-work
+    owner_work_item_id: W000
+    implementation_status: conflicting
+    nearest_wrong_system: The live record passes while synthetic topologies or later record shapes fail unrelated tests.
+    compatibility_effect: Evolution meaning remains unchanged while workflow evidence becomes shape independent.
+  - id: F010
+    summary: Guidance and ordinary checks preserve completed-campaign and predecessor capability claims.
+    classification: stale baseline
+    consequence: Contributors are directed toward replay, assessments, aliases, and a completed campaign gate after removal.
+    authority_refs: [owner-plan:phase-8, AGENTS.md]
+    evidence_refs: []
+    disposition: implementation-work
+    owner_work_item_id: W008
+    implementation_status: conflicting
+    nearest_wrong_system: Runtime subtraction completes while public claims or ordinary gates still preserve the old system.
+    compatibility_effect: Documentation and checks will describe only simplified runnable v2.
 decisions:
-  - id: D001
-    summary: Clear the existing multiplicity work family at the public active-validation transaction boundary.
-    authority_refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::explicitGraphChangeSet]
-    alternatives: [Drop and recreate temporary tables., Add a generic temporary-work registry., Retain completed rows until the next operation.]
+  - id: D000
+    summary: Keep evolution checks layered and synthetic instead of live-record-shaped.
+    authority_refs: [AGENTS.md, owner-plan:phase-0]
+    alternatives: [Retain one monolithic validator., Use the live evolution as every test fixture.]
     reversible: true
+    owner_work_item_id: W000
+    evidence_intent: [Synthetic records exercise invariants., One explicit test validates the committed record., Pure checks run without Git.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D001
+    summary: Use scalar values, local cardinality, field patches, and one unversioned draft.
+    authority_refs: [owner-plan:section-2]
+    alternatives: [Retain recursive JSON., Retain relationship rules., Retain versioned proposals and assessments.]
+    reversible: false
     owner_work_item_id: W001
-    evidence_intent: [Every multiplicity-prefixed relation is empty after accepted, rejected, and failed active changes., Internal rolled-back exact-work inspection remains available before the public boundary cleanup.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_active_graph_change_clears_multiplicity_work_after_every_exit, path:tests/vellis/test_semantic_work_locality.py#test_active_endpoint_type_work_scales_with_applicable_degree]
+    evidence_intent: [The model distinguishes scalar kinds, patch non-effects, local bounds, and draft overlay.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D002
+    summary: Expose one query with identity and connected-pattern selections and post-bound hydration.
+    authority_refs: [owner-plan:section-3]
+    alternatives: [Separate match and get., Retain projection and aggregation.]
+    reversible: false
+    owner_work_item_id: W001
+    evidence_intent: [Evidence rejects hidden selectors, disconnected products, and hydration before bounding.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D003
+    summary: Use immutable domain values, SQLite functions, operation functions, and thin adapters.
+    authority_refs: [owner-plan:sections-4.2-through-4.7]
+    alternatives: [Forwarding service classes., ORM interfaces., Global store.]
+    reversible: true
+    owner_work_item_id: W002
+    evidence_intent: [One connection per operation., One definition resolver., No framework imports in domain.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D004
+    summary: Compile flat bounded queries to parameterized SQL CTEs with version-aware FTS and an independent oracle.
+    authority_refs: [owner-plan:section-4.8]
+    alternatives: [General query AST., In-memory graph evaluation.]
+    reversible: true
+    owner_work_item_id: W003
+    evidence_intent: [Oracle catches compiler mutations., Limit-plus-one precedes hydration., Historical search respects intervals.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D005
+    summary: Store one normalized draft patch per key and opaque continuations with internal fingerprints.
+    authority_refs: [owner-plan:section-4.9]
+    alternatives: [Draft edit log., Public draft version., Generic cursor subsystem.]
+    reversible: true
+    owner_work_item_id: W004
+    evidence_intent: [Live writes preserve unstaged fields., Cursors expire correctly., Activation revalidates.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D006
+    summary: Use version intervals, a canonical hash chain, separate activity, SQL restore, and online backup.
+    authority_refs: [owner-plan:sections-4.5-and-4.10-through-4.11]
+    alternatives: [Replay history., Public snapshots and tails., Activity hash chain.]
+    reversible: false
+    owner_work_item_id: W005
+    evidence_intent: [Reads do not replay., Audit detects corruption., Backup works while serving and excludes sidecars.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D007
+    summary: Stream v1 JSON through staging SQLite and report every disposition before publication.
+    authority_refs: [owner-plan:section-4.12]
+    alternatives: [Whole-document load., In-place conversion., Silent coercion.]
+    reversible: true
+    owner_work_item_id: W006
+    evidence_intent: [Import memory is bounded., Mixed values become exact JSON text., Digests bind confirmation.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D008
+    summary: Pin selected stable dependencies and use public FastMCP and client CLI boundaries only.
+    authority_refs: [owner-plan:sections-4.1-and-5]
+    alternatives: [Beta private hooks., Direct config edits., Literal tokens in arguments.]
+    reversible: true
+    owner_work_item_id: W007
+    evidence_intent: [Installed STDIO and HTTP work., Requests isolate connections., Registration exposes no token.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D009
+    summary: Delete predecessor machinery and synchronize every public and contributor claim.
+    authority_refs: [owner-plan:phase-8]
+    alternatives: [Leave compatibility residue., Keep completed campaign validation in ordinary checks.]
+    reversible: true
+    owner_work_item_id: W008
+    evidence_intent: [Complexity decreases., Full gates and black-box scenarios pass., Cold reconstruction finds no obsolete path.]
+    implementation_status: not evaluated
+    evidence_refs: []
 work_items:
-  - id: W001
+  - id: W000
     order: 1
-    label: Clear completed active-mutation validation work
+    label: Establish the evolution and trustworthy workflow tooling
     kind: implementation
     dependencies: []
-    planned_baseline: {dimension: implementation, identity: git:d1c91842fcf97a38771926a547033e4f3f842bf5}
-    finding_ids: [F001, F002, F003]
-    decision_ids: [D001]
-    authority:
-      - {refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::explicitGraphChangeSet, VellisVerification::currentWorkScaling, AGENTS.md], coverage: full, remaining_work_item_ids: []}
-    approval: {status: not-required, reason: "This is a model-preserving cleanup and evidence correction under accepted work-locality authority.", checkpoint: null}
-    nearest_wrong_system: Validation rows are exact and bounded during the operation but remain populated after one public exit path.
-    compatibility_effect: No public result, transaction, persistence, or history meaning changes.
-    non_effects: [No model edit., No persistent schema or snapshot change., No new cleanup abstraction., No owner-data or external-client access.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_active_graph_change_clears_multiplicity_work_after_every_exit, path:tests/vellis/test_semantic_work_locality.py#test_assessment_and_restore_clear_population_work_after_success_and_failure, path:tests/vellis/test_semantic_work_locality.py#test_active_endpoint_type_work_scales_with_applicable_degree, path:tests/test_system_evolution.py#test_only_one_work_item_may_be_active, path:tests/test_system_evolution.py#test_executable_work_requires_complete_dependencies, path:README.md#implementation-status, path:docs/mcp-realization.md#semantic-work-locality-evidence, command:just check]
+    planned_baseline: {dimension: implementation, identity: git:5196bb01fedb90c815ae15f40cddb041fc915d01}
+    finding_ids: [F009]
+    decision_ids: [D000]
+    authority: [{refs: [AGENTS.md, owner-plan:phase-0], coverage: full, remaining_work_item_ids: []}]
+    approval: {status: not-required, reason: Workflow validation changes no Vellis product meaning., checkpoint: null}
+    nearest_wrong_system: The validator remains coupled to live topology or Git state in pure tests.
+    compatibility_effect: No product or model behavior changes.
+    non_effects: [No model edit., No product patch., No protected user-data access., No stale campaign reconstruction.]
+    lifecycle: active
+    implementation_status: partial
+    evidence_refs: []
     blocker: null
-    checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5
-# Final clean review pair inspected shared frozen token
-# git:1e4484514d628e55760f2ba82020f5eacb0e0abc and substantive target
-# git:d1c91842fcf97a38771926a547033e4f3f842bf5.
-# /root/active_work_authority_review — authority and conformance — clean.
-# /root/active_work_engineering_review — engineering and evidence — clean.
-# Both reviewers passed focused evidence, just model-check, just system-evolution-check,
-# just package-check, just check (1,232 tests plus package exercise), and git diff --check.
+    checkpoint: null
+  - id: W001
+    order: 2
+    label: Rebaseline and accept complete SysML authority
+    kind: modeling
+    dependencies: [W000]
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    finding_ids: [F001, F002, F003, F004]
+    decision_ids: [D001, D002]
+    authority: [{refs: [owner-plan:sections-1-through-3], coverage: full, remaining_work_item_ids: []}]
+    approval: {status: pending, reason: "The owner approved this plan as the changed-meaning gate, subject to a conforming Phase 1 model.", checkpoint: null}
+    nearest_wrong_system: Vocabulary changes while predecessor identity, query, mutation, or proposal semantics remain.
+    compatibility_effect: Unreleased prototype-v2 behavior and storage assumptions break intentionally.
+    non_effects: [No product implementation before model acceptance., No deferred feature., No v1 storage access.]
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W002
+    order: 3
+    label: Build the typed domain and fresh SQLite foundation
+    kind: implementation
+    dependencies: [W001]
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    finding_ids: [F005]
+    decision_ids: [D003]
+    authority: [{refs: [owner-plan:phase-2], coverage: full, remaining_work_item_ids: []}]
+    approval: {status: not-required, reason: The approved plan selects this fresh-storage realization., checkpoint: null}
+    nearest_wrong_system: New modules wrap the monolith, shared connection, recursive domain, or duplicate loaders.
+    compatibility_effect: Fresh VEL2 only; prototype databases receive an actionable refusal.
+    non_effects: [No compatibility layer., No MCP yet., No alternate store abstraction.]
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W003
+    order: 4
+    label: Implement progressive discovery and unified query
+    kind: implementation
+    dependencies: [W002]
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    finding_ids: []
+    decision_ids: [D004]
+    authority: [{refs: [owner-plan:phase-3], coverage: full, remaining_work_item_ids: []}]
+    approval: {status: not-required, reason: The approved plan fixes query behavior and realization., checkpoint: null}
+    nearest_wrong_system: Renamed tools retain projection, aggregation, hidden selectors, or unbounded hydration.
+    compatibility_effect: Old query requests and results are unsupported.
+    non_effects: [No aggregation., No fuzzy or semantic search., No query AST.]
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W004
+    order: 5
+    label: Implement active changes, draft, validation, and activation
+    kind: implementation
+    dependencies: [W003]
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    finding_ids: []
+    decision_ids: [D005]
+    authority: [{refs: [owner-plan:phase-4], coverage: full, remaining_work_item_ids: []}]
+    approval: {status: not-required, reason: The approved plan fixes patches and the draft bucket., checkpoint: null}
+    nearest_wrong_system: Patches lose data, removal cascades, or activation needs a stale assessment identity.
+    compatibility_effect: Replacement, proposal version, assessment, and conflict-list paths are removed.
+    non_effects: [No cascade., No draft version., No whole-state active validation.]
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W005
+    order: 6
+    label: Implement ledgers, history, restore, audit, and backup
+    kind: implementation
+    dependencies: [W004]
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    finding_ids: [F006]
+    decision_ids: [D006]
+    authority: [{refs: [owner-plan:phase-5], coverage: full, remaining_work_item_ids: []}]
+    approval: {status: not-required, reason: The approved plan selects indexed history and SQLite recovery., checkpoint: null}
+    nearest_wrong_system: Version tables coexist with replay, snapshot APIs, or duplicated mutation payloads.
+    compatibility_effect: Replay artifacts and preserve commands are removed.
+    non_effects: [No activity hash chain., No pruning., No checkpoint framework.]
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W006
+    order: 7
+    label: Implement streamed v1 initialization
+    kind: implementation
+    dependencies: [W005]
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    finding_ids: [F007]
+    decision_ids: [D007]
+    authority: [{refs: [owner-plan:phase-6], coverage: full, remaining_work_item_ids: []}]
+    approval: {status: not-required, reason: The approved plan selects one first-use compatibility path., checkpoint: null}
+    nearest_wrong_system: Import silently loses data or retains the whole graph.
+    compatibility_effect: One v1 snapshot initializes v2; no v1 history or storage migration.
+    non_effects: [No v1 storage open., No in-place migration., No date inference.]
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W007
+    order: 8
+    label: Implement MCP, transports, setup, and client onboarding
+    kind: integration
+    dependencies: [W006]
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    finding_ids: [F008]
+    decision_ids: [D008]
+    authority: [{refs: [owner-plan:phase-7], coverage: full, remaining_work_item_ids: []}]
+    approval: {status: not-required, reason: "The approved plan fixes dependencies, transports, commands, and client boundaries.", checkpoint: null}
+    nearest_wrong_system: Public paths depend on private hooks, shared SQLite, config edits, or exposed tokens.
+    compatibility_effect: Old aliases and private framework behavior are removed.
+    non_effects: [No TLS or OAuth., No daemon., No client config parsing.]
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W008
+    order: 9
+    label: Subtract predecessor machinery, synchronize documentation, and close
+    kind: closure
+    dependencies: [W007]
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    finding_ids: [F010]
+    decision_ids: [D009]
+    authority: [{refs: [owner-plan:phase-8], coverage: full, remaining_work_item_ids: []}]
+    approval: {status: not-required, reason: Closure removes superseded paths and aligns claims., checkpoint: null}
+    nearest_wrong_system: Runtime passes while old paths, tests, claims, or campaign gates remain.
+    compatibility_effect: The unreleased branch exposes only rebaselined v2.
+    non_effects: [No campaign-engine redesign., No deferred placeholders., No protected user-data access.]
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
 closure:
-  finding_disposition: complete
-  model_status: unchanged
-  implementation_status: conforming
-  integration_status: conforming
-  external_status: not applicable
-  compatibility: No public or persistent compatibility effect; active validation releases its temporary multiplicity rows at operation exit.
-  reviews:
-    - {lens: authority and conformance, status: clean, reviewer: /root/active_work_authority_review, checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5, evidence_refs: [command:just check]}
-    - {lens: engineering and evidence, status: clean, reviewer: /root/active_work_engineering_review, checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5, evidence_refs: [command:just check]}
-  evidence_refs: [path:README.md#implementation-status, path:docs/mcp-realization.md#semantic-work-locality-evidence, command:just check]
-  checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5
+  finding_disposition: open
+  model_status: not evaluated
+  implementation_status: conflicting
+  integration_status: conflicting
+  external_status: not evaluated
+  compatibility: The unreleased prototype-v2 model, database, API, proposal, query, replay, aliases, and private framework boundaries intentionally break.
+  reviews: []
+  evidence_refs: []
+  checkpoint: null
