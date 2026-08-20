@@ -18,13 +18,13 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:5196bb01fedb90c815ae15f40cddb041fc915d01
-  target: &phase0_target
+  target: &phase1_target
     model: sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794
-    implementation: git:4d2f88f8d6742588396cd1e0c1647568897e9319
+    implementation: git:71d831fc09670158b965c960ae4fa88231d16479
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:4d2f88f8d6742588396cd1e0c1647568897e9319
-  observed: *phase0_target
+    checkpoint: git:71d831fc09670158b965c960ae4fa88231d16479
+  observed: *phase1_target
 scope:
   authority_scope:
     - owner-plan:Vellis-v2-Simplification-Rebaseline
@@ -306,11 +306,18 @@ work_items:
     nearest_wrong_system: Vocabulary changes while predecessor identity, query, mutation, or proposal semantics remain.
     compatibility_effect: Unreleased prototype-v2 behavior and storage assumptions break intentionally.
     non_effects: [No product implementation before model acceptance., No deferred feature., No v1 storage access.]
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs: [path:docs/v2-simplification-model-evidence.md#authority-and-compatibility, path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-model-evidence.md#sysml-reference-evidence, path:docs/v2-simplification-model-evidence.md#adequacy-review, path:docs/v2-simplification-model-evidence.md#subtraction-review, path:docs/v2-simplification-model-evidence.md#medium-rehearsal-disposition, command:just model-check, command:just model-reference-check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:71d831fc09670158b965c960ae4fa88231d16479
+  # Phase 1 clean review pair inspected staged tree token
+  # 3720af1c8dd64907842dfa65e096226b4954ed4a, preserved by checkpoint
+  # git:71d831fc09670158b965c960ae4fa88231d16479.
+  # /root/phase1_authority_review_6 — authority and conformance — clean.
+  # /root/phase1_engineering_review_6 — engineering and evidence — clean.
+  # Both independently confirmed the accepted model digest, model/reference/evolution
+  # checks, diff check, authority closure, evidence truth, and owner draft-metadata clarification.
   - id: W002
     order: 3
     label: Build the typed domain and fresh SQLite foundation
@@ -324,7 +331,7 @@ work_items:
     nearest_wrong_system: New modules wrap the monolith, shared connection, recursive domain, or duplicate loaders.
     compatibility_effect: Fresh VEL2 only; prototype databases receive an actionable refusal.
     non_effects: [No compatibility layer., No MCP yet., No alternate store abstraction.]
-    lifecycle: pending
+    lifecycle: active
     implementation_status: absent
     evidence_refs: []
     blocker: null
