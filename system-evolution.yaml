@@ -18,13 +18,13 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:5196bb01fedb90c815ae15f40cddb041fc915d01
-  target: &phase1_target
+  target: &phase2_target
     model: sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794
-    implementation: git:71d831fc09670158b965c960ae4fa88231d16479
+    implementation: git:677fb3ecdb7823f9ec22f92a394ade4d864fd580
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:71d831fc09670158b965c960ae4fa88231d16479
-  observed: *phase1_target
+    checkpoint: git:677fb3ecdb7823f9ec22f92a394ade4d864fd580
+  observed: *phase2_target
 scope:
   authority_scope:
     - owner-plan:Vellis-v2-Simplification-Rebaseline
@@ -331,11 +331,18 @@ work_items:
     nearest_wrong_system: New modules wrap the monolith, shared connection, recursive domain, or duplicate loaders.
     compatibility_effect: Fresh VEL2 only; prototype databases receive an actionable refusal.
     non_effects: [No compatibility layer., No MCP yet., No alternate store abstraction.]
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs: [path:docs/v2-simplification-phase2-evidence.md#implemented-distinction, path:docs/v2-simplification-phase2-evidence.md#third-pair-root-cause-audit, path:docs/v2-simplification-phase2-evidence.md#focused-evidence, path:docs/v2-simplification-phase2-evidence.md#subtraction-and-locality-review, command:uv run pytest -q tests/vellis/test_domain_v2.py tests/vellis/test_canonical_encoding_v2.py tests/vellis/test_storage_v2.py, command:just lint, command:just typecheck, command:just model-check, command:just model-reference-check, command:just system-evolution-check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:677fb3ecdb7823f9ec22f92a394ade4d864fd580
+  # Phase 2 clean review pair inspected shared staged tree token
+  # 00e7d53bd4b12e52be39631180a6c3ee73ffeb61, preserved by checkpoint
+  # git:677fb3ecdb7823f9ec22f92a394ade4d864fd580.
+  # /root/phase2_authority_review_12 — authority and conformance — clean.
+  # /root/phase2_engineering_review_12 — engineering and evidence — clean.
+  # Both independently confirmed 66 focused tests, lint/type/model/reference/evolution,
+  # successor C901 and diff checks, plus the two documented F010/W008 full-suite failures.
   - id: W003
     order: 4
     label: Implement progressive discovery and unified query
@@ -349,7 +356,7 @@ work_items:
     nearest_wrong_system: Renamed tools retain projection, aggregation, hidden selectors, or unbounded hydration.
     compatibility_effect: Old query requests and results are unsupported.
     non_effects: [No aggregation., No fuzzy or semantic search., No query AST.]
-    lifecycle: pending
+    lifecycle: active
     implementation_status: absent
     evidence_refs: []
     blocker: null
