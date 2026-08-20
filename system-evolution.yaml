@@ -18,13 +18,13 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:5196bb01fedb90c815ae15f40cddb041fc915d01
-  target: &phase3_target
+  target: &phase4_target
     model: sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794
-    implementation: git:0c7940fd3677322222d9bafebe48fa9661b874a5
+    implementation: git:eba341978d18e4362d4aad875445a7d070ec1d58
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:0c7940fd3677322222d9bafebe48fa9661b874a5
-  observed: *phase3_target
+    checkpoint: git:eba341978d18e4362d4aad875445a7d070ec1d58
+  observed: *phase4_target
 scope:
   authority_scope:
     - owner-plan:Vellis-v2-Simplification-Rebaseline
@@ -382,11 +382,20 @@ work_items:
     nearest_wrong_system: Patches lose data, removal cascades, activation needs a stale assessment identity, or concurrent mutations share connection state.
     compatibility_effect: The Phase 4 successor service semantics replace complete-object mutation and proposal/assessment meaning; predecessor public adapter paths remain reachable until W008 removes them.
     non_effects: [No cascade., No draft version., No whole-state active validation., No shared operation connection or cross-operation temporary population.]
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs: [path:docs/v2-simplification-phase4-evidence.md#implemented-distinction, path:docs/v2-simplification-phase4-evidence.md#evidence-status, command:uv run pytest -q tests/vellis/test_domain_v2.py tests/vellis/test_canonical_encoding_v2.py tests/vellis/test_storage_v2.py tests/vellis/test_query_v2_successor.py tests/vellis/test_change_draft_v2.py, command:just lint, command:just typecheck, command:just model-check, command:just model-reference-check, command:just system-evolution-check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:eba341978d18e4362d4aad875445a7d070ec1d58
+  # Phase 4 clean review pair inspected shared staged tree token
+  # b57276d80209905b137a1b04c7e419681615c986, preserved by checkpoint
+  # git:eba341978d18e4362d4aad875445a7d070ec1d58.
+  # /root/phase4_authority_review_10 — authority and conformance — clean.
+  # /root/phase4_engineering_review_10 — engineering and evidence — clean.
+  # Both independently confirmed 152 focused successor tests and the bounded
+  # patch/draft/query/validation/activation evidence; manager gates also confirmed
+  # lint/type/model/reference/evolution and only the two documented F010/W008
+  # full-suite failures among 1,387 tests.
   - id: W005
     order: 6
     label: Implement ledgers, history, restore, audit, and backup
@@ -400,7 +409,7 @@ work_items:
     nearest_wrong_system: Version tables coexist with replay, snapshot APIs, or duplicated mutation payloads.
     compatibility_effect: Replay artifacts and preserve commands are removed.
     non_effects: [No activity hash chain., No pruning., No checkpoint framework.]
-    lifecycle: pending
+    lifecycle: active
     implementation_status: absent
     evidence_refs: []
     blocker: null
