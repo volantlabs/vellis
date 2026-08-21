@@ -13,6 +13,7 @@ from vellis.canonical_encoding import CanonicalHeader, canonical_record_hash
 from vellis.database import connect_database, require_supported_database
 from vellis.definition_repository import load_definitions
 from vellis.domain import (
+    PUBLIC_ITEM_LIMIT,
     Anchor,
     AnchorUpsert,
     AssociatedData,
@@ -290,42 +291,59 @@ def _prospective_system(existing, reservation) -> SystemEnvelope | None:
     )
 
 
-def _request_findings(request: GraphChangeRequest) -> tuple[Finding, ...]:
+def _request_findings(
+    request: GraphChangeRequest,
+    *,
+    upserts_path: str = "/upserts",
+    removals_path: str = "/removeUuids",
+    check_command_duplicates: bool = True,
+) -> tuple[Finding, ...]:
     findings: list[Finding] = []
-    commands = [value.uuid for value in request.upserts]
-    commands.extend(request.remove_uuids)
-    _duplicates(commands, "/", "UUID occurs in more than one command", findings)
-    if len(commands) > 1_000:
-        findings.append(Finding(FindingCode.INVALID_VALUE, "change exceeds 1000 commands", "/"))
+    commands = [
+        (value.uuid, f"{upserts_path}/{index}/uuid") for index, value in enumerate(request.upserts)
+    ]
+    commands.extend(
+        (uuid, f"{removals_path}/{index}") for index, uuid in enumerate(request.remove_uuids)
+    )
+    if check_command_duplicates:
+        _duplicate_command_paths(commands, "UUID occurs in more than one command", findings)
+    if len(commands) > PUBLIC_ITEM_LIMIT:
+        findings.append(
+            Finding(
+                FindingCode.INVALID_VALUE,
+                f"change exceeds {PUBLIC_ITEM_LIMIT} commands",
+                "",
+            )
+        )
     for index, value in enumerate(request.upserts):
         if isinstance(value, AssociatedDataUpsert):
             _duplicates(
                 value.anchor_uuids or (),
-                f"/upserts/{index}/anchorUuids",
+                f"{upserts_path}/{index}/anchorUuids",
                 "duplicate anchor",
                 findings,
             )
             _duplicates(
                 value.add_anchor_uuids,
-                f"/upserts/{index}/addAnchorUuids",
+                f"{upserts_path}/{index}/addAnchorUuids",
                 "duplicate anchor",
                 findings,
             )
             _duplicates(
                 value.remove_anchor_uuids,
-                f"/upserts/{index}/removeAnchorUuids",
+                f"{upserts_path}/{index}/removeAnchorUuids",
                 "duplicate anchor",
                 findings,
             )
             _duplicates(
                 (name for name, _ in value.set_properties),
-                f"/upserts/{index}/setProperties",
+                f"{upserts_path}/{index}/setProperties",
                 "duplicate property",
                 findings,
             )
             _duplicates(
                 value.remove_properties,
-                f"/upserts/{index}/removeProperties",
+                f"{upserts_path}/{index}/removeProperties",
                 "duplicate property",
                 findings,
             )
@@ -334,7 +352,7 @@ def _request_findings(request: GraphChangeRequest) -> tuple[Finding, ...]:
                     Finding(
                         FindingCode.CONFLICT,
                         "anchor cannot be both added and removed",
-                        f"/upserts/{index}",
+                        f"{upserts_path}/{index}",
                     )
                 )
             if {name for name, _ in value.set_properties} & set(value.remove_properties):
@@ -342,7 +360,7 @@ def _request_findings(request: GraphChangeRequest) -> tuple[Finding, ...]:
                     Finding(
                         FindingCode.CONFLICT,
                         "property cannot be both set and removed",
-                        f"/upserts/{index}",
+                        f"{upserts_path}/{index}",
                     )
                 )
     return _ordered(findings)
@@ -688,6 +706,14 @@ def _duplicates(values, path, summary, findings):
     for index, value in enumerate(values):
         if value in seen:
             findings.append(Finding(FindingCode.DUPLICATE, summary, f"{path}/{index}"))
+        seen.add(value)
+
+
+def _duplicate_command_paths(commands, summary, findings):
+    seen = set()
+    for value, path in commands:
+        if value in seen:
+            findings.append(Finding(FindingCode.DUPLICATE, summary, path))
         seen.add(value)
 
 

@@ -44,8 +44,8 @@ class _FindingCategories(list[str]):
             super().append(finding)
 
 
-def audit_database(path: Path) -> AuditReport:
-    connection = connect_database(path, read_only=True)
+def audit_database(path: Path, *, immutable: bool = False) -> AuditReport:
+    connection = connect_database(path, read_only=True, immutable=immutable)
     try:
         return audit_connection(connection)
     finally:

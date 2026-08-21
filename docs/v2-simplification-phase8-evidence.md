@@ -59,7 +59,7 @@ Measurements use the Phase 0 reproduction rules against the current closure tree
 | Product Python lines under `vellis/` | 23,854 | 20,497 | -3,357 |
 | Test Python lines | 28,692 | 16,168 | -12,524 |
 | Product C901 findings above 10 | 37 | 0 | -37 |
-| Repository C901 findings above 10 | 53 | 11 | -42 |
+| `vellis/ + tools/` C901 findings above 10 | 53 | 11 | -42 |
 | Persistent application tables | 39 | 25 | -14 |
 | Named temporary relations | 38 | 20 | -18 |
 | Product private FastMCP/MCP references | 4 | 0 | -4 |
@@ -220,6 +220,7 @@ value with zero blocking dispositions.
 Mechanical closure inventories also pass: zero product C901 findings above 10, zero production
 private FastMCP/MCP references, zero tests accessing a product-owned connection, one canonical
 definition resolver, per-operation connection acquisition with explicit close on every exit, 25
-persistent application relations, and 20 named temporary relations. The 11 remaining repository-wide
-C901 findings are unchanged portable workflow/reference tools outside product production code; the
-inactive campaign engine was deliberately not redesigned.
+persistent application relations, and 20 named temporary relations. The 11 findings counted across
+`vellis/ + tools/` are unchanged portable workflow/reference tooling; two additional test functions
+exceed 10 when tests are included. None violates the production constraint, and the inactive
+campaign engine was deliberately not redesigned.

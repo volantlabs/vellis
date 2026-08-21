@@ -13,7 +13,7 @@ from vellis.domain import (
     LinkTypeDefinition,
     ResolvedState,
 )
-from vellis.domain_validation import definition_set_findings, graph_object_findings
+from vellis.domain_validation import graph_object_findings, type_definition_findings
 from vellis.draft_repository import load_draft_definitions
 from vellis.draft_sql_overlay import install_draft_graph_overlay
 from vellis.graph_repository import load_graph_objects
@@ -46,9 +46,11 @@ def _definition_findings(connection, state, draft):
         definition = selected[0]
         references = _definition_references(definition)
         context = _effective_definitions(connection, state, references, draft)
-        for finding in definition_set_findings((definition, *context), require_system=not draft):
-            if finding.path is None or finding.path.startswith("/definitions/0"):
-                yield finding
+        yield from type_definition_findings(
+            definition,
+            context,
+            require_system=not draft,
+        )
 
 
 def _object_findings(connection, state, draft):

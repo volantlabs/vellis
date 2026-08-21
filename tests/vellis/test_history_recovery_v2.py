@@ -1284,6 +1284,8 @@ def test_online_backup_and_initialization_preserve_complete_database_only(
         reads.result()
         assert copied.result() == backup
 
+    assert not tuple(backup.parent.glob(f".{backup.name}.*.tmp-*"))
+
     assert audit_database(path).clean
     assert audit_database(backup).clean
     assert _activity_count(path) == source_activity + 9
@@ -1300,7 +1302,10 @@ def test_online_backup_and_initialization_preserve_complete_database_only(
         connection.close()
     restored = tmp_path / "restored" / "vellis.db"
     restored.parent.mkdir(mode=0o700)
-    assert initialize_from_backup(backup, restored) == restored
+    initialized = initialize_from_backup(backup, restored)
+    assert initialized.database_path == str(restored)
+    assert initialized.resulting_revision == int(lineage["head_revision"])
+    assert not tuple(restored.parent.glob(f".{restored.name}.*.tmp-*"))
     restored_connection = connect_database(restored, read_only=True)
     try:
         restored_lineage = restored_connection.execute(
@@ -1311,6 +1316,22 @@ def test_online_backup_and_initialization_preserve_complete_database_only(
         restored_connection.close()
     with pytest.raises(FileExistsError):
         backup_database(path, backup)
+
+
+def test_backup_initialization_leaves_a_single_file_source_unchanged(tmp_path: Path) -> None:
+    source = _database(tmp_path)
+    _seed(source)
+    backup = tmp_path / "single-file.sqlite3"
+    assert backup_database(source, backup) == backup
+    assert not Path(f"{backup}-wal").exists()
+    assert not Path(f"{backup}-shm").exists()
+
+    destination = tmp_path / "recovered" / "vellis.sqlite3"
+    initialized = initialize_from_backup(backup, destination)
+    assert initialized.resulting_revision == 1
+    assert not Path(f"{backup}-wal").exists()
+    assert not Path(f"{backup}-shm").exists()
+    assert audit_database(destination).clean
 
 
 @pytest.mark.parametrize("boundary", ["online-copy", "file-flush", "directory-flush", "link"])

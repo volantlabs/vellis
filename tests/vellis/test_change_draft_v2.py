@@ -71,6 +71,7 @@ from vellis.query_domain import (
     PropertySelection,
 )
 from vellis.read_operations import query_graph
+from vellis.starter import everyday_life_starter
 
 PERSON = "11111111-1111-4111-8111-111111111111"
 PERSON_2 = "22222222-2222-4222-8222-222222222222"
@@ -81,6 +82,17 @@ GROUP_2 = "66666666-6666-4666-8666-666666666666"
 GROUP_3 = "77777777-7777-4777-8777-777777777777"
 LINK_2 = "88888888-8888-4888-8888-888888888888"
 LINK_3 = "99999999-9999-4999-8999-999999999999"
+
+
+def _resolve_pointer(document, pointer: str):
+    if pointer == "":
+        return document
+    assert pointer.startswith("/")
+    current = document
+    for raw_token in pointer[1:].split("/"):
+        token = raw_token.replace("~1", "/").replace("~0", "~")
+        current = current[int(token)] if isinstance(current, list) else current[token]
+    return current
 
 
 def _definitions():
@@ -197,6 +209,185 @@ def test_stale_and_conflicting_requests_have_no_state_effect(tmp_path: Path) -> 
     )
     assert conflict.status is OperationStatus.REJECTED
     assert read_state(path) == before
+
+
+def test_active_duplicate_paths_resolve_to_the_later_request_member(tmp_path: Path) -> None:
+    path = _database(tmp_path)
+    cases = (
+        (
+            GraphChangeRequest(
+                0,
+                (
+                    AnchorUpsert(PERSON, "test.person", "Alice"),
+                    AnchorUpsert(PERSON, "test.person", "Duplicate"),
+                ),
+            ),
+            {
+                "upserts": [{"uuid": PERSON}, {"uuid": PERSON}],
+                "removeUuids": [],
+            },
+            "/upserts/1/uuid",
+        ),
+        (
+            GraphChangeRequest(
+                0,
+                (AnchorUpsert(PERSON, "test.person", "Alice"),),
+                (PERSON,),
+            ),
+            {"upserts": [{"uuid": PERSON}], "removeUuids": [PERSON]},
+            "/removeUuids/0",
+        ),
+    )
+    for request, document, expected_path in cases:
+        result = apply_graph_change(path, request)
+        duplicate = next(
+            finding for finding in result.findings if finding.code is FindingCode.DUPLICATE
+        )
+        assert duplicate.path == expected_path
+        assert duplicate.path is not None
+        assert _resolve_pointer(document, duplicate.path) == PERSON
+
+
+def test_draft_duplicate_paths_cover_every_later_request_member(tmp_path: Path) -> None:
+    path = _database(tmp_path)
+    definition = AnchorTypeDefinition("test.person", "Person")
+    object_upsert = AnchorUpsert(PERSON, display_name="Changed")
+    cases = (
+        (
+            DraftChangeRequest(definition_upserts=(definition, definition)),
+            {"definitionUpserts": [{"typeKey": "test.person"}] * 2},
+            "/definitionUpserts/1/typeKey",
+            "test.person",
+        ),
+        (
+            DraftChangeRequest(
+                definition_upserts=(definition,), definition_removals=("test.person",)
+            ),
+            {
+                "definitionUpserts": [{"typeKey": "test.person"}],
+                "definitionRemovals": ["test.person"],
+            },
+            "/definitionRemovals/0",
+            "test.person",
+        ),
+        (
+            DraftChangeRequest(
+                definition_removals=("test.person",),
+                unstage_definition_keys=("test.person",),
+            ),
+            {
+                "definitionRemovals": ["test.person"],
+                "unstageDefinitionKeys": ["test.person"],
+            },
+            "/unstageDefinitionKeys/0",
+            "test.person",
+        ),
+        (
+            DraftChangeRequest(object_upserts=(object_upsert, object_upsert)),
+            {"objectUpserts": [{"uuid": PERSON}] * 2},
+            "/objectUpserts/1/uuid",
+            PERSON,
+        ),
+        (
+            DraftChangeRequest(object_upserts=(object_upsert,), object_removals=(PERSON,)),
+            {"objectUpserts": [{"uuid": PERSON}], "objectRemovals": [PERSON]},
+            "/objectRemovals/0",
+            PERSON,
+        ),
+        (
+            DraftChangeRequest(object_removals=(PERSON,), unstage_object_uuids=(PERSON,)),
+            {"objectRemovals": [PERSON], "unstageObjectUuids": [PERSON]},
+            "/unstageObjectUuids/0",
+            PERSON,
+        ),
+    )
+    for request, document, expected_path, expected_value in cases:
+        result = change_draft(path, request).outcome
+        duplicate = next(
+            finding for finding in result.findings if finding.code is FindingCode.DUPLICATE
+        )
+        assert duplicate.path == expected_path
+        assert duplicate.path is not None
+        assert _resolve_pointer(document, duplicate.path) == expected_value
+
+
+def test_command_limit_uses_the_empty_pointer_for_the_whole_request(tmp_path: Path) -> None:
+    path = _database(tmp_path)
+    upserts = tuple(
+        AnchorUpsert(f"{index:08x}-0000-4000-8000-{index:012x}", "test.person", "Person")
+        for index in range(1_001)
+    )
+    request = GraphChangeRequest(0, upserts)
+    result = apply_graph_change(path, request)
+    limit_finding = next(
+        finding for finding in result.findings if "exceeds 1000 commands" in finding.summary
+    )
+    document = {"expectedRevision": 0, "upserts": [{}] * 1_001, "removeUuids": []}
+    assert limit_finding.path == ""
+    assert _resolve_pointer(document, limit_finding.path) is document
+
+
+def test_draft_definition_findings_key_each_dependent_and_preserve_referent(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "owner" / "vellis.db"
+    initialize_with_definitions(path, everyday_life_starter())
+    assert (
+        change_draft(path, DraftChangeRequest(definition_removals=("life.person",))).outcome.status
+        is OperationStatus.ACCEPTED
+    )
+    result = validate_state(path, ValidationRequest(ValidationScope.DRAFT, 100))
+    assert result.payload is not None
+    missing_person = tuple(
+        finding for finding in result.payload.findings if finding.type_keys == ("life.person",)
+    )
+    dependent_keys = {
+        "life.person.details",
+        "life.responsible_for",
+        "life.member_of",
+        "life.involves",
+        "life.documents",
+        "life.mentions",
+    }
+    assert len(missing_person) == len(dependent_keys)
+    for dependent_key in dependent_keys:
+        assert (
+            sum(
+                finding.path is not None
+                and finding.path.startswith(f"/definitions/{dependent_key}/")
+                for finding in missing_person
+            )
+            == 1
+        )
+
+
+def test_definition_subject_keys_are_json_pointer_escaped(tmp_path: Path) -> None:
+    path = tmp_path / "owner" / "vellis.db"
+    referent = "test/referent~type"
+    dependent = "test/dependent~type"
+    initialize_with_definitions(
+        path,
+        (
+            AnchorTypeDefinition(referent, "Referent"),
+            AssociatedDataTypeDefinition(
+                dependent,
+                "Dependent",
+                (referent,),
+                (),
+                Cardinality(1),
+                Cardinality(0),
+            ),
+        ),
+    )
+    assert (
+        change_draft(path, DraftChangeRequest(definition_removals=(referent,))).outcome.status
+        is OperationStatus.ACCEPTED
+    )
+    result = validate_state(path, ValidationRequest(ValidationScope.DRAFT, 10))
+    assert result.payload is not None
+    finding = next(item for item in result.payload.findings if item.type_keys == (referent,))
+    assert finding.path is not None
+    assert finding.path.startswith("/definitions/test~1dependent~0type/")
 
 
 def test_removal_never_cascades_and_names_surviving_dependents(tmp_path: Path) -> None:

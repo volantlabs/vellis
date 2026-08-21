@@ -5,6 +5,7 @@ from __future__ import annotations
 import re2
 
 from vellis.domain import (
+    PUBLIC_ITEM_LIMIT,
     AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
     Finding,
@@ -16,7 +17,6 @@ from vellis.domain import (
     canonical_number_text,
 )
 from vellis.query_domain import (
-    PUBLIC_ITEM_LIMIT,
     DirectAssociation,
     DisplayNameField,
     GraphQuery,
@@ -104,7 +104,7 @@ def _identity_findings(selection: IdentitySelection) -> tuple[Finding, ...]:
             _finding(
                 FindingCode.INVALID_VALUE,
                 "/selection/objects",
-                "objects must contain between 1 and 1000 selections",
+                f"objects must contain between 1 and {PUBLIC_ITEM_LIMIT} selections",
             )
         )
     _duplicates(tuple(value.uuid for value in selection.objects), "/selection/objects", findings)
@@ -127,7 +127,7 @@ def _pattern_findings(
             _finding(
                 FindingCode.INVALID_VALUE,
                 "/selection/maximumMatches",
-                "maximumMatches must be between 1 and 1000",
+                f"maximumMatches must be between 1 and {PUBLIC_ITEM_LIMIT}",
             )
         )
     total = len(selection.nodes) + len(selection.direct_associations) + len(selection.links)
@@ -140,7 +140,11 @@ def _pattern_findings(
         )
     if total > PUBLIC_ITEM_LIMIT:
         findings.append(
-            _finding(FindingCode.INVALID_VALUE, "/selection", "combined pattern items exceed 1000")
+            _finding(
+                FindingCode.INVALID_VALUE,
+                "/selection",
+                f"combined pattern items exceed {PUBLIC_ITEM_LIMIT}",
+            )
         )
     names = tuple(node.name for node in selection.nodes) + tuple(
         link.name for link in selection.links
@@ -189,7 +193,13 @@ def _node_findings(
     _duplicates(node.uuids, f"{path}/uuids", findings)
     _duplicate_values(node.predicates, f"{path}/predicates", findings)
     if len(node.type_keys) > PUBLIC_ITEM_LIMIT or len(node.uuids) > PUBLIC_ITEM_LIMIT:
-        findings.append(_finding(FindingCode.INVALID_VALUE, path, "node filter exceeds 1000 items"))
+        findings.append(
+            _finding(
+                FindingCode.INVALID_VALUE,
+                path,
+                f"node filter exceeds {PUBLIC_ITEM_LIMIT} items",
+            )
+        )
     selected: list[TypeDefinition] = []
     for position, key in enumerate(node.type_keys):
         definition = definitions.get(key)
@@ -239,13 +249,21 @@ def _node_findings(
         else:
             _selected_property_findings(node.properties, selected, f"{path}/properties", findings)
     for position, predicate in enumerate(node.predicates):
-        _predicate_findings(predicate, selected, node, f"{path}/predicates/{position}", findings)
+        _predicate_findings(
+            predicate,
+            selected,
+            node,
+            path,
+            f"{path}/predicates/{position}",
+            findings,
+        )
 
 
 def _predicate_findings(
     predicate: Predicate,
     definitions: list[TypeDefinition],
     node: PatternNode,
+    node_path: str,
     path: str,
     findings: list[Finding],
 ) -> None:
@@ -274,7 +292,7 @@ def _predicate_findings(
             findings.append(
                 _finding(
                     FindingCode.MISSING,
-                    f"{path}/../typeKeys",
+                    f"{node_path}/typeKeys",
                     "property predicates require explicit typeKeys",
                 )
             )
@@ -394,7 +412,11 @@ def _any_of_findings(
         return
     if len(predicate.values) > PUBLIC_ITEM_LIMIT:
         findings.append(
-            _finding(FindingCode.INVALID_VALUE, f"{path}/values", "anyOf exceeds 1000 values")
+            _finding(
+                FindingCode.INVALID_VALUE,
+                f"{path}/values",
+                f"anyOf exceeds {PUBLIC_ITEM_LIMIT} values",
+            )
         )
     _duplicates(
         tuple(_operand_key(value) for value in predicate.values), f"{path}/values", findings
@@ -466,7 +488,11 @@ def _term_payload_findings(
         )
     if len(predicate.terms) > PUBLIC_ITEM_LIMIT:
         findings.append(
-            _finding(FindingCode.INVALID_VALUE, f"{path}/terms", "term list exceeds 1000 values")
+            _finding(
+                FindingCode.INVALID_VALUE,
+                f"{path}/terms",
+                f"term list exceeds {PUBLIC_ITEM_LIMIT} values",
+            )
         )
     _full_text_kind_finding(value_kind, path, findings)
     _duplicates(predicate.terms, f"{path}/terms", findings)
@@ -522,7 +548,11 @@ def _property_selection_findings(
     _duplicates(selection.names, path, findings)
     if len(selection.names) > PUBLIC_ITEM_LIMIT:
         findings.append(
-            _finding(FindingCode.INVALID_VALUE, path, "property selection exceeds 1000 names")
+            _finding(
+                FindingCode.INVALID_VALUE,
+                path,
+                f"property selection exceeds {PUBLIC_ITEM_LIMIT} names",
+            )
         )
 
 
@@ -631,7 +661,13 @@ def _link_findings(
     _duplicates(link.type_keys, f"{path}/typeKeys", findings)
     _duplicates(link.uuids, f"{path}/uuids", findings)
     if len(link.type_keys) > PUBLIC_ITEM_LIMIT or len(link.uuids) > PUBLIC_ITEM_LIMIT:
-        findings.append(_finding(FindingCode.INVALID_VALUE, path, "link filter exceeds 1000 items"))
+        findings.append(
+            _finding(
+                FindingCode.INVALID_VALUE,
+                path,
+                f"link filter exceeds {PUBLIC_ITEM_LIMIT} items",
+            )
+        )
     source = nodes.get(link.source)
     target = nodes.get(link.target)
     if source is None:

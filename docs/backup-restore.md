@@ -15,7 +15,8 @@ online backup API, completely audits the copied temporary snapshot, and then pub
 owner-private file atomically. It appends no source activity. The database copy includes its lineage,
 draft, activity, settings, and retained validation backing. Adjacent files are not backup content:
 the HTTP token, v1 import report, and SQLite WAL/SHM sidecars are not copied. Protect the backup as
-plaintext personal context.
+plaintext personal context. A successful publication leaves no internal temporary database or
+temporary WAL/SHM sidecar beside the destination.
 
 Initialize a separate, empty data directory from that backup with:
 
@@ -27,8 +28,10 @@ vellis setup \
 ```
 
 This preserves the copied lineage rather than creating a new revision. Vellis refuses a nonempty
-destination and never overwrites an existing database. Client connection, if wanted, is a separate
-later `vellis connect` operation.
+destination and never overwrites an existing database. Leave the destination directory absent so
+Vellis creates it owner-private, or create it empty with mode `0700` on POSIX. Client connection, if
+wanted, is a separate later `vellis connect` operation. Auditing the input during successful
+initialization does not leave new SQLite sidecars beside a single-file backup.
 
 Restore historical meaning inside the current lineage by revision or canonical time:
 

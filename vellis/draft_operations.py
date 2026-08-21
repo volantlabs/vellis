@@ -21,6 +21,7 @@ from vellis.change_domain import (
 from vellis.change_operations import _request_findings
 from vellis.database import connect_database, require_supported_database
 from vellis.domain import (
+    PUBLIC_ITEM_LIMIT,
     CurrentState,
     Finding,
     FindingCode,
@@ -206,7 +207,7 @@ def activate_draft(
     *,
     initiator: str = "agent",
     source: str | None = None,
-    finding_limit: int = 1_000,
+    finding_limit: int = PUBLIC_ITEM_LIMIT,
 ) -> ValidationResult:
     connection = connect_database(database_path)
     try:
@@ -294,10 +295,10 @@ def activate_draft(
 
 
 def _fresh_validation(connection, request, revision):
-    if request.limit is None or not 1 <= request.limit <= 1_000:
+    if request.limit is None or not 1 <= request.limit <= PUBLIC_ITEM_LIMIT:
         finding = Finding(
             FindingCode.INVALID_VALUE,
-            "fresh validation requires limit from 1 through 1000",
+            f"fresh validation requires limit from 1 through {PUBLIC_ITEM_LIMIT}",
             "/limit",
         )
         return ValidationResult(
@@ -496,21 +497,42 @@ def _apply_draft_request(connection, request):
 
 def _draft_request_findings(connection, request):
     findings = []
-    definition_keys = (
-        [value.type_key for value in request.definition_upserts]
-        + list(request.definition_removals)
-        + list(request.unstage_definition_keys)
+    definition_commands = [
+        (value.type_key, f"/definitionUpserts/{index}/typeKey")
+        for index, value in enumerate(request.definition_upserts)
+    ]
+    definition_commands.extend(
+        (key, f"/definitionRemovals/{index}")
+        for index, key in enumerate(request.definition_removals)
     )
-    object_keys = (
-        [value.uuid for value in request.object_upserts]
-        + list(request.object_removals)
-        + list(request.unstage_object_uuids)
+    definition_commands.extend(
+        (key, f"/unstageDefinitionKeys/{index}")
+        for index, key in enumerate(request.unstage_definition_keys)
     )
-    _duplicates(definition_keys, "/", "type key occurs in more than one command", findings)
-    _duplicates(object_keys, "/", "UUID occurs in more than one command", findings)
-    if len(definition_keys) + len(object_keys) > 1_000:
+    object_commands = [
+        (value.uuid, f"/objectUpserts/{index}/uuid")
+        for index, value in enumerate(request.object_upserts)
+    ]
+    object_commands.extend(
+        (uuid, f"/objectRemovals/{index}") for index, uuid in enumerate(request.object_removals)
+    )
+    object_commands.extend(
+        (uuid, f"/unstageObjectUuids/{index}")
+        for index, uuid in enumerate(request.unstage_object_uuids)
+    )
+    _duplicate_command_paths(
+        definition_commands,
+        "type key occurs in more than one command",
+        findings,
+    )
+    _duplicate_command_paths(object_commands, "UUID occurs in more than one command", findings)
+    if len(definition_commands) + len(object_commands) > PUBLIC_ITEM_LIMIT:
         findings.append(
-            Finding(FindingCode.INVALID_VALUE, "draft change exceeds 1000 commands", "/")
+            Finding(
+                FindingCode.INVALID_VALUE,
+                f"draft change exceeds {PUBLIC_ITEM_LIMIT} commands",
+                "",
+            )
         )
     for index, definition in enumerate(request.definition_upserts):
         if definition.system is not None:
@@ -534,7 +556,14 @@ def _draft_request_findings(connection, request):
                 )
             )
     graph_request = GraphChangeRequest(0, request.object_upserts, request.object_removals)
-    findings.extend(_request_findings(graph_request))
+    findings.extend(
+        _request_findings(
+            graph_request,
+            upserts_path="/objectUpserts",
+            removals_path="/objectRemovals",
+            check_command_duplicates=False,
+        )
+    )
     for index, upsert in enumerate(request.object_upserts):
         reservation = connection.execute(
             "SELECT kind FROM graph_object_identity WHERE uuid = ?", (upsert.uuid,)
@@ -607,6 +636,14 @@ def _duplicates(values, path, summary, findings):
     for index, value in enumerate(values):
         if value in seen:
             findings.append(Finding(FindingCode.DUPLICATE, summary, f"{path}/{index}"))
+        seen.add(value)
+
+
+def _duplicate_command_paths(commands, summary, findings):
+    seen = set()
+    for value, path in commands:
+        if value in seen:
+            findings.append(Finding(FindingCode.DUPLICATE, summary, path))
         seen.add(value)
 
 

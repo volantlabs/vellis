@@ -20,7 +20,14 @@ from vellis.change_domain import (
 from vellis.change_operations import _content
 from vellis.database import connect_database, require_supported_database
 from vellis.definition_repository import load_definitions
-from vellis.domain import CurrentState, Finding, FindingCode, OperationOutcome, OperationStatus
+from vellis.domain import (
+    PUBLIC_ITEM_LIMIT,
+    CurrentState,
+    Finding,
+    FindingCode,
+    OperationOutcome,
+    OperationStatus,
+)
 from vellis.draft_analysis import draft_counts
 from vellis.draft_repository import (
     draft_fingerprint,
@@ -349,10 +356,10 @@ def _staged_operations(connection, row):
 
 def _request_finding(request):
     if request.cursor is None:
-        if request.limit is None or not 1 <= request.limit <= 1_000:
+        if request.limit is None or not 1 <= request.limit <= PUBLIC_ITEM_LIMIT:
             return Finding(
                 FindingCode.INVALID_VALUE,
-                "fresh inspection requires limit from 1 through 1000",
+                f"fresh inspection requires limit from 1 through {PUBLIC_ITEM_LIMIT}",
                 "/limit",
             )
     elif (

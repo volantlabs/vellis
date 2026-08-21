@@ -29,6 +29,7 @@ from vellis.domain import (
     SystemEnvelope,
     ValueKind,
 )
+from vellis.json_pointer import append_pointer
 from vellis.operations import read_state
 from vellis.query_domain import (
     GraphQuery,
@@ -46,7 +47,6 @@ from vellis.v1_import_domain import (
 )
 from vellis.v1_import_operations import initialize_from_v1, preview_v1_import
 from vellis.v1_json import canonical_number
-from vellis.v1_pointer import append_pointer
 from vellis.v1_provenance import finding_source_pointer, finding_targets
 from vellis.v1_report import add_disposition, render_machine_report, write_human_report
 from vellis.v1_stage import create_stage

@@ -23,7 +23,7 @@ from vellis.change_domain import (
 )
 from vellis.change_operations import apply_graph_change
 from vellis.discovery_operations import type_inspect, type_summary
-from vellis.domain import GraphChangeRequest
+from vellis.domain import PUBLIC_ITEM_LIMIT, GraphChangeRequest
 from vellis.draft_inspection_operations import inspect_draft
 from vellis.draft_operations import activate_draft, change_draft, discard_draft, validate_state
 from vellis.history_domain import HistoryKind, HistoryRequest
@@ -59,7 +59,6 @@ TOOL_NAMES = (
     "rtg_draft_discard",
     "rtg_history",
 )
-PUBLIC_ITEM_LIMIT = 1_000
 HistoryKindInput = Literal["canonical", "activity"]
 _OMITTED_ARGUMENT = Field(default_factory=lambda: None)
 

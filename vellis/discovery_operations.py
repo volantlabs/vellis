@@ -10,6 +10,7 @@ from vellis.database import connect_database, require_supported_database
 from vellis.definition_repository import load_definitions
 from vellis.discovery_repository import load_anchor_summary, load_neighborhoods
 from vellis.domain import (
+    PUBLIC_ITEM_LIMIT,
     AnchorTypeDefinition,
     Finding,
     FindingCode,
@@ -22,7 +23,6 @@ from vellis.draft_read_operations import draft_neighborhoods
 from vellis.draft_repository import load_draft_definitions
 from vellis.public_wire import public_result
 from vellis.query_domain import (
-    PUBLIC_ITEM_LIMIT,
     DefinitionNeighborhood,
     TypeInspectionResult,
     TypeSummaryResult,
@@ -238,7 +238,7 @@ def _inspection_request_findings(anchor_type_keys, include_legacy_system):
             _finding(
                 FindingCode.INVALID_VALUE,
                 "/anchorTypeKeys",
-                "anchorTypeKeys must contain between 1 and 1000 keys",
+                f"anchorTypeKeys must contain between 1 and {PUBLIC_ITEM_LIMIT} keys",
             )
         )
     seen: set[str] = set()

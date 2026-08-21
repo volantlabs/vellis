@@ -187,8 +187,8 @@ def _setup(arguments) -> int:
     if interactive and not _confirm(f"Initialize {directory}?"):
         print("Setup cancelled; no destination was published.")
         return EXIT_SUCCESS
-    _initialize(arguments, selected, database)
-    print(f"Vellis initialized revision 0 at {database}")
+    revision = _initialize(arguments, selected, database)
+    print(f"Vellis initialized revision {revision} at {database}")
     if interactive and arguments.connect is None and not arguments.no_connect:
         _interactive_connection_choice(arguments)
     return EXIT_SUCCESS if _complete_setup_connection(arguments, directory) else EXIT_FAILED
@@ -461,22 +461,23 @@ def _setup_mode(arguments) -> str | None:
     return None
 
 
-def _initialize(arguments, selected: str, database: Path) -> None:
+def _initialize(arguments, selected: str, database: Path) -> int:
     if selected == "blank":
-        initialize_blank(database)
+        return initialize_blank(database).resulting_revision
     elif selected == "starter":
-        initialize_with_definitions(database, everyday_life_starter())
+        return initialize_with_definitions(database, everyday_life_starter()).resulting_revision
     elif selected == "backup":
-        initialize_from_backup(arguments.from_backup, database)
+        return initialize_from_backup(arguments.from_backup, database).resulting_revision
     else:
         if not arguments.confirm_source_digest or not arguments.confirm_report_digest:
             raise ValueError("confirmed v1 import requires both preview digests")
-        initialize_from_v1(
+        result = initialize_from_v1(
             arguments.from_v1,
             database,
             confirmed_source_sha256=arguments.confirm_source_digest,
             confirmed_report_sha256=arguments.confirm_report_digest,
         )
+        return result.resulting_revision
 
 
 def _connect_selected(

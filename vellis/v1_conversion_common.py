@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from vellis.domain import SystemEnvelope, canonical_uuid
+from vellis.json_pointer import append_pointer
 from vellis.v1_import_domain import V1Disposition, V1ImportError
 from vellis.v1_json import canonical_legacy_json
-from vellis.v1_pointer import append_pointer
 from vellis.v1_report import add_disposition
 
 

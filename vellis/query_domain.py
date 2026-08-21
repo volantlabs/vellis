@@ -23,8 +23,6 @@ from vellis.domain import (
     canonical_uuid,
 )
 
-PUBLIC_ITEM_LIMIT = 1_000
-
 
 class PatternNodeKind(StrEnum):
     ANCHOR = "anchor"

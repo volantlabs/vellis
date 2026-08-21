@@ -71,7 +71,7 @@ class HistoryRequest:
             type(self.maximum_records) is not int
             or not 1 <= self.maximum_records <= PUBLIC_ITEM_LIMIT
         ):
-            raise ValueError("history maximum must be between 1 and 1000")
+            raise ValueError(f"history maximum must be between 1 and {PUBLIC_ITEM_LIMIT}")
         if self.range is not None and not isinstance(
             self.range, TimeHistoryRange | SequenceHistoryRange
         ):

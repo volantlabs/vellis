@@ -21,6 +21,7 @@ from vellis.domain import (
     ValueKind,
 )
 from vellis.domain_validation import property_definition_findings
+from vellis.json_pointer import append_pointer
 from vellis.v1_candidate import stage_definition
 from vellis.v1_conversion_common import (
     is_live,
@@ -30,7 +31,6 @@ from vellis.v1_conversion_common import (
 )
 from vellis.v1_identity import identity_conflicted, source_entry_live
 from vellis.v1_import_domain import V1Disposition, V1ImportError
-from vellis.v1_pointer import append_pointer
 from vellis.v1_population import permitted_anchor_keys, permitted_link_keys
 from vellis.v1_report import add_disposition
 from vellis.v1_stage import STAGE_RELATION, iter_category, put_payload

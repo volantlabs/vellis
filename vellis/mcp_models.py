@@ -8,6 +8,7 @@ from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Fie
 from pydantic.json_schema import SkipJsonSchema
 
 from vellis.domain import (
+    PUBLIC_ITEM_LIMIT,
     AnchorTypeDefinition,
     AnchorUpsert,
     AssociatedDataTypeDefinition,
@@ -49,7 +50,6 @@ def _camel(name: str) -> str:
     return head + "".join(value.capitalize() for value in tail)
 
 
-PUBLIC_ITEM_LIMIT = 1_000
 NonemptyText = Annotated[str, Field(min_length=1)]
 BoundedStrings = Annotated[list[NonemptyText], Field(max_length=PUBLIC_ITEM_LIMIT)]
 NonemptyStrings = Annotated[list[NonemptyText], Field(min_length=1, max_length=PUBLIC_ITEM_LIMIT)]

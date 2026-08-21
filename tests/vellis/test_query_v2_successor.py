@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -61,6 +62,16 @@ L3 = "30000000-0000-4000-8000-000000000003"
 L4 = "30000000-0000-4000-8000-000000000004"
 L5 = "30000000-0000-4000-8000-000000000005"
 MISSING = "90000000-0000-4000-8000-000000000009"
+
+
+def _resolve_pointer(document: Any, pointer: str) -> Any:
+    if pointer == "":
+        return document
+    assert pointer.startswith("/")
+    current = document
+    for token in pointer[1:].split("/"):
+        current = current[int(token)] if isinstance(current, list) else current[token]
+    return current
 
 
 def test_cold_summary_and_focused_inspection_are_complete_and_ordered(tmp_path: Path) -> None:
@@ -344,6 +355,61 @@ def test_property_predicate_closed_set(
     else:
         predicate = Predicate(PropertyField("score"), operator, value=value)
     assert _bound_uuids(_single_node_query(database, node, predicate)) == expected
+
+
+def test_strict_numeric_boundary_rejects_an_inclusive_comparison_mutant(
+    tmp_path: Path,
+) -> None:
+    database = _database(tmp_path)
+    scores = {D1: 5, D2: 10}
+    intended = tuple(uuid for uuid, score in scores.items() if score > 5)
+    inclusive_mutant = tuple(uuid for uuid, score in scores.items() if score >= 5)
+    assert intended != inclusive_mutant
+
+    node = PatternNode("detail", PatternNodeKind.ASSOCIATED_DATA, ("test.details",))
+    result = _single_node_query(
+        database,
+        node,
+        Predicate(
+            PropertyField("score"),
+            PredicateOperator.GREATER_THAN,
+            value=ScalarValue.integer(5),
+        ),
+    )
+    assert _bound_uuids(result) == intended
+
+
+def test_property_predicate_missing_type_keys_points_to_the_node_member(
+    tmp_path: Path,
+) -> None:
+    database = _database(tmp_path)
+    predicate = Predicate(
+        PropertyField("score"),
+        PredicateOperator.GREATER_THAN,
+        value=ScalarValue.integer(5),
+    )
+    selection = PatternSelection(
+        10,
+        (PatternNode("detail", PatternNodeKind.ASSOCIATED_DATA, predicates=(predicate,)),),
+    )
+    result = query_graph(database, GraphQuery(selection))
+    assert result.status is OperationStatus.REJECTED
+    finding = next(item for item in result.findings if item.code.value == "missing")
+    request = {
+        "selection": {
+            "nodes": [
+                {
+                    "name": "detail",
+                    "kind": "associatedData",
+                    "typeKeys": [],
+                    "predicates": [{"field": {"name": "score"}, "operator": "greaterThan"}],
+                }
+            ]
+        }
+    }
+    assert finding.path == "/selection/nodes/0/typeKeys"
+    assert finding.path is not None
+    assert _resolve_pointer(request, finding.path) == []
 
 
 def test_null_presence_and_date_timestamp_number_ordering_are_distinct(tmp_path: Path) -> None:

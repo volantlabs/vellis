@@ -11,6 +11,7 @@ setup:
 # Check formatting and lint rules.
 lint:
     @uv run ruff check .
+    @uv run ruff check vellis --select C901
     @uv run ruff format --check .
 
 # Apply formatting.

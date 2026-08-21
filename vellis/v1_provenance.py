@@ -5,9 +5,9 @@ from __future__ import annotations
 import sqlite3
 
 from vellis.domain import Finding
+from vellis.json_pointer import append_pointer
 from vellis.v1_identity import source_entry_live
 from vellis.v1_json import decode_legacy_json
-from vellis.v1_pointer import append_pointer
 from vellis.v1_stage import STAGE_RELATION
 
 

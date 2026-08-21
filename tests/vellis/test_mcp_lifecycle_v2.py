@@ -31,6 +31,7 @@ import vellis.query_domain as query_domain
 from vellis.__main__ import EXIT_FAILED, EXIT_SUCCESS, main
 from vellis.audit import audit_database
 from vellis.backup_operations import backup_database
+from vellis.change_operations import apply_graph_change
 from vellis.mcp import TOOL_NAMES, build_server
 from vellis.onboarding import (
     ClientKind,
@@ -1907,6 +1908,43 @@ def test_setup_noninteractive_is_explicit_and_connection_failure_does_not_rollba
         == EXIT_FAILED
     )
     assert (directory / "vellis.sqlite3").exists()
+
+
+def test_setup_from_backup_reports_the_preserved_head_revision(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    source_directory = tmp_path / "source"
+    source = source_directory / "vellis.sqlite3"
+    initialize_with_definitions(source, everyday_life_starter())
+    changed = apply_graph_change(
+        source,
+        domain.GraphChangeRequest(
+            0,
+            (domain.AnchorUpsert(UUID, "life.person", "Owner"),),
+        ),
+    )
+    assert changed.resulting_revision == 1
+    backup = tmp_path / "backup.sqlite3"
+    assert backup_database(source, backup) == backup
+
+    destination = tmp_path / "recovered"
+    assert (
+        main(
+            [
+                "setup",
+                "--from-backup",
+                str(backup),
+                "--data-dir",
+                str(destination),
+                "--no-connect",
+            ]
+        )
+        == EXIT_SUCCESS
+    )
+    assert (
+        f"Vellis initialized revision 1 at {destination / 'vellis.sqlite3'}"
+        in capsys.readouterr().out
+    )
 
 
 def test_setup_parser_has_no_unselected_yes_option(

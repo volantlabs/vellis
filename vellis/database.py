@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from vellis.domain import PUBLIC_ITEM_LIMIT
+
 APPLICATION_ID = 0x56454C32  # VEL2
 PROTOTYPE_APPLICATION_ID = 0x56454C31  # VEL1
 # VEL2 is unreleased during this rebaseline. Once released, any incompatible schema or canonical
@@ -17,9 +19,14 @@ class DatabaseError(RuntimeError):
     """The selected file is not a supported VEL2 database."""
 
 
-def connect_database(path: Path, *, read_only: bool = False) -> sqlite3.Connection:
+def connect_database(
+    path: Path, *, read_only: bool = False, immutable: bool = False
+) -> sqlite3.Connection:
+    if immutable and not read_only:
+        raise ValueError("immutable connections must be read-only")
     if read_only:
-        uri = f"{path.resolve().as_uri()}?mode=ro"
+        immutable_query = "&immutable=1" if immutable else ""
+        uri = f"{path.resolve().as_uri()}?mode=ro{immutable_query}"
         connection = sqlite3.connect(uri, uri=True, isolation_level=None)
     else:
         connection = sqlite3.connect(path, isolation_level=None)
@@ -66,7 +73,7 @@ def create_schema(connection: sqlite3.Connection) -> None:
     connection.execute(f"PRAGMA user_version = {USER_VERSION}")
 
 
-_SCHEMA = """
+_SCHEMA = f"""
 CREATE TABLE metadata_setting (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     lineage_uuid TEXT NOT NULL CHECK (
@@ -740,7 +747,7 @@ CREATE TABLE validation_run (
     effective_draft_change_count INTEGER,
     cursor_hash BLOB,
     next_offset INTEGER,
-    page_limit INTEGER CHECK (page_limit IS NULL OR page_limit BETWEEN 1 AND 1000)
+    page_limit INTEGER CHECK (page_limit IS NULL OR page_limit BETWEEN 1 AND {PUBLIC_ITEM_LIMIT})
 ) STRICT;
 CREATE TABLE validation_finding (
     scope TEXT NOT NULL REFERENCES validation_run(scope) ON DELETE CASCADE,

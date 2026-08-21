@@ -8,6 +8,7 @@ import sqlite3
 
 from vellis.change_domain import DraftCategory, DraftOperation
 from vellis.domain import (
+    PUBLIC_ITEM_LIMIT,
     AnchorUpsert,
     AssociatedDataUpsert,
     Finding,
@@ -112,7 +113,7 @@ def _validate_inspect_state(connection, state, fingerprint):
     if not isinstance(uuids, list) or any(canonical_uuid(value) != value for value in uuids):
         raise ValueError("inspect UUIDs")
     limit, offset, revision = state["limit"], state["offset"], state["evaluatedRevision"]
-    if type(limit) is not int or not 1 <= limit <= 1000:
+    if type(limit) is not int or not 1 <= limit <= PUBLIC_ITEM_LIMIT:
         raise ValueError("inspect limit")
     if type(offset) is not int or offset < limit:
         raise ValueError("inspect offset")
@@ -499,7 +500,7 @@ def _validate_validation_cursor(run, total):
         raise ValueError("cursor digest")
     if type(offset) is not int or type(limit) is not int:
         raise ValueError("cursor numbers")
-    if not 1 <= limit <= 1000 or not limit <= offset < total:
+    if not 1 <= limit <= PUBLIC_ITEM_LIMIT or not limit <= offset < total:
         raise ValueError("cursor bounds")
 
 

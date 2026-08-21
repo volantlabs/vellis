@@ -82,9 +82,9 @@ findings:
     consequence: A cold agent cannot identify which definitions depend on one removed key.
     authority_refs: [RTG::'Validation Finding', VellisRequirements::mcpBoundary]
     evidence_refs: [path:docs/v2-simplification-phase4-evidence.md#implemented-distinction]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Several dependent definitions produce indistinguishable positional paths while retaining only the missing referent identity.
     compatibility_effect: Findings become more precise without a wire-shape change.
   - id: F004
@@ -93,9 +93,9 @@ findings:
     consequence: Programmatic repair cannot resolve double-slash, synthetic-parent, or non-member paths against the original request.
     authority_refs: [RTG::'Validation Finding', VellisRequirements::mcpBoundary]
     evidence_refs: [path:tests/vellis/test_domain_v2.py#test_dynamic_domain_finding_paths_are_rfc6901_pointers]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Behavior rejects correctly but returns a path that is syntactically or referentially unusable.
     compatibility_effect: Only diagnostic paths change.
   - id: F005
@@ -104,9 +104,9 @@ findings:
     consequence: A single edit can make public schemas, validation, storage constraints, and summaries disagree.
     authority_refs: [VellisRequirements::mcpBoundary]
     evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: One enforcement site silently accepts or advertises a different maximum from the rest.
     compatibility_effect: The public value remains 1000 and database schema/version remain unchanged.
   - id: F006
@@ -115,9 +115,9 @@ findings:
     consequence: The operator matrix lacks one explicit demonstration that strict and inclusive numeric comparisons produce different public results.
     authority_refs: [VellisVerification::'Predicates Search And Bounds Are Exact']
     evidence_refs: [path:tests/vellis/test_query_v2_successor.py#test_sql_topology_matches_independent_oracle_and_catches_distinctness_mutant]
-    disposition: plan-change
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: A strict numeric boundary is compiled inclusively while ordinary expected-value cases fail to expose it.
     compatibility_effect: No product behavior changes; evidence becomes discriminating.
   - id: F007
@@ -137,9 +137,9 @@ findings:
     consequence: The evidence label implies tests were included when its reproduction command excludes them.
     authority_refs: [owner-plan:Vellis-v2-Simplification-Rebaseline]
     evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#final-gates]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Readers infer no additional test complexity findings exist from a narrower measurement.
     compatibility_effect: Documentation only.
   - id: F009
@@ -148,9 +148,9 @@ findings:
     consequence: A five-line alias adds an independent module without independent meaning.
     authority_refs: [owner-plan:Vellis-v2-Pre-release-Closure-Correction-Plan]
     evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#intended-deletion-and-boundary-inventory]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: The alias survives or is replaced by another forwarding layer.
     compatibility_effect: Private imports move directly; public behavior is unchanged.
   - id: F010
@@ -159,9 +159,9 @@ findings:
     consequence: A durable simplicity constraint can regress while the ordinary project gate remains green.
     authority_refs: [owner-plan:Vellis-v2-Simplification-Rebaseline]
     evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#final-gates]
-    disposition: plan-change
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: A production complexity regression lands because only an ad hoc closure command detects it.
     compatibility_effect: Developer gate only.
   - id: F011
@@ -175,6 +175,50 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Cleanup creates a second definition-resolution abstraction or mutable cache.
     compatibility_effect: No change.
+  - id: F012
+    summary: Backup initialization reports revision zero instead of the preserved lineage head.
+    classification: implementation defect
+    consequence: An owner can mistake a correctly recovered nonzero lineage for a fresh system.
+    authority_refs: [VellisRequirements::lifecycle]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_setup_from_backup_reports_the_preserved_head_revision, path:docs/v2-pre-release-evidence.md#installed-owner-narratives]
+    disposition: resolved
+    owner_work_item_id: W002
+    implementation_status: conforming
+    nearest_wrong_system: Backup state is preserved while the successful CLI result always claims revision zero.
+    compatibility_effect: The existing setup message now reports the actual preserved revision.
+  - id: F013
+    summary: Backup publication and initialization leave hidden WAL and SHM sidecars for private temporary or static source files.
+    classification: implementation defect
+    consequence: Plaintext-adjacent internal artifacts accumulate despite successful atomic single-file publication and setup mutates the backup directory it reads.
+    authority_refs: [VellisRequirements::lifecycle]
+    evidence_refs: [path:tests/vellis/test_history_recovery_v2.py#test_online_backup_and_initialization_preserve_complete_database_only, path:docs/v2-pre-release-evidence.md#installed-owner-narratives]
+    disposition: resolved
+    owner_work_item_id: W002
+    implementation_status: conforming
+    nearest_wrong_system: The destination database is correct but audit-created sidecars survive beside a private temporary copy or the input backup.
+    compatibility_effect: Successful backup publication removes its own temporary sidecars and backup initialization opens its static source immutably so it creates none.
+  - id: F014
+    summary: Public query guidance does not explain kind-specific property selection despite the shared input shape.
+    classification: stale baseline
+    consequence: A schema-driven agent can request properties on an anchor or link and encounter an avoidable semantic rejection.
+    authority_refs: [VellisRequirements::mcpBoundary]
+    evidence_refs: [path:docs/mcp-realization.md#mcp-realization, path:docs/v2-pre-release-evidence.md#installed-owner-narratives]
+    disposition: resolved
+    owner_work_item_id: W002
+    implementation_status: conforming
+    nearest_wrong_system: Shared structural schema is mistaken for permission to select scalar properties on every node kind.
+    compatibility_effect: Documentation clarifies existing semantics; schema and behavior remain unchanged.
+  - id: F015
+    summary: Public setup guidance omits required Python and owner-private directory prerequisites.
+    classification: stale baseline
+    consequence: A normal wheel install or pre-created data directory fails before the owner can run the documented workflow.
+    authority_refs: [VellisRequirements::simpleOperation, owner-plan:Vellis-v2-Pre-release-Closure-Correction-Plan]
+    evidence_refs: [path:README.md#runnable-v2-boundary, path:docs/backup-restore.md#backup-and-restore, path:docs/v2-pre-release-evidence.md#installed-owner-narratives]
+    disposition: resolved
+    owner_work_item_id: W002
+    implementation_status: conforming
+    nearest_wrong_system: The package correctly refuses an unsupported runtime or permissive directory but public guidance does not state the corrective prerequisite.
+    compatibility_effect: Documentation only.
 decisions:
   - id: D001
     summary: Encode definition subjects in keyed paths while retaining missing or conflicting referents in typeKeys.
@@ -183,8 +227,8 @@ decisions:
     reversible: true
     owner_work_item_id: W002
     evidence_intent: [Multiple dependents are independently repairable., Dynamic type-key segments obey RFC 6901., V1 provenance retains missing-referent identity.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_draft_definition_findings_key_each_dependent_and_preserve_referent, path:tests/vellis/test_change_draft_v2.py#test_definition_subject_keys_are_json_pointer_escaped]
   - id: D002
     summary: Keep vellis.domain.PUBLIC_ITEM_LIMIT as the sole Python authority and render SQLite from it.
     authority_refs: [VellisRequirements::mcpBoundary]
@@ -192,8 +236,8 @@ decisions:
     reversible: true
     owner_work_item_id: W002
     evidence_intent: [Schemas and 1000 and 1001 boundaries agree., Rendered schema and database version remain unchanged.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_command_limit_uses_the_empty_pointer_for_the_whole_request, path:tests/vellis/test_mcp_lifecycle_v2.py#test_discovered_schemas_encode_bounds_and_kind_compatible_scalars]
   - id: D003
     summary: Keep the independent oracle topology-only and add one behavior-level predicate mutant discriminator.
     authority_refs: [VellisVerification::'Predicates Search And Bounds Are Exact']
@@ -201,8 +245,8 @@ decisions:
     reversible: true
     owner_work_item_id: W002
     evidence_intent: [A strict numeric result differs from a locally computed inclusive mutant and matches the public query.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_query_v2_successor.py#test_strict_numeric_boundary_rejects_an_inclusive_comparison_mutant]
   - id: D004
     summary: Retain repeated effective-definition composition as explicit glue.
     authority_refs: [owner-plan:Vellis-v2-Pre-release-Closure-Correction-Plan]
@@ -219,8 +263,8 @@ decisions:
     reversible: true
     owner_work_item_id: W003
     evidence_intent: [The final narrative names the deviation and future checkpoint lesson without changing history or portable tooling.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:docs/v2-pre-release-evidence.md#simplicity-and-scope-reassessment]
 work_items:
   - id: W001
     order: 1
@@ -255,26 +299,29 @@ work_items:
     checkpoint: git:d49900a57be85a76683e939b74566a674ccab535
   - id: W002
     order: 2
-    label: Repair diagnostics and make simplicity durable
+    label: Repair diagnostics and recovery boundary and make simplicity durable
     kind: implementation
     dependencies: [W001]
     planned_baseline: {dimension: model, identity: "sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc"}
-    finding_ids: [F003, F004, F005, F006, F008, F009, F010, F011]
+    finding_ids: [F003, F004, F005, F006, F008, F009, F010, F011, F012, F013, F014, F015]
     decision_ids: [D001, D002, D003, D004]
     authority:
       - refs: [RTG::'Validation Finding', VellisRequirements::mcpBoundary, VellisVerification::'Predicates Search And Bounds Are Exact']
+        coverage: full
+        remaining_work_item_ids: []
+      - refs: [VellisRequirements::lifecycle, VellisRequirements::simpleOperation]
         coverage: full
         remaining_work_item_ids: []
     approval:
       status: not-required
       reason: W002 implements approved authority and bounded model-preserving realization decisions.
       checkpoint: null
-    nearest_wrong_system: Local fixes pass nominal tests while paths remain unresolvable, limits drift, or simplicity and predicate evidence remain ad hoc.
-    compatibility_effect: Only finding paths change publicly; all other behavior, schema, commands, tools, and starter content remain stable.
-    non_effects: [Add no registry alternate predicate engine configuration schema relation database version or resolver., Preserve topology-oracle scope and repeated effective-definition glue.]
+    nearest_wrong_system: Local fixes pass nominal tests while paths remain unresolvable, limits drift, recovery reports the wrong head or creates private temporary/source artifacts, setup guidance omits required prerequisites, or simplicity and predicate evidence remain ad hoc.
+    compatibility_effect: Finding paths become precise, successful backup setup reports the preserved head and reads its static source immutably, and successful backup publication removes only its internal temporary sidecars; wire schemas, commands, tools, database schema/version, starter content, and canonical meaning remain stable.
+    non_effects: [Add no registry alternate predicate engine configuration schema relation database version or resolver., Preserve topology-oracle scope and repeated effective-definition glue., Do not alter ordinary live database WAL or SHM behavior.]
     lifecycle: active
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_draft_definition_findings_key_each_dependent_and_preserve_referent, path:tests/vellis/test_query_v2_successor.py#test_strict_numeric_boundary_rejects_an_inclusive_comparison_mutant, path:tests/vellis/test_mcp_lifecycle_v2.py#test_setup_from_backup_reports_the_preserved_head_revision, path:tests/vellis/test_history_recovery_v2.py#test_online_backup_and_initialization_preserve_complete_database_only, path:docs/v2-pre-release-evidence.md#installed-owner-narratives, path:docs/v2-pre-release-evidence.md#verification, command:just check]
     blocker: null
     checkpoint: null
   - id: W003
@@ -294,22 +341,22 @@ work_items:
       reason: Closure applies the approved evidence protocol without changing product meaning.
       checkpoint: null
     nearest_wrong_system: Green internal tests conceal an owner workflow recovery packaging or public-boundary failure.
-    compatibility_effect: No public compatibility change beyond W002 diagnostic precision.
+    compatibility_effect: No public compatibility change beyond W002 diagnostic precision, truthful setup output, private temporary-artifact cleanup, and clarified operating guidance.
     non_effects: [Do not commit prompts or transcripts., Do not invent performance thresholds or speculative features.]
     lifecycle: pending
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:docs/v2-pre-release-evidence.md#installed-owner-narratives, path:docs/v2-pre-release-evidence.md#simplicity-and-scope-reassessment, path:docs/v2-pre-release-evidence.md#verification]
     blocker: null
     checkpoint: null
 closure:
-  finding_disposition: open
+  finding_disposition: complete
   model_status: accepted
-  implementation_status: not evaluated
-  integration_status: not evaluated
-  external_status: not evaluated
-  compatibility: Runtime starter content and public inventories remain stable; only finding paths are intentionally sharpened.
+  implementation_status: conforming
+  integration_status: conforming
+  external_status: conforming
+  compatibility: Runtime starter content, wire schemas, database schema/version, commands, tools, and canonical meaning remain stable. Finding paths are sharpened, backup setup reports the preserved head instead of revision zero and reads its static source immutably, successful backup publication removes its own private temporary sidecars, and operating guidance states existing query, runtime, and directory constraints.
   reviews:
     - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
     - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
-  evidence_refs: []
+  evidence_refs: [path:docs/v2-pre-release-evidence.md#installed-owner-narratives, path:docs/v2-pre-release-evidence.md#simplicity-and-scope-reassessment, path:docs/v2-pre-release-evidence.md#verification, command:just check]
   checkpoint: null

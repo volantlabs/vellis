@@ -14,6 +14,10 @@ The public tools are `rtg_type_summary`, `rtg_type_inspect`, `rtg_query`, `rtg_c
 `rtg_draft_discard`, and `rtg_history`. Their count is not an internal architecture. A cold agent
 starts with summary and focused inspection, uses identity query directly for known UUIDs or pattern
 query for connected questions, requests only needed properties, and narrows an over-broad match.
+Property selection and property predicates apply only to associated-data nodes; anchor nodes already
+return their structural `displayName`, and link nodes return their structural endpoints. The shared
+strict input shape is followed by semantic kind validation, so a property request on an anchor or
+link is rejected with `kindMismatch`.
 Active change assumes owner approval in the surrounding workflow. The draft workflow is inspect,
 effective query, validate, activate or discard; it has no status/version or assessment token.
 

@@ -9,9 +9,9 @@ from pathlib import Path
 
 import ijson
 
+from vellis.json_pointer import append_pointer
 from vellis.v1_import_domain import V1ImportError
 from vellis.v1_json import canonical_legacy_json, decode_legacy_json
-from vellis.v1_pointer import append_pointer
 
 STAGE_RELATION = "v1_initialization_stage"
 

@@ -16,6 +16,7 @@ from vellis.domain import (
     ScalarValue,
     ValueKind,
 )
+from vellis.json_pointer import append_pointer
 from vellis.v1_candidate import iter_definitions, stage_object
 from vellis.v1_conversion_common import (
     imported_uuid,
@@ -26,7 +27,6 @@ from vellis.v1_conversion_common import (
 from vellis.v1_identity import identity_conflicted, source_entry_live
 from vellis.v1_import_domain import V1Disposition, V1ImportError
 from vellis.v1_json import canonical_legacy_json, decode_legacy_json
-from vellis.v1_pointer import append_pointer
 from vellis.v1_report import add_disposition
 from vellis.v1_stage import STAGE_RELATION, iter_category
 

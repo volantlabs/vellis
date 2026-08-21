@@ -10,6 +10,7 @@ from pathlib import Path
 
 from vellis.audit import audit_database
 from vellis.database import connect_database, require_supported_database
+from vellis.operations import InitializationResult
 
 
 class BackupIntegrityError(RuntimeError):
@@ -22,17 +23,21 @@ class BackupPublicationDurabilityError(RuntimeError):
 
 def backup_database(source: Path, destination: Path) -> Path:
     """Copy one live database without reading or copying adjacent sidecars."""
-    return _copy_database(source, destination)
+    published, _, _ = _copy_database(source, destination)
+    return published
 
 
-def initialize_from_backup(source: Path, destination: Path) -> Path:
+def initialize_from_backup(source: Path, destination: Path) -> InitializationResult:
     """Publish an audited lineage into an absent destination database."""
-    _require_clean(source, "backup source")
+    _require_clean(source, "backup source", immutable=True)
     _prepare_empty_destination(destination)
-    return _copy_database(source, destination)
+    published, lineage_uuid, revision = _copy_database(source, destination, source_immutable=True)
+    return InitializationResult(str(published), lineage_uuid, revision)
 
 
-def _copy_database(source: Path, destination: Path) -> Path:
+def _copy_database(
+    source: Path, destination: Path, *, source_immutable: bool = False
+) -> tuple[Path, str, int]:
     if destination.exists():
         raise FileExistsError(f"backup destination already exists: {destination}")
     if not destination.parent.is_dir():
@@ -48,7 +53,7 @@ def _copy_database(source: Path, destination: Path) -> Path:
     source_connection = None
     destination_connection = None
     try:
-        source_connection = connect_database(source, read_only=True)
+        source_connection = connect_database(source, read_only=True, immutable=source_immutable)
         require_supported_database(source_connection)
         destination_connection = sqlite3.connect(temporary, isolation_level=None)
         source_connection.backup(destination_connection, pages=64, progress=_backup_progress)
@@ -59,12 +64,14 @@ def _copy_database(source: Path, destination: Path) -> Path:
         os.chmod(temporary, 0o600)
         if os.name == "posix" and stat.S_IMODE(temporary.stat().st_mode) != 0o600:
             raise PermissionError("temporary backup is not owner-private")
-        _require_clean(temporary, "copied database")
+        _require_clean(temporary, "copied database", immutable=True)
+        lineage_uuid, revision = _database_identity(temporary)
+        _remove_sqlite_sidecars(temporary)
         _flush_file(temporary)
         _flush_directory(destination.parent)
         _publish_without_replace(temporary, destination)
         _flush_directory_after_publication(destination.parent)
-        return destination
+        return destination, lineage_uuid, revision
     except BaseException:
         if destination_connection is not None:
             destination_connection.close()
@@ -75,17 +82,42 @@ def _copy_database(source: Path, destination: Path) -> Path:
         except OSError:
             # Preserve the primary failure, especially an indeterminate publication result.
             pass
+        try:
+            _remove_sqlite_sidecars(temporary)
+        except OSError:
+            pass
         raise
 
 
-def _require_clean(path: Path, label: str) -> None:
-    report = audit_database(path)
+def _require_clean(path: Path, label: str, *, immutable: bool = False) -> None:
+    report = audit_database(path, immutable=immutable)
     if not report.clean:
         raise BackupIntegrityError(f"{label} failed audit: {report.findings[0]}")
 
 
+def _database_identity(path: Path) -> tuple[str, int]:
+    connection = connect_database(path, read_only=True, immutable=True)
+    try:
+        require_supported_database(connection)
+        row = connection.execute(
+            "SELECT lineage_uuid, head_revision FROM metadata_setting WHERE singleton = 1"
+        ).fetchone()
+        assert row is not None
+        return str(row["lineage_uuid"]), int(row["head_revision"])
+    finally:
+        connection.close()
+
+
 def _backup_progress(status: int, remaining: int, total: int) -> None:
     """Keep online-backup progress private while permitting concurrency evidence."""
+
+
+def _remove_sqlite_sidecars(database: Path) -> None:
+    for sidecar in (Path(f"{database}-wal"), Path(f"{database}-shm")):
+        try:
+            os.unlink(sidecar)
+        except FileNotFoundError:
+            pass
 
 
 def _prepare_empty_destination(destination: Path) -> None:

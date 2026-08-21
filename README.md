@@ -63,6 +63,14 @@ The scalar domain, SQLite persistence, discovery/query, active changes, draft go
 history/activity, restore/audit/backup, v1 initialization, and MCP/owner boundary are implemented.
 The unreleased prototype modules and compatibility paths are absent.
 
+Vellis v2 requires Python 3.14 or newer. To install a built wheel as an isolated owner command with
+`uv`, select that runtime explicitly:
+
+```sh
+uv tool install /absolute/path/to/vellis-2.0.0-py3-none-any.whl --python 3.14
+vellis --help
+```
+
 The owner command has seven subcommands:
 
 ```text
@@ -82,6 +90,10 @@ use:
 vellis setup --blank --no-connect --data-dir /absolute/path/to/vellis-data
 vellis setup --starter --no-connect --data-dir /absolute/path/to/vellis-data
 ```
+
+The selected data directory must either be absent, so Vellis can create it owner-private, or be
+empty and use mode `0700` on POSIX. Vellis refuses a pre-existing directory with broader
+permissions rather than placing personal data there.
 
 V1 preview options apply only to `--from-v1 --preview`; confirmed imports require both displayed
 digests. Preview never connects a client or publishes a destination. Interactive setup always asks
