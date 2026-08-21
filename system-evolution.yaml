@@ -1,516 +1,306 @@
 schema_version: "1.0"
 evolution:
-  id: vellis-2-simplification-rebaseline
-  objective: Rebaseline Vellis v2 around a small scalar RTG, field-level changes, one draft, indexed history, and simple public boundaries.
-  observable_distinction: Owners can query, change, draft, recover, migrate, and connect without recursive JSON, replacement updates, replay, private hooks, or implementation-shaped governance.
-  lifecycle: complete
+  id: vellis-2-pre-release-closure-corrections
+  objective: Close bounded pre-release diagnostic, simplicity, evidence, and authority findings without reopening the v2 design.
+  observable_distinction: Agents receive repairable exact finding paths, every public bound has one authority, and release evidence discriminates the remaining plausible wrong systems without new product machinery.
+  lifecycle: awaiting-approval
   approval:
-    status: accepted
-    reason: The owner supplied and approved the decision-complete rebaseline plan; this checkpoint makes that accepted consequence reconstructible.
-    checkpoint: git:d2723f131a11ae6b339c36311b4dabcc632c6bf5
+    status: pending
+    reason: The owner-approved closure plan changes starter-count and finding-location authority before implementation proceeds.
+    checkpoint: null
   blocker: null
-  checkpoint: git:4612c0df3e9671d6e3a6c0843143e20242122af4
+  checkpoint: null
 baselines:
   status: current
   source: &source
-    model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:5196bb01fedb90c815ae15f40cddb041fc915d01
-    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:5196bb01fedb90c815ae15f40cddb041fc915d01
-  target: &final_target
     model: sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794
-    implementation: git:4612c0df3e9671d6e3a6c0843143e20242122af4
+    implementation: git:7d007fd0b7e2ac6e8671bc297400f1490dd03a62
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:4612c0df3e9671d6e3a6c0843143e20242122af4
-  observed: *final_target
+    checkpoint: git:7d007fd0b7e2ac6e8671bc297400f1490dd03a62
+  target: null
+  observed: *source
 scope:
   authority_scope:
+    - owner-plan:Vellis-v2-Pre-release-Closure-Correction-Plan
     - owner-plan:Vellis-v2-Simplification-Rebaseline
-    - model/10-rtg-domain.sysml
-    - model/15-everyday-life-starter.sysml
-    - model/20-rtg-system.sysml
-    - model/30-vellis.sysml
-    - model/40-requirements.sysml
-    - model/50-verification.sysml
-    - AGENTS.md
+    - RTG::'Validation Finding'
+    - RTGSystem::'Validate current or draft state'
+    - EverydayLifeStarter::'Everyday Life Starter Definition Set'
+    - VellisRequirements::mcpBoundary
+    - VellisRequirements::starter
+    - VellisVerification::'Inspect Validate Activate And Discard Draft'
+    - VellisVerification::'Starter Is Small Typed And Optional'
   implementation_scope:
     - system-evolution.yaml
     - model/
     - vellis/
     - tests/
-    - tools/system_evolution.py
-    - README.md
-    - CONTRIBUTING.md
-    - SECURITY.md
-    - docs/
+    - docs/v2-simplification-phase8-evidence.md
+    - docs/v2-pre-release-evidence.md
     - justfile
-    - pyproject.toml
-    - uv.lock
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
-    - Prototype-v2 database or API compatibility.
-    - Fuzzy, semantic, embedding, aggregation, dimensional-analysis, or alternative-database features.
-    - OAuth, roles, tenants, TLS termination, daemonization, service management, or encryption at rest.
-    - Activity pruning, built-in analysis agents, conversation capture, or speculative extension frameworks.
-    - Portable implementation-campaign engine redesign.
-    - Numerical performance promises without representative owner data and hardware.
+    - No new public operation, error code, finding field, configuration, migration framework, schema relation, or compatibility layer.
+    - No full predicate oracle or alternate query engine.
+    - No effective-definition helper or resolver refactor.
+    - No portable campaign-engine redesign or C901 cleanup in tooling or tests.
+    - No retroactive Git-history rewrite or generic deletion-sequencing framework.
+    - No arbitrary module, table, line, or test-count reduction.
+    - No protected .data inspection.
 findings:
   - id: F001
-    summary: Recursive JSON and relationship-rule identities make the RTG larger than the owner problem.
+    summary: Exact top-level starter multiplicities contradict the accepted completeness decision.
     classification: model gap
-    consequence: Agents must reason about nested values and independently identified constraints instead of scalar facts and local type cardinality.
-    authority_refs: [owner-plan:sections-2.1-through-2.6]
-    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase2-evidence.md#implemented-distinction, path:docs/v2-simplification-phase2-evidence.md#focused-evidence]
-    disposition: resolved
-    owner_work_item_id: W002
-    implementation_status: conforming
-    nearest_wrong_system: The model renames predecessor concepts while retaining recursive values or participant-rule identities.
-    compatibility_effect: The unreleased prototype model and database are intentionally incompatible.
+    consequence: Redundant totals freeze an inventory already established by named modeled definitions and make intentional vocabulary evolution unnecessarily contradictory.
+    authority_refs: [EverydayLifeStarter::'Everyday Life Starter Definition Set', VellisRequirements::starter, VellisVerification::'Starter Is Small Typed And Optional']
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:tests/vellis/test_storage_v2.py#test_starter_has_exact_small_typed_vocabulary_and_no_graph]
+    disposition: model-change
+    owner_work_item_id: W001
+    implementation_status: conflicting
+    nearest_wrong_system: The named starter remains complete but authority rejects it solely because a redundant aggregate count changed.
+    compatibility_effect: Runtime starter content remains semantically unchanged.
   - id: F002
-    summary: Projection, aggregation, and match/get-shaped query behavior exceed the connected bounded questions required.
+    summary: Finding authority does not state repairable subject and location semantics.
     classification: model gap
-    consequence: The compiler carries a general query language where identity lookup and connected pattern matching suffice.
-    authority_refs: [owner-plan:sections-3.3-through-3.6]
-    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase3-evidence.md#implemented-distinction, path:docs/v2-simplification-phase3-evidence.md#focused-evidence, path:docs/v2-simplification-phase3-evidence.md#subtraction-and-locality-review, path:tests/test_repository_policy.py#test_unreleased_predecessor_modules_are_absent, path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
-    disposition: resolved
-    owner_work_item_id: W008
-    implementation_status: conforming
-    nearest_wrong_system: A unified tool name hides existing projection, aggregation, hidden-selector, or two-step machinery.
-    compatibility_effect: Prototype query requests and results are unsupported.
+    consequence: Several affected subjects may legally collapse to one positional path, forcing an agent to rediscover which dependent needs repair.
+    authority_refs: [RTG::'Validation Finding', VellisRequirements::mcpBoundary, VellisVerification::'Inspect Validate Activate And Discard Draft']
+    evidence_refs: [path:docs/v2-simplification-phase4-evidence.md#evidence-status, path:tests/vellis/test_domain_v2.py#test_dynamic_domain_finding_paths_are_rfc6901_pointers]
+    disposition: model-change
+    owner_work_item_id: W001
+    implementation_status: conflicting
+    nearest_wrong_system: Findings name a missing referent but not the independently repairable request member or affected-state subject.
+    compatibility_effect: Existing fields and finding codes remain; only path precision is strengthened.
   - id: F003
-    summary: Complete-object updates can discard owner data that an agent did not retrieve.
-    classification: model gap
-    consequence: A small change requires reconstructing unrelated content and creates a silent-loss footgun.
-    authority_refs: [owner-plan:sections-2.8-and-3.7]
-    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase4-evidence.md#evidence-status, path:tests/test_repository_policy.py#test_unreleased_predecessor_modules_are_absent, path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
-    disposition: resolved
-    owner_work_item_id: W008
-    implementation_status: conforming
-    nearest_wrong_system: An upsert-shaped adapter still replaces an entire persisted object.
-    compatibility_effect: Mutation becomes field-level with explicit removal and no cascade.
+    summary: Effective validation collapses every definition subject to definitions index zero.
+    classification: implementation defect
+    consequence: A cold agent cannot identify which definitions depend on one removed key.
+    authority_refs: [RTG::'Validation Finding', VellisRequirements::mcpBoundary]
+    evidence_refs: [path:docs/v2-simplification-phase4-evidence.md#implemented-distinction]
+    disposition: implementation-work
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: Several dependent definitions produce indistinguishable positional paths while retaining only the missing referent identity.
+    compatibility_effect: Findings become more precise without a wire-shape change.
   - id: F004
-    summary: Proposal versions, status, assessments, and tokens duplicate draft inspection and validation.
-    classification: model gap
-    consequence: A bucket of deltas acquires an unnecessary public lifecycle and persisted identities.
-    authority_refs: [owner-plan:sections-2.9-and-3.8-through-3.12]
-    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase4-evidence.md#evidence-status, path:tests/test_repository_policy.py#test_unreleased_predecessor_modules_are_absent, path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
-    disposition: resolved
-    owner_work_item_id: W008
-    implementation_status: conforming
-    nearest_wrong_system: Draft terminology changes while version, stale status, or assessment identity remains.
-    compatibility_effect: Prototype proposal and assessment contracts are removed.
+    summary: Duplicate, root, and property-predicate paths do not resolve to request locations.
+    classification: implementation defect
+    consequence: Programmatic repair cannot resolve double-slash, synthetic-parent, or non-member paths against the original request.
+    authority_refs: [RTG::'Validation Finding', VellisRequirements::mcpBoundary]
+    evidence_refs: [path:tests/vellis/test_domain_v2.py#test_dynamic_domain_finding_paths_are_rfc6901_pointers]
+    disposition: implementation-work
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: Behavior rejects correctly but returns a path that is syntactically or referentially unusable.
+    compatibility_effect: Only diagnostic paths change.
   - id: F005
-    summary: The shared-connection monolithic store and duplicate definition resolution are correctness hazards.
+    summary: The one public item limit is defined and rendered in multiple production locations.
     classification: implementation defect
-    consequence: Temporary populations persist, tests reach private state, and concurrent HTTP operations cannot isolate connections.
-    authority_refs: [owner-plan:sections-4.2-through-4.7]
-    evidence_refs: [path:docs/v2-simplification-phase2-evidence.md#implemented-distinction, path:docs/v2-simplification-phase2-evidence.md#focused-evidence, path:docs/v2-simplification-phase2-evidence.md#subtraction-and-locality-review]
-    disposition: resolved
+    consequence: A single edit can make public schemas, validation, storage constraints, and summaries disagree.
+    authority_refs: [VellisRequirements::mcpBoundary]
+    evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
+    disposition: implementation-work
     owner_work_item_id: W002
-    implementation_status: conforming
-    nearest_wrong_system: Forwarding classes retain the global store, connection, and duplicate loaders.
-    compatibility_effect: Fresh VEL2 storage replaces the unreleased prototype schema without migration.
+    implementation_status: conflicting
+    nearest_wrong_system: One enforcement site silently accepts or advertises a different maximum from the rest.
+    compatibility_effect: The public value remains 1000 and database schema/version remain unchanged.
   - id: F006
-    summary: Replay, snapshots, tails, and event-family tables duplicate indexed version history.
-    classification: implementation defect
-    consequence: Recovery and historical reads carry several state authorities for a local SQLite product.
-    authority_refs: [owner-plan:sections-4.10-and-4.11]
-    evidence_refs: [path:docs/v2-simplification-phase5-evidence.md#predecessor-reachability-and-subtraction, path:docs/v2-simplification-phase5-evidence.md#evidence-status, path:tests/test_repository_policy.py#test_unreleased_predecessor_modules_are_absent, path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
-    disposition: resolved
-    owner_work_item_id: W008
-    implementation_status: conforming
-    nearest_wrong_system: Version tables are added while replay remains authoritative or public.
-    compatibility_effect: SQLite history, restore, audit, and backup replace snapshot and replay.
-  - id: F007
-    summary: V1 initialization must preserve legacy meaning without predecessor architecture or whole-graph memory.
-    classification: realization decision
-    consequence: A naive importer can silently coerce mixed values, lose metadata, or scale with the source graph.
-    authority_refs: [owner-plan:section-4.12]
-    evidence_refs: [path:tests/vellis/test_v1_import_v2.py#test_preview_and_confirm_publish_exact_audited_revision_zero, path:tests/vellis/test_v1_import_v2.py#test_property_wide_inference_preserves_scalars_and_exact_converted_json, path:tests/vellis/test_v1_import_v2.py#test_identity_reservations_scan_every_live_and_nonlive_family_before_omission, path:tests/vellis/test_v1_import_v2.py#test_same_kind_repetition_in_every_graph_family_is_not_imported_as_history, path:tests/vellis/test_v1_import_v2.py#test_every_cross_graph_kind_pair_conflicts_before_nonlive_omission, path:tests/vellis/test_v1_import_v2.py#test_same_kind_repetition_in_every_definition_family_is_not_reactivation, path:tests/vellis/test_v1_import_v2.py#test_every_cross_definition_kind_pair_conflicts_before_nonlive_omission, path:tests/vellis/test_v1_import_v2.py#test_every_source_association_is_independently_disposed, path:tests/vellis/test_v1_import_v2.py#test_every_malformed_association_container_or_member_blocks_at_source, path:tests/vellis/test_v1_import_v2.py#test_association_uuid_normalization_is_reported_and_duplicates_remain_canonical, path:tests/vellis/test_v1_import_v2.py#test_disposition_targets_are_centrally_canonical_and_exact, path:tests/vellis/test_v1_import_v2.py#test_every_dynamic_source_pointer_segment_uses_rfc6901, path:tests/vellis/test_v1_import_v2.py#test_dynamic_property_names_are_escaped_across_conversion_omission_and_findings, path:tests/vellis/test_v1_import_v2.py#test_special_link_type_path_maps_unknown_endpoint_to_exact_v1_provenance, path:tests/vellis/test_domain_v2.py#test_dynamic_domain_finding_paths_are_rfc6901_pointers, path:tests/vellis/test_v1_import_v2.py#test_candidate_findings_retain_source_provenance, path:tests/vellis/test_v1_import_v2.py#test_missing_required_named_property_has_exact_source_and_target_identity, path:tests/vellis/test_v1_import_v2.py#test_digit_only_property_name_precedes_numeric_candidate_index_in_provenance, path:tests/vellis/test_v1_import_v2.py#test_absent_required_digit_only_property_uses_the_staged_type_definition, path:tests/vellis/test_v1_import_v2.py#test_digit_only_definition_keys_preserve_each_origin_for_a_shared_missing_member, path:tests/vellis/test_v1_import_v2.py#test_invalid_empty_property_keeps_exact_source_pointer_without_target_identity, path:tests/vellis/test_v1_import_v2.py#test_every_collection_shape_is_blocked_or_explicitly_omitted, path:tests/vellis/test_v1_import_v2.py#test_local_bounds_use_final_inferred_permitted_population, path:tests/vellis/test_v1_import_v2.py#test_any_targeted_nonreducible_rule_suppresses_exact_mapping_for_the_role, path:tests/vellis/test_v1_import_v2.py#test_link_overlap_extracts_every_recognizable_type_from_nonexact_members, path:tests/vellis/test_v1_import_v2.py#test_selector_name_collision_is_nonexact_but_suppresses_its_complete_role, path:tests/vellis/test_v1_import_v2.py#test_cross_kind_selector_name_collision_suppresses_the_recognizable_data_role, path:tests/vellis/test_v1_import_v2.py#test_unrelated_broken_count_group_pair_does_not_suppress_safe_exact_mapping, path:tests/vellis/test_v1_import_v2.py#test_inferred_population_subset_never_maps_as_a_local_bound, path:tests/vellis/test_v1_import_v2.py#test_every_population_or_result_narrowing_field_prevents_bound_mapping, path:tests/vellis/test_v1_import_v2.py#test_every_refinement_field_is_mapped_or_reported_for_every_conversion_path, path:tests/vellis/test_v1_import_v2.py#test_one_directory_rename_is_the_only_visibility_boundary, path:docs/v2-simplification-phase6-evidence.md#evidence-status]
-    disposition: resolved
-    owner_work_item_id: W006
-    implementation_status: conforming
-    nearest_wrong_system: Import succeeds but loses or binary64-rounds values, or materializes the snapshot in memory.
-    compatibility_effect: One confirmed v1 JSON snapshot initializes revision zero; v1 storage and history remain unsupported.
-  - id: F008
-    summary: Private FastMCP hooks, monkeypatching, schema rewriting, and deep client parsing make the boundary fragile.
-    classification: implementation defect
-    consequence: Dependency changes and concurrent HTTP requests can break behavior outside supported APIs.
-    authority_refs: [owner-plan:sections-5.1-through-5.4]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_public_server_lists_strict_selected_tools_and_calls_successor, path:tests/vellis/test_mcp_lifecycle_v2.py#test_discovered_schemas_encode_bounds_and_kind_compatible_scalars, path:tests/vellis/test_mcp_lifecycle_v2.py#test_real_stdio_initialize_list_and_call, path:tests/vellis/test_mcp_lifecycle_v2.py#test_real_token_protected_http_initialize_list_and_call, path:tests/vellis/test_mcp_lifecycle_v2.py#test_bearer_middleware_protects_complete_application, path:tests/vellis/test_mcp_lifecycle_v2.py#test_client_replacement_probes_before_remove_and_reports_recovery, path:tests/vellis/test_mcp_lifecycle_v2.py#test_successful_add_with_failed_final_probe_reports_changed_unconfirmed_readiness, path:docs/v2-simplification-phase7-evidence.md#boundary-inventory-before-coding]
-    disposition: resolved
-    owner_work_item_id: W007
-    implementation_status: conforming
-    nearest_wrong_system: Tools work while private server internals or literal client secrets remain in the path.
-    compatibility_effect: Only selected CLI commands, STDIO, HTTP, and public client onboarding remain.
-  - id: F009
-    summary: Evolution validation is overcomplex and tests derive fixtures from the live record.
+    summary: Predicate evidence lacks a direct plausible-mutant discriminator.
     classification: plan gap
-    consequence: A valid successor can break unrelated tests, while one function mixes schema, invariants, Git, and presentation.
-    authority_refs: [AGENTS.md, owner-plan:phase-0]
-    evidence_refs: [path:tests/test_system_evolution.py#test_committed_evolution_record_is_valid, path:tests/test_system_evolution.py#test_complete_record_must_be_committed, path:docs/v2-simplification-baseline.md#size-and-complexity, command:uv run pytest tests/test_system_evolution.py, command:just system-evolution-check]
-    disposition: resolved
-    owner_work_item_id: W000
-    implementation_status: conforming
-    nearest_wrong_system: The live record passes while synthetic topologies or later record shapes fail unrelated tests.
-    compatibility_effect: Evolution meaning remains unchanged while workflow evidence becomes shape independent.
-  - id: F010
-    summary: Guidance and ordinary checks preserve completed-campaign and predecessor capability claims.
+    consequence: The operator matrix lacks one explicit demonstration that strict and inclusive numeric comparisons produce different public results.
+    authority_refs: [VellisVerification::'Predicates Search And Bounds Are Exact']
+    evidence_refs: [path:tests/vellis/test_query_v2_successor.py#test_sql_topology_matches_independent_oracle_and_catches_distinctness_mutant]
+    disposition: plan-change
+    owner_work_item_id: W002
+    implementation_status: partial
+    nearest_wrong_system: A strict numeric boundary is compiled inclusively while ordinary expected-value cases fail to expose it.
+    compatibility_effect: No product behavior changes; evidence becomes discriminating.
+  - id: F007
+    summary: Production deletion was historically deferred to the final subtraction phase.
+    classification: plan gap
+    consequence: Intermediate checkpoints carried predecessor and successor implementations together, weakening phase-local simplicity review.
+    authority_refs: [owner-plan:Vellis-v2-Simplification-Rebaseline]
+    evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
+    disposition: accepted
+    owner_work_item_id: W003
+    implementation_status: not applicable
+    nearest_wrong_system: A future campaign again treats phase-local deletion as optional prose and reviews duplicate runtime paths.
+    compatibility_effect: Historical Git state is retained unchanged.
+  - id: F008
+    summary: Phase 8 labels a vellis plus tools C901 count as repository-wide.
     classification: stale baseline
-    consequence: Contributors are directed toward replay, assessments, aliases, and a completed campaign gate after removal.
-    authority_refs: [owner-plan:phase-8, AGENTS.md]
-    evidence_refs: [path:tests/test_repository_policy.py#test_ordinary_check_excludes_inactive_campaign_gate, path:tests/test_repository_policy.py#test_unreleased_predecessor_modules_are_absent, path:README.md#development-setup, path:docs/v2-simplification-phase8-evidence.md#documentation-synchronization]
-    disposition: resolved
-    owner_work_item_id: W008
+    consequence: The evidence label implies tests were included when its reproduction command excludes them.
+    authority_refs: [owner-plan:Vellis-v2-Simplification-Rebaseline]
+    evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#final-gates]
+    disposition: implementation-work
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: Readers infer no additional test complexity findings exist from a narrower measurement.
+    compatibility_effect: Documentation only.
+  - id: F009
+    summary: v1_pointer.py is a forwarding-only production module.
+    classification: realization decision
+    consequence: A five-line alias adds an independent module without independent meaning.
+    authority_refs: [owner-plan:Vellis-v2-Pre-release-Closure-Correction-Plan]
+    evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#intended-deletion-and-boundary-inventory]
+    disposition: implementation-work
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: The alias survives or is replaced by another forwarding layer.
+    compatibility_effect: Private imports move directly; public behavior is unchanged.
+  - id: F010
+    summary: Product C901 at most 10 is measured but absent from ordinary just check.
+    classification: plan gap
+    consequence: A durable simplicity constraint can regress while the ordinary project gate remains green.
+    authority_refs: [owner-plan:Vellis-v2-Simplification-Rebaseline]
+    evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#final-gates]
+    disposition: plan-change
+    owner_work_item_id: W002
+    implementation_status: partial
+    nearest_wrong_system: A production complexity regression lands because only an ad hoc closure command detects it.
+    compatibility_effect: Developer gate only.
+  - id: F011
+    summary: Effective-definition composition repeats as small explicit glue.
+    classification: realization decision
+    consequence: Extracting it could create another resolver or authority; retaining it leaves several obvious call-site compositions.
+    authority_refs: [owner-plan:Vellis-v2-Pre-release-Closure-Correction-Plan]
+    evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
+    disposition: accepted
+    owner_work_item_id: W002
     implementation_status: conforming
-    nearest_wrong_system: Runtime subtraction completes while public claims or ordinary gates still preserve the old system.
-    compatibility_effect: Documentation and checks will describe only simplified runnable v2.
+    nearest_wrong_system: Cleanup creates a second definition-resolution abstraction or mutable cache.
+    compatibility_effect: No change.
 decisions:
-  - id: D000
-    summary: Keep evolution checks layered and synthetic instead of live-record-shaped.
-    authority_refs: [AGENTS.md, owner-plan:phase-0]
-    alternatives: [Retain one monolithic validator., Use the live evolution as every test fixture.]
-    reversible: true
-    owner_work_item_id: W000
-    evidence_intent: [Synthetic records exercise invariants., One explicit test validates the committed record., Pure checks run without Git.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/test_system_evolution.py#test_pure_invariants_do_not_consult_git_or_repository_state, path:tests/test_system_evolution.py#test_schema_requires_work_and_at_least_one_finding_or_decision, path:tests/test_system_evolution.py#test_an_accepted_approval_binds_and_seals_owned_meaning, path:tests/test_system_evolution.py#test_evolution_approval_allows_later_not_required_internal_decision, path:docs/v2-simplification-baseline.md#portable-forward-test-disposition, command:just skills-check, command:just lint, command:just typecheck]
   - id: D001
-    summary: Use scalar values and local cardinality.
-    authority_refs: [owner-plan:section-2]
-    alternatives: [Retain recursive JSON., Retain relationship rules., Retain versioned proposals and assessments.]
-    reversible: false
+    summary: Encode definition subjects in keyed paths while retaining missing or conflicting referents in typeKeys.
+    authority_refs: [RTG::'Validation Finding', VellisRequirements::mcpBoundary]
+    alternatives: [Add a finding field., Repurpose typeKeys first entry as the subject., Retain positional definition paths.]
+    reversible: true
     owner_work_item_id: W002
-    evidence_intent: [The implementation distinguishes scalar kinds and enforces local bounds without relationship-rule identities.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_domain_v2.py#test_definition_references_and_complete_graph_cardinality_are_validated, path:tests/vellis/test_domain_v2.py#test_all_four_local_cardinality_roles_cover_exact_minimum_maximum_and_unbounded, path:tests/vellis/test_storage_v2.py#test_scalar_versions_round_trip_null_and_all_nonnull_kinds, path:docs/v2-simplification-phase2-evidence.md#focused-evidence]
+    evidence_intent: [Multiple dependents are independently repairable., Dynamic type-key segments obey RFC 6901., V1 provenance retains missing-referent identity.]
+    implementation_status: not evaluated
+    evidence_refs: []
   - id: D002
-    summary: Expose one query with identity and connected-pattern selections and post-bound hydration.
-    authority_refs: [owner-plan:section-3]
-    alternatives: [Separate match and get., Retain projection and aggregation.]
-    reversible: false
-    owner_work_item_id: W003
-    evidence_intent: [Evidence rejects hidden selectors, disconnected products, and hydration before bounding.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_query_v2_successor.py#test_identity_selection_reports_missing_and_hydrates_only_requested_fields, path:tests/vellis/test_query_v2_successor.py#test_connected_patterns_bind_every_selector_and_enforce_whole_result_bound, path:docs/v2-simplification-phase3-evidence.md#focused-evidence]
-  - id: D003
-    summary: Use immutable domain values, SQLite functions, operation functions, and thin adapters.
-    authority_refs: [owner-plan:sections-4.2-through-4.7]
-    alternatives: [Forwarding service classes., ORM interfaces., Global store.]
+    summary: Keep vellis.domain.PUBLIC_ITEM_LIMIT as the sole Python authority and render SQLite from it.
+    authority_refs: [VellisRequirements::mcpBoundary]
+    alternatives: [Add configuration., Add a limits module., Retain copied constants and literals.]
     reversible: true
     owner_work_item_id: W002
-    evidence_intent: [One connection per operation., One definition resolver., No framework imports in domain.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_storage_v2.py#test_current_resolution_and_reads_do_not_traverse_canonical_history, path:tests/vellis/test_storage_v2.py#test_failure_after_temporary_creation_publishes_nothing, path:docs/v2-simplification-phase2-evidence.md#subtraction-and-locality-review]
+    evidence_intent: [Schemas and 1000 and 1001 boundaries agree., Rendered schema and database version remain unchanged.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D003
+    summary: Keep the independent oracle topology-only and add one behavior-level predicate mutant discriminator.
+    authority_refs: [VellisVerification::'Predicates Search And Bounds Are Exact']
+    alternatives: [Build a second predicate engine., Monkeypatch a private compiler helper., Rely only on hand-written expectations.]
+    reversible: true
+    owner_work_item_id: W002
+    evidence_intent: [A strict numeric result differs from a locally computed inclusive mutant and matches the public query.]
+    implementation_status: not evaluated
+    evidence_refs: []
   - id: D004
-    summary: Compile flat bounded queries to parameterized SQL CTEs with version-aware FTS and an independent oracle.
-    authority_refs: [owner-plan:section-4.8]
-    alternatives: [General query AST., In-memory graph evaluation.]
+    summary: Retain repeated effective-definition composition as explicit glue.
+    authority_refs: [owner-plan:Vellis-v2-Pre-release-Closure-Correction-Plan]
+    alternatives: [Add another resolver helper., Add a repository facade.]
+    reversible: true
+    owner_work_item_id: W002
+    evidence_intent: [Exactly one canonical definition resolver remains and composition stays local and stateless.]
+    implementation_status: conforming
+    evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
+  - id: D005
+    summary: Preserve historical deletion evidence without Git rewriting or new process-gate tooling.
+    authority_refs: [owner-plan:Vellis-v2-Pre-release-Closure-Correction-Plan]
+    alternatives: [Rewrite history., Add a generic campaign mechanism., Record the operational lesson only.]
     reversible: true
     owner_work_item_id: W003
-    evidence_intent: [Topology oracle catches selector and join mutations., Limit-plus-one precedes hydration., Historical search respects intervals.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_query_v2_successor.py#test_sql_topology_matches_independent_oracle_and_catches_distinctness_mutant, path:tests/vellis/test_query_v2_successor.py#test_bound_is_checked_before_hydration, path:tests/vellis/test_query_v2_successor.py#test_historical_query_uses_selected_intervals_for_graph_and_search, path:docs/v2-simplification-phase3-evidence.md#subtraction-and-locality-review]
-  - id: D005
-    summary: Store one normalized draft patch per key and opaque continuations with internal fingerprints.
-    authority_refs: [owner-plan:section-4.9]
-    alternatives: [Draft edit log., Public draft version., Generic cursor subsystem.]
-    reversible: true
-    owner_work_item_id: W004
-    evidence_intent: [Live writes preserve unstaged fields., Cursors expire correctly., Activation revalidates.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_draft_fields_win_while_unstaged_live_fields_follow_live, path:tests/vellis/test_change_draft_v2.py#test_inspection_pages_and_expires_on_live_or_draft_change, path:tests/vellis/test_change_draft_v2.py#test_activation_revalidates_invalid_valid_and_redundant_drafts, path:docs/v2-simplification-phase4-evidence.md#evidence-status]
-  - id: D010
-    summary: Use field-level graph patches and one unversioned durable draft.
-    authority_refs: [owner-plan:sections-2.8-through-2.9]
-    alternatives: [Use complete-object replacement., Retain proposal versions and assessment identities.]
-    reversible: false
-    owner_work_item_id: W004
-    evidence_intent: [One-field changes preserve unseen data., Draft overlay follows live fields without public version or assessment identity.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_field_patches_preserve_unmentioned_content_and_distinguish_null, path:tests/vellis/test_change_draft_v2.py#test_draft_only_addition_has_no_system_until_activation, path:tests/vellis/test_change_draft_v2.py#test_repeated_draft_edits_merge_tombstone_restart_and_unstage, path:docs/v2-simplification-phase4-evidence.md#evidence-status]
-  - id: D006
-    summary: Use version intervals, a canonical hash chain, separate activity, SQL restore, and online backup.
-    authority_refs: [owner-plan:sections-4.5-and-4.10-through-4.11]
-    alternatives: [Replay history., Public snapshots and tails., Activity hash chain.]
-    reversible: false
-    owner_work_item_id: W005
-    evidence_intent: [Reads do not replay., Audit detects corruption., Backup works while serving and excludes sidecars.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_history_recovery_v2.py#test_history_is_complete_bounded_ordered_and_excludes_its_own_activity, path:tests/vellis/test_history_recovery_v2.py#test_restore_revision_preserves_lineage_metadata_and_intervening_history, path:tests/vellis/test_history_recovery_v2.py#test_read_only_audit_detects_independent_relation_corruption, path:tests/vellis/test_history_recovery_v2.py#test_online_backup_and_initialization_preserve_complete_database_only, path:docs/v2-simplification-phase5-evidence.md#evidence-status]
-  - id: D007
-    summary: Stream v1 JSON through staging SQLite and report every disposition before publication.
-    authority_refs: [owner-plan:section-4.12]
-    alternatives: [Whole-document load., In-place conversion., Silent coercion.]
-    reversible: true
-    owner_work_item_id: W006
-    evidence_intent: [Import memory is bounded., Mixed values become exact JSON text., Digests bind confirmation.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_v1_import_v2.py#test_large_source_staging_retains_only_the_current_source_entry, path:tests/vellis/test_v1_import_v2.py#test_large_decimal_lexeme_and_nonlive_content_are_explicitly_disposed, path:tests/vellis/test_v1_import_v2.py#test_canonical_number_does_not_expand_rejected_huge_plain_form, path:tests/vellis/test_v1_import_v2.py#test_identity_reservations_scan_every_live_and_nonlive_family_before_omission, path:tests/vellis/test_v1_import_v2.py#test_every_refinement_field_is_mapped_or_reported_for_every_conversion_path, path:tests/vellis/test_v1_import_v2.py#test_every_collection_shape_is_blocked_or_explicitly_omitted, path:tests/vellis/test_v1_import_v2.py#test_any_targeted_nonreducible_rule_suppresses_exact_mapping_for_the_role, path:tests/vellis/test_v1_import_v2.py#test_link_overlap_extracts_every_recognizable_type_from_nonexact_members, path:tests/vellis/test_v1_import_v2.py#test_selector_name_collision_is_nonexact_but_suppresses_its_complete_role, path:tests/vellis/test_v1_import_v2.py#test_cross_kind_selector_name_collision_suppresses_the_recognizable_data_role, path:tests/vellis/test_v1_import_v2.py#test_unrelated_broken_count_group_pair_does_not_suppress_safe_exact_mapping, path:tests/vellis/test_v1_import_v2.py#test_disposition_targets_are_centrally_canonical_and_exact, path:tests/vellis/test_v1_import_v2.py#test_machine_and_streamed_human_reports_share_exact_identity_order, path:tests/vellis/test_v1_import_v2.py#test_candidate_findings_retain_source_provenance, path:tests/vellis/test_v1_import_v2.py#test_missing_required_named_property_has_exact_source_and_target_identity, path:tests/vellis/test_v1_import_v2.py#test_digit_only_property_name_precedes_numeric_candidate_index_in_provenance, path:tests/vellis/test_v1_import_v2.py#test_absent_required_digit_only_property_uses_the_staged_type_definition, path:tests/vellis/test_v1_import_v2.py#test_digit_only_definition_keys_preserve_each_origin_for_a_shared_missing_member, path:tests/vellis/test_v1_import_v2.py#test_invalid_empty_property_keeps_exact_source_pointer_without_target_identity, path:tests/vellis/test_v1_import_v2.py#test_local_bounds_use_final_inferred_permitted_population, path:tests/vellis/test_v1_import_v2.py#test_preview_and_digest_refusal_publish_nothing, path:docs/v2-simplification-phase6-evidence.md#mandatory-bounded-root-cause-audit]
-  - id: D008
-    summary: Pin selected stable dependencies and use public FastMCP and client CLI boundaries only.
-    authority_refs: [owner-plan:sections-4.1-and-5]
-    alternatives: [Beta private hooks., Direct config edits., Literal tokens in arguments.]
-    reversible: true
-    owner_work_item_id: W007
-    evidence_intent: [Installed STDIO and HTTP work., Requests isolate connections., Registration exposes no token.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_shared_public_projection_failure_rolls_back_every_activation_path, path:tests/vellis/test_history_recovery_v2.py#test_shared_public_projection_precedes_every_other_public_commit_path, path:tests/vellis/test_history_recovery_v2.py#test_settings_public_projection_failure_precedes_token_publication, path:tests/vellis/test_mcp_lifecycle_v2.py#test_public_server_lists_strict_selected_tools_and_calls_successor, path:tests/vellis/test_mcp_lifecycle_v2.py#test_conditional_wire_shapes_fail_before_operation_or_activity, path:tests/vellis/test_mcp_lifecycle_v2.py#test_json_native_nested_enums_reach_operations, path:tests/vellis/test_mcp_lifecycle_v2.py#test_real_stdio_initialize_list_and_call, path:tests/vellis/test_mcp_lifecycle_v2.py#test_real_token_protected_http_initialize_list_and_call, path:tests/vellis/test_mcp_lifecycle_v2.py#test_real_loopback_http_without_token_initialize_list_and_call, path:tests/vellis/test_mcp_lifecycle_v2.py#test_cli_passes_one_captured_absolute_executable_without_path_reresolution, path:tests/vellis/test_mcp_lifecycle_v2.py#test_claude_http_registration_checks_public_help_and_keeps_token_out_of_argv, path:tests/vellis/test_mcp_lifecycle_v2.py#test_claude_http_refuses_help_that_only_mentions_headers, path:tests/vellis/test_mcp_lifecycle_v2.py#test_http_client_commands_pass_only_environment_references, command:just package-check, path:docs/v2-simplification-phase7-evidence.md#bounded-root-cause-audit-inventory]
-  - id: D009
-    summary: Delete predecessor machinery and synchronize every public and contributor claim.
-    authority_refs: [owner-plan:phase-8]
-    alternatives: [Leave compatibility residue., Keep completed campaign validation in ordinary checks.]
-    reversible: true
-    owner_work_item_id: W008
-    evidence_intent: [Complexity decreases., Full gates and black-box scenarios pass., Cold reconstruction finds no obsolete path.]
-    implementation_status: conforming
-    evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements, path:docs/v2-simplification-phase8-evidence.md#documentation-synchronization, path:docs/v2-simplification-phase8-evidence.md#black-box-scenarios, path:docs/v2-simplification-phase8-evidence.md#final-gates, path:docs/backup-restore.md#backup-and-restore, path:docs/http-operation.md#external-foreground-supervision, path:docs/http-operation.md#external-network-examples, path:docs/http-operation.md#reconcile-a-lost-mutation-response]
+    evidence_intent: [The final narrative names the deviation and future checkpoint lesson without changing history or portable tooling.]
+    implementation_status: not evaluated
+    evidence_refs: []
 work_items:
-  - id: W000
-    order: 1
-    label: Establish the evolution and trustworthy workflow tooling
-    kind: implementation
-    dependencies: []
-    planned_baseline: {dimension: implementation, identity: git:5196bb01fedb90c815ae15f40cddb041fc915d01}
-    finding_ids: [F009]
-    decision_ids: [D000]
-    authority: [{refs: [AGENTS.md, owner-plan:phase-0], coverage: full, remaining_work_item_ids: []}]
-    approval: {status: not-required, reason: Workflow validation changes no Vellis product meaning., checkpoint: null}
-    nearest_wrong_system: The validator remains coupled to live topology or Git state in pure tests.
-    compatibility_effect: No product or model behavior changes.
-    non_effects: [No model edit., No product patch., No protected user-data access., No stale campaign reconstruction.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:docs/v2-simplification-baseline.md#size-and-complexity, path:docs/v2-simplification-baseline.md#portable-forward-test-disposition, path:docs/v2-simplification-baseline.md#phase-0-review-convergence-audit, path:tests/test_system_evolution.py#test_schema_requires_work_and_at_least_one_finding_or_decision, path:tests/test_system_evolution.py#test_pure_invariants_do_not_consult_git_or_repository_state, path:tests/test_system_evolution.py#test_committed_evolution_record_is_valid, path:tests/test_system_evolution.py#test_complete_record_must_be_committed, path:tests/test_system_evolution.py#test_an_accepted_approval_binds_and_seals_owned_meaning, path:tests/test_system_evolution.py#test_evolution_approval_allows_later_not_required_internal_decision, command:uv run pytest tests/test_system_evolution.py, command:just system-evolution-check, command:just skills-check, command:just lint, command:just typecheck]
-    blocker: null
-    checkpoint: git:4d2f88f8d6742588396cd1e0c1647568897e9319
-  # Phase 0 clean review pair inspected shared staged tree token
-  # 5a4dea7556e82bffbd9c9eb55036b01c3b60bef3, preserved by checkpoint
-  # git:4d2f88f8d6742588396cd1e0c1647568897e9319.
-  # /root/phase0_authority_review_4 — authority and conformance — clean.
-  # /root/phase0_engineering_review_4 — engineering and evidence — clean.
-  # Both independently confirmed the focused tests, evolution/skills/lint/type checks,
-  # successor C901 check, diff check, portable forward tests, and exact inventory.
   - id: W001
-    order: 2
-    label: Rebaseline and accept complete SysML authority
+    order: 1
+    label: Correct and accept affected model authority
     kind: modeling
-    dependencies: [W000]
+    dependencies: []
     planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: []
+    finding_ids: [F001, F002]
     decision_ids: []
-    authority: [{refs: [owner-plan:sections-1-through-3], coverage: full, remaining_work_item_ids: []}]
-    approval: {status: not-required, reason: "The accepted evolution approval already governs this model-only authority work.", checkpoint: null}
-    nearest_wrong_system: Vocabulary changes while predecessor identity, query, mutation, or proposal semantics remain.
-    compatibility_effect: Unreleased prototype-v2 behavior and storage assumptions break intentionally.
-    non_effects: [No product implementation before model acceptance., No deferred feature., No v1 storage access.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:docs/v2-simplification-model-evidence.md#authority-and-compatibility, path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-model-evidence.md#sysml-reference-evidence, path:docs/v2-simplification-model-evidence.md#adequacy-review, path:docs/v2-simplification-model-evidence.md#subtraction-review, path:docs/v2-simplification-model-evidence.md#medium-rehearsal-disposition, command:just model-check, command:just model-reference-check]
+    authority:
+      - refs: [EverydayLifeStarter::'Everyday Life Starter Definition Set', VellisRequirements::starter, VellisVerification::'Starter Is Small Typed And Optional']
+        coverage: full
+        remaining_work_item_ids: []
+      - refs: [RTG::'Validation Finding', VellisRequirements::mcpBoundary, VellisVerification::'Inspect Validate Activate And Discard Draft']
+        coverage: partial
+        remaining_work_item_ids: [W002]
+    approval:
+      status: pending
+      reason: The owner approved the exact starter and finding-location authority changes in the closure plan.
+      checkpoint: null
+    nearest_wrong_system: The model removes useful named starter content or still permits indistinguishable affected-state subjects.
+    compatibility_effect: Runtime starter content and wire fields remain unchanged; diagnostic paths become more precise in W002.
+    non_effects: [Preserve every named starter definition property endpoint nested bound and runtime value., Add no model element public field finding code or operation.]
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
     blocker: null
-    checkpoint: git:71d831fc09670158b965c960ae4fa88231d16479
-  # Phase 1 clean review pair inspected staged tree token
-  # 3720af1c8dd64907842dfa65e096226b4954ed4a, preserved by checkpoint
-  # git:71d831fc09670158b965c960ae4fa88231d16479.
-  # /root/phase1_authority_review_6 — authority and conformance — clean.
-  # /root/phase1_engineering_review_6 — engineering and evidence — clean.
-  # Both independently confirmed the accepted model digest, model/reference/evolution
-  # checks, diff check, authority closure, evidence truth, and owner draft-metadata clarification.
+    checkpoint: null
   - id: W002
-    order: 3
-    label: Build the typed domain and fresh SQLite foundation
+    order: 2
+    label: Repair diagnostics and make simplicity durable
     kind: implementation
     dependencies: [W001]
     planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: [F001, F005]
-    decision_ids: [D001, D003]
-    authority: [{refs: [owner-plan:phase-2], coverage: full, remaining_work_item_ids: []}]
-    approval: {status: not-required, reason: The approved plan selects this fresh-storage realization., checkpoint: null}
-    nearest_wrong_system: New modules wrap the monolith, shared connection, recursive domain, or duplicate loaders.
-    compatibility_effect: Fresh VEL2 only; prototype databases receive an actionable refusal.
-    non_effects: [No compatibility layer., No MCP yet., No alternate store abstraction.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:docs/v2-simplification-phase2-evidence.md#implemented-distinction, path:docs/v2-simplification-phase2-evidence.md#third-pair-root-cause-audit, path:docs/v2-simplification-phase2-evidence.md#focused-evidence, path:docs/v2-simplification-phase2-evidence.md#subtraction-and-locality-review, command:uv run pytest -q tests/vellis/test_domain_v2.py tests/vellis/test_canonical_encoding_v2.py tests/vellis/test_storage_v2.py, command:just lint, command:just typecheck, command:just model-check, command:just model-reference-check, command:just system-evolution-check]
+    finding_ids: [F003, F004, F005, F006, F008, F009, F010, F011]
+    decision_ids: [D001, D002, D003, D004]
+    authority:
+      - refs: [RTG::'Validation Finding', VellisRequirements::mcpBoundary, VellisVerification::'Predicates Search And Bounds Are Exact']
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: W002 implements approved authority and bounded model-preserving realization decisions.
+      checkpoint: null
+    nearest_wrong_system: Local fixes pass nominal tests while paths remain unresolvable, limits drift, or simplicity and predicate evidence remain ad hoc.
+    compatibility_effect: Only finding paths change publicly; all other behavior, schema, commands, tools, and starter content remain stable.
+    non_effects: [Add no registry alternate predicate engine configuration schema relation database version or resolver., Preserve topology-oracle scope and repeated effective-definition glue.]
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
     blocker: null
-    checkpoint: git:677fb3ecdb7823f9ec22f92a394ade4d864fd580
-  # Phase 2 clean review pair inspected shared staged tree token
-  # 00e7d53bd4b12e52be39631180a6c3ee73ffeb61, preserved by checkpoint
-  # git:677fb3ecdb7823f9ec22f92a394ade4d864fd580.
-  # /root/phase2_authority_review_12 — authority and conformance — clean.
-  # /root/phase2_engineering_review_12 — engineering and evidence — clean.
-  # Both independently confirmed 66 focused tests, lint/type/model/reference/evolution,
-  # successor C901 and diff checks, plus the two documented F010/W008 full-suite failures.
+    checkpoint: null
   - id: W003
-    order: 4
-    label: Implement progressive discovery and unified query
-    kind: implementation
-    dependencies: [W002]
-    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: []
-    decision_ids: [D002, D004]
-    authority: [{refs: [owner-plan:phase-3], coverage: full, remaining_work_item_ids: []}]
-    approval: {status: not-required, reason: The approved plan fixes query behavior and realization., checkpoint: null}
-    nearest_wrong_system: Renamed tools retain projection, aggregation, hidden selectors, or unbounded hydration.
-    compatibility_effect: Old query requests and results are unsupported.
-    non_effects: [No aggregation., No fuzzy or semantic search., No query AST.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:docs/v2-simplification-phase3-evidence.md#implemented-distinction, path:docs/v2-simplification-phase3-evidence.md#focused-evidence, path:docs/v2-simplification-phase3-evidence.md#subtraction-and-locality-review, command:uv run pytest -q tests/vellis/test_domain_v2.py tests/vellis/test_canonical_encoding_v2.py tests/vellis/test_storage_v2.py tests/vellis/test_query_v2_successor.py, command:just lint, command:just typecheck, command:just model-check, command:just model-reference-check, command:just system-evolution-check]
-    blocker: null
-    checkpoint: git:0c7940fd3677322222d9bafebe48fa9661b874a5
-  # Phase 3 clean review pair inspected shared staged tree token
-  # 5d9b49bc70dae1dca31d58afd137f32af42c5ee8, preserved by checkpoint
-  # git:0c7940fd3677322222d9bafebe48fa9661b874a5.
-  # /root/phase3_authority_review_8 — authority and conformance — clean.
-  # /root/phase3_engineering_review_8 — engineering and evidence — clean.
-  # Both independently confirmed 94 focused tests, successor C901 and diff checks;
-  # manager gates also confirmed lint/type/model/reference/evolution and only the two
-  # documented F010/W008 full-suite failures among 1,329 tests.
-  - id: W004
-    order: 5
-    label: Implement active changes, draft, validation, and activation
-    kind: implementation
-    dependencies: [W003]
-    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: []
-    decision_ids: [D005, D010]
-    authority: [{refs: [owner-plan:phase-4], coverage: full, remaining_work_item_ids: []}]
-    approval: {status: not-required, reason: The approved plan fixes patches and the draft bucket., checkpoint: null}
-    nearest_wrong_system: Patches lose data, removal cascades, activation needs a stale assessment identity, or concurrent mutations share connection state.
-    compatibility_effect: The Phase 4 successor service semantics replace complete-object mutation and proposal/assessment meaning; predecessor public adapter paths remain reachable until W008 removes them.
-    non_effects: [No cascade., No draft version., No whole-state active validation., No shared operation connection or cross-operation temporary population.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:docs/v2-simplification-phase4-evidence.md#implemented-distinction, path:docs/v2-simplification-phase4-evidence.md#evidence-status, command:uv run pytest -q tests/vellis/test_domain_v2.py tests/vellis/test_canonical_encoding_v2.py tests/vellis/test_storage_v2.py tests/vellis/test_query_v2_successor.py tests/vellis/test_change_draft_v2.py, command:just lint, command:just typecheck, command:just model-check, command:just model-reference-check, command:just system-evolution-check]
-    blocker: null
-    checkpoint: git:eba341978d18e4362d4aad875445a7d070ec1d58
-  # Phase 4 clean review pair inspected shared staged tree token
-  # b57276d80209905b137a1b04c7e419681615c986, preserved by checkpoint
-  # git:eba341978d18e4362d4aad875445a7d070ec1d58.
-  # /root/phase4_authority_review_10 — authority and conformance — clean.
-  # /root/phase4_engineering_review_10 — engineering and evidence — clean.
-  # Both independently confirmed 152 focused successor tests and the bounded
-  # patch/draft/query/validation/activation evidence; manager gates also confirmed
-  # lint/type/model/reference/evolution and only the two documented F010/W008
-  # full-suite failures among 1,387 tests.
-  - id: W005
-    order: 6
-    label: Implement ledgers, history, restore, audit, and backup
-    kind: implementation
-    dependencies: [W004]
-    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: []
-    decision_ids: [D006]
-    authority: [{refs: [owner-plan:phase-5], coverage: full, remaining_work_item_ids: []}]
-    approval: {status: not-required, reason: The approved plan selects indexed history and SQLite recovery., checkpoint: null}
-    nearest_wrong_system: Version tables coexist with replay, snapshot APIs, or duplicated mutation payloads.
-    compatibility_effect: The Phase 5 successor uses indexed history and SQLite recovery; predecessor replay, snapshot, tail, and preserve reachability remains W008 subtraction work.
-    non_effects: [No activity hash chain., No pruning., No checkpoint framework.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:docs/v2-simplification-phase5-evidence.md#implemented-distinction, path:docs/v2-simplification-phase5-evidence.md#evidence-status, command:uv run pytest -q tests/vellis/test_domain_v2.py tests/vellis/test_canonical_encoding_v2.py tests/vellis/test_storage_v2.py tests/vellis/test_query_v2_successor.py tests/vellis/test_change_draft_v2.py tests/vellis/test_history_recovery_v2.py, command:just lint, command:just typecheck, command:just model-check, command:just model-reference-check, command:just system-evolution-check]
-    blocker: null
-    checkpoint: git:93a97fd73118caae68ea0d1d31aa329aa2f0400d
-  # Phase 5 clean review pair inspected shared staged tree token
-  # d4290550755b4c93e5f5d3f11fdffbfbddd48547, preserved by checkpoint
-  # git:93a97fd73118caae68ea0d1d31aa329aa2f0400d.
-  # /root/phase5_authority_review_6 — authority and conformance — clean.
-  # /root/phase5_engineering_review_6 — engineering and evidence — clean.
-  # Manager independently passed F821, lint, typecheck, 243 successor tests,
-  # C901 <= 10, model/reference/evolution checks, and staged diff validation.
-  - id: W006
-    order: 7
-    label: Implement streamed v1 initialization
-    kind: implementation
-    dependencies: [W005]
-    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: [F007]
-    decision_ids: [D007]
-    authority: [{refs: [owner-plan:phase-6], coverage: full, remaining_work_item_ids: []}]
-    approval: {status: not-required, reason: The approved plan selects one first-use compatibility path., checkpoint: null}
-    nearest_wrong_system: Import silently loses data or retains the whole graph.
-    compatibility_effect: One v1 snapshot initializes v2; no v1 history or storage migration.
-    non_effects: [No v1 storage open., No in-place migration., No date inference.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_v1_import_v2.py#test_preview_and_confirm_publish_exact_audited_revision_zero, path:docs/v2-simplification-phase6-evidence.md#evidence-status, path:docs/v1-initialization.md#export-without-exposing-v1-storage-to-v2]
-    blocker: null
-    checkpoint: git:9f57ab0138ea919829c6c3f8baf96dfe62e2554a
-  # Phase 6 clean review pair inspected shared staged tree token
-  # d7f1b578d430a9a26184b32c7aa341b490e3777e, preserved by checkpoint
-  # git:9f57ab0138ea919829c6c3f8baf96dfe62e2554a.
-  # /root/phase6_authority_review_9 — authority and conformance — clean.
-  # /root/phase6_engineering_review_9 — engineering and evidence — clean.
-  # Manager independently passed F821, lint, typecheck, 459 successor tests,
-  # C901 <= 10, model/reference/evolution/skills checks, and staged diff validation.
-  - id: W007
-    order: 8
-    label: Implement MCP, transports, setup, and client onboarding
-    kind: integration
-    dependencies: [W006]
-    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: [F008]
-    decision_ids: [D008]
-    authority: [{refs: [owner-plan:phase-7], coverage: full, remaining_work_item_ids: []}]
-    approval: {status: not-required, reason: "The approved plan fixes dependencies, transports, commands, and client boundaries.", checkpoint: null}
-    nearest_wrong_system: Public paths depend on private hooks, shared SQLite, config edits, or exposed tokens.
-    compatibility_effect: Old aliases and private framework behavior are removed.
-    non_effects: [No TLS or OAuth., No daemon., No client config parsing.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_every_selected_tool_reaches_one_successor_operation, path:tests/vellis/test_mcp_lifecycle_v2.py#test_discovered_schemas_encode_bounds_and_kind_compatible_scalars, path:tests/vellis/test_mcp_lifecycle_v2.py#test_conditional_wire_shapes_fail_before_operation_or_activity, path:tests/vellis/test_mcp_lifecycle_v2.py#test_direct_json_null_is_rejected_for_every_omissible_wire_member, path:tests/vellis/test_mcp_lifecycle_v2.py#test_nested_wire_model_optional_member_inventory_rejects_direct_null, path:tests/vellis/test_mcp_lifecycle_v2.py#test_semantically_dirty_definitions_stage_and_validate_without_adapter_failure, path:tests/vellis/test_mcp_lifecycle_v2.py#test_explicit_empty_allowed_values_survive_draft_inspection_and_validation, path:tests/vellis/test_mcp_lifecycle_v2.py#test_json_native_nested_enums_reach_operations, path:tests/vellis/test_mcp_lifecycle_v2.py#test_unknown_wire_member_is_invalid_arguments_not_domain_result, path:tests/vellis/test_mcp_lifecycle_v2.py#test_real_stdio_initialize_list_and_call, path:tests/vellis/test_mcp_lifecycle_v2.py#test_real_token_protected_http_initialize_list_and_call, path:tests/vellis/test_mcp_lifecycle_v2.py#test_real_loopback_http_without_token_initialize_list_and_call, path:tests/vellis/test_mcp_lifecycle_v2.py#test_token_file_bytes_are_exact_and_never_whitespace_normalized, path:tests/vellis/test_mcp_lifecycle_v2.py#test_server_startup_failures_name_stage_action_and_leave_memory_unchanged, path:tests/vellis/test_mcp_lifecycle_v2.py#test_setup_parser_has_no_unselected_yes_option, path:tests/vellis/test_mcp_lifecycle_v2.py#test_setup_rejects_context_incompatible_v1_flags_without_effects, path:tests/vellis/test_mcp_lifecycle_v2.py#test_interactive_setup_explicitly_offers_each_non_v1_mode, path:tests/vellis/test_mcp_lifecycle_v2.py#test_interactive_v1_previews_and_binds_exact_confirmation_digests, path:tests/vellis/test_mcp_lifecycle_v2.py#test_http_setup_with_selected_client_prints_ordered_secret_free_next_steps, path:tests/vellis/test_mcp_lifecycle_v2.py#test_reachable_http_setup_registers_selected_client_when_environment_is_ready, path:tests/vellis/test_mcp_lifecycle_v2.py#test_guided_http_setup_and_rotation_never_print_or_store_token, path:tests/vellis/test_mcp_lifecycle_v2.py#test_token_permissions_are_fixed_before_atomic_publication, path:tests/vellis/test_mcp_lifecycle_v2.py#test_post_publication_token_durability_failure_says_token_changed, path:tests/vellis/test_mcp_lifecycle_v2.py#test_client_replacement_probes_before_remove_and_reports_recovery, path:tests/vellis/test_mcp_lifecycle_v2.py#test_add_invocation_exception_after_removal_reports_changed_state_and_recovery, path:tests/vellis/test_mcp_lifecycle_v2.py#test_existing_client_requires_replace_without_external_mutation, path:tests/vellis/test_mcp_lifecycle_v2.py#test_successful_add_with_failed_final_probe_reports_changed_unconfirmed_readiness, path:tests/vellis/test_mcp_lifecycle_v2.py#test_claude_http_registration_checks_public_help_and_keeps_token_out_of_argv, path:tests/vellis/test_mcp_lifecycle_v2.py#test_claude_http_refuses_help_that_only_mentions_headers, command:just package-check, path:docs/http-operation.md#http-operation, path:docs/v2-simplification-phase7-evidence.md#evidence-status]
-    blocker: null
-    checkpoint: git:cad469a51bd0b991d83ef80c034e5639ad958557
-  # Phase 7 clean review pair on staged tree
-  # ab94a13005dfd1545e18f9390a201e3078222d09:
-  # /root/phase7_authority_review_11 — authority and conformance — clean.
-  # /root/phase7_engineering_review_11 — engineering and evidence — clean.
-  # Manager independently passed F821, lint, typecheck, 553 successor tests,
-  # C901 <= 10, package, model/reference/evolution/skills, and staged diff checks.
-  - id: W008
-    order: 9
-    label: Subtract predecessor machinery, synchronize documentation, and close
+    order: 3
+    label: Validate owner narratives and close the pre-release evolution
     kind: closure
-    dependencies: [W007]
-    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: [F002, F003, F004, F006, F010]
-    decision_ids: [D009]
-    authority: [{refs: [owner-plan:phase-8], coverage: full, remaining_work_item_ids: []}]
-    approval: {status: not-required, reason: Closure removes superseded paths and aligns claims., checkpoint: null}
-    nearest_wrong_system: Runtime passes while old paths, tests, claims, or campaign gates remain.
-    compatibility_effect: The unreleased branch exposes only rebaselined v2.
-    non_effects: [No campaign-engine redesign., No deferred placeholders., No protected user-data access.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:tests/test_repository_policy.py#test_ordinary_check_excludes_inactive_campaign_gate, path:tests/test_repository_policy.py#test_unreleased_predecessor_modules_are_absent, path:tests/vellis/test_query_v2_successor.py#test_property_predicate_closed_set, path:tests/vellis/test_query_v2_successor.py#test_null_presence_and_date_timestamp_number_ordering_are_distinct, path:tests/vellis/test_change_draft_v2.py#test_one_activation_reserves_all_new_graph_identities_before_dependents, path:tests/vellis/test_change_draft_v2.py#test_one_activation_reserves_all_new_type_keys_before_dependencies, path:tests/vellis/test_change_draft_v2.py#test_resolved_removal_validates_complete_local_cardinality_peers, path:tests/vellis/test_v1_import_v2.py#test_public_v1_empty_property_descriptions_are_reported_conversions, path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements, path:docs/v2-simplification-phase8-evidence.md#documentation-synchronization, path:docs/v2-simplification-phase8-evidence.md#black-box-scenarios, path:docs/v2-simplification-phase8-evidence.md#final-gates, path:docs/backup-restore.md#backup-and-restore, path:docs/http-operation.md#reconcile-a-lost-mutation-response]
+    dependencies: [W002]
+    planned_baseline: {dimension: implementation, identity: "git:7d007fd0b7e2ac6e8671bc297400f1490dd03a62"}
+    finding_ids: [F007]
+    decision_ids: [D005]
+    authority:
+      - refs: [owner-plan:Vellis-v2-Pre-release-Closure-Correction-Plan]
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: Closure applies the approved evidence protocol without changing product meaning.
+      checkpoint: null
+    nearest_wrong_system: Green internal tests conceal an owner workflow recovery packaging or public-boundary failure.
+    compatibility_effect: No public compatibility change beyond W002 diagnostic precision.
+    non_effects: [Do not commit prompts or transcripts., Do not invent performance thresholds or speculative features.]
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
     blocker: null
-    checkpoint: git:4612c0df3e9671d6e3a6c0843143e20242122af4
-  # Final clean review pair on staged tree
-  # 402fdbf65a3bcf429350e806a9bfcc9fd614bde2:
-  # /root/phase8_authority_review_3 — authority and conformance — clean.
-  # /root/phase8_engineering_review_3 — engineering and evidence — clean.
-  # Manager independently passed every final gate, including 789 tests,
-  # wheel/sdist package checks, ordinary just check, and subtraction inventories.
+    checkpoint: null
 closure:
-  finding_disposition: complete
-  model_status: accepted
-  implementation_status: conforming
-  integration_status: conforming
-  external_status: conforming
-  compatibility: The unreleased prototype-v2 model, database, API, proposal, query, replay, aliases, and private framework boundaries intentionally break.
+  finding_disposition: open
+  model_status: not evaluated
+  implementation_status: not evaluated
+  integration_status: not evaluated
+  external_status: not evaluated
+  compatibility: Runtime starter content and public inventories remain stable; only finding paths are intentionally sharpened.
   reviews:
-    - lens: authority and conformance
-      status: clean
-      reviewer: /root/phase8_authority_review_3
-      checkpoint: git:4612c0df3e9671d6e3a6c0843143e20242122af4
-      evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#final-gates, command:just check]
-    - lens: engineering and evidence
-      status: clean
-      reviewer: /root/phase8_engineering_review_3
-      checkpoint: git:4612c0df3e9671d6e3a6c0843143e20242122af4
-      evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements, command:just package-check]
-  evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#black-box-scenarios, path:docs/v2-simplification-phase8-evidence.md#final-gates, command:just check]
-  checkpoint: git:4612c0df3e9671d6e3a6c0843143e20242122af4
+    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+  evidence_refs: []
+  checkpoint: null
