@@ -3,11 +3,11 @@ evolution:
   id: vellis-2-pre-release-closure-corrections
   objective: Close bounded pre-release diagnostic, simplicity, evidence, and authority findings without reopening the v2 design.
   observable_distinction: Agents receive repairable exact finding paths, every public bound has one authority, and release evidence discriminates the remaining plausible wrong systems without new product machinery.
-  lifecycle: awaiting-approval
+  lifecycle: active
   approval:
-    status: pending
+    status: accepted
     reason: The owner-approved closure plan changes starter-count and finding-location authority before implementation proceeds.
-    checkpoint: null
+    checkpoint: git:c4a9caa4175b3da1ee0ee69ecbaa3e3cd3e974c5
   blocker: null
   checkpoint: null
 baselines:
@@ -18,8 +18,13 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
     checkpoint: git:7d007fd0b7e2ac6e8671bc297400f1490dd03a62
-  target: null
-  observed: *source
+  target: &target
+    model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
+    implementation: git:c4a9caa4175b3da1ee0ee69ecbaa3e3cd3e974c5
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
+    checkpoint: git:c4a9caa4175b3da1ee0ee69ecbaa3e3cd3e974c5
+  observed: *target
 scope:
   authority_scope:
     - owner-plan:Vellis-v2-Pre-release-Closure-Correction-Plan
@@ -55,9 +60,9 @@ findings:
     consequence: Redundant totals freeze an inventory already established by named modeled definitions and make intentional vocabulary evolution unnecessarily contradictory.
     authority_refs: [EverydayLifeStarter::'Everyday Life Starter Definition Set', VellisRequirements::starter, VellisVerification::'Starter Is Small Typed And Optional']
     evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:tests/vellis/test_storage_v2.py#test_starter_has_exact_small_typed_vocabulary_and_no_graph]
-    disposition: model-change
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: The named starter remains complete but authority rejects it solely because a redundant aggregate count changed.
     compatibility_effect: Runtime starter content remains semantically unchanged.
   - id: F002
@@ -66,9 +71,9 @@ findings:
     consequence: Several affected subjects may legally collapse to one positional path, forcing an agent to rediscover which dependent needs repair.
     authority_refs: [RTG::'Validation Finding', VellisRequirements::mcpBoundary, VellisVerification::'Inspect Validate Activate And Discard Draft']
     evidence_refs: [path:docs/v2-simplification-phase4-evidence.md#evidence-status, path:tests/vellis/test_domain_v2.py#test_dynamic_domain_finding_paths_are_rfc6901_pointers]
-    disposition: model-change
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Findings name a missing referent but not the independently repairable request member or affected-state subject.
     compatibility_effect: Existing fields and finding codes remain; only path precision is strengthened.
   - id: F003
@@ -222,7 +227,7 @@ work_items:
     label: Correct and accept affected model authority
     kind: modeling
     dependencies: []
-    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
+    planned_baseline: {dimension: model, identity: "sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc"}
     finding_ids: [F001, F002]
     decision_ids: []
     authority:
@@ -233,15 +238,19 @@ work_items:
         coverage: partial
         remaining_work_item_ids: [W002]
     approval:
-      status: pending
+      status: accepted
       reason: The owner approved the exact starter and finding-location authority changes in the closure plan.
-      checkpoint: null
+      checkpoint: git:c4a9caa4175b3da1ee0ee69ecbaa3e3cd3e974c5
     nearest_wrong_system: The model removes useful named starter content or still permits indistinguishable affected-state subjects.
     compatibility_effect: Runtime starter content and wire fields remain unchanged; diagnostic paths become more precise in W002.
     non_effects: [Preserve every named starter definition property endpoint nested bound and runtime value., Add no model element public field finding code or operation.]
-    lifecycle: pending
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: active
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_storage_v2.py#test_starter_has_exact_small_typed_vocabulary_and_no_graph
+      - command:just model-check
+      - command:just model-reference-check
+      - command:just system-evolution-check
     blocker: null
     checkpoint: null
   - id: W002

@@ -36,72 +36,68 @@ package EverydayLifeStarter {
          * The complete optional recommended fresh vocabulary. It contains no
          * graph data and is not a protected ontology or later installer.
          */
-        item starterAnchorTypes [12] redefines anchorTypes;
-        item starterAssociatedDataTypes [12] redefines associatedDataTypes;
-        item starterLinkTypes [9] redefines linkTypes;
-
-        item personType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item personType [1] : 'Anchor Type Definition' subsets anchorTypes {
             attribute :>> typeKey = "life.person";
             attribute :>> description =
                 "A person known to the owner. Use the anchor display name for the person's name.";
         }
-        item groupType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item groupType [1] : 'Anchor Type Definition' subsets anchorTypes {
             attribute :>> typeKey = "life.group";
             attribute :>> description =
                 "A household, family, team, organization, or community. Use the anchor display name for its name.";
         }
-        item areaType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item areaType [1] : 'Anchor Type Definition' subsets anchorTypes {
             attribute :>> typeKey = "life.area";
             attribute :>> description =
                 "An ongoing sphere of responsibility such as health, home, family, finances, or work. Use the anchor display name for its title.";
         }
-        item goalType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item goalType [1] : 'Anchor Type Definition' subsets anchorTypes {
             attribute :>> typeKey = "life.goal";
             attribute :>> description =
                 "An outcome the owner wants to achieve. Use the anchor display name for its title.";
         }
-        item projectType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item projectType [1] : 'Anchor Type Definition' subsets anchorTypes {
             attribute :>> typeKey = "life.project";
             attribute :>> description =
                 "A coordinated body of work with a desired outcome. Use the anchor display name for its title.";
         }
-        item taskType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item taskType [1] : 'Anchor Type Definition' subsets anchorTypes {
             attribute :>> typeKey = "life.task";
             attribute :>> description =
                 "A discrete piece of work. Use the anchor display name for its title.";
         }
-        item eventType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item eventType [1] : 'Anchor Type Definition' subsets anchorTypes {
             attribute :>> typeKey = "life.event";
             attribute :>> description =
                 "An occurrence the owner wants to remember. Use the anchor display name for its title.";
         }
-        item routineType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item routineType [1] : 'Anchor Type Definition' subsets anchorTypes {
             attribute :>> typeKey = "life.routine";
             attribute :>> description =
                 "A recurring responsibility or practice. Use the anchor display name for its title.";
         }
-        item decisionType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item decisionType [1] : 'Anchor Type Definition' subsets anchorTypes {
             attribute :>> typeKey = "life.decision";
             attribute :>> description =
                 "A decision whose outcome or reasoning matters later. Use the anchor display name for its title.";
         }
-        item noteType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item noteType [1] : 'Anchor Type Definition' subsets anchorTypes {
             attribute :>> typeKey = "life.note";
             attribute :>> description =
                 "A captured piece of knowledge or observation. Use the anchor display name for its title.";
         }
-        item resourceType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item resourceType [1] : 'Anchor Type Definition' subsets anchorTypes {
             attribute :>> typeKey = "life.resource";
             attribute :>> description =
                 "A useful source, object, or reference. Use the anchor display name for its title.";
         }
-        item placeType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item placeType [1] : 'Anchor Type Definition' subsets anchorTypes {
             attribute :>> typeKey = "life.place";
             attribute :>> description =
                 "A place relevant to the owner's life. Use the anchor display name for its name.";
         }
 
-        item personDetails [1] : 'Starter Details Type' subsets starterAssociatedDataTypes {
+        item personDetails [1] : 'Starter Details Type' subsets associatedDataTypes {
             attribute :>> typeKey = "life.person.details";
             attribute :>> description =
                 "Optional current everyday details about one Person; other independently typed data may also describe that Person.";
@@ -120,7 +116,7 @@ package EverydayLifeStarter {
                 attribute :>> description = "Additional owner-provided notes about the person.";
             }
         }
-        item groupDetails [1] : 'Starter Details Type' subsets starterAssociatedDataTypes {
+        item groupDetails [1] : 'Starter Details Type' subsets associatedDataTypes {
             attribute :>> typeKey = "life.group.details";
             attribute :>> description = "Optional current everyday details about one Group.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = groupType;
@@ -132,7 +128,7 @@ package EverydayLifeStarter {
                 attribute :>> name = "description"; attribute :>> description = "A description of the group.";
             }
         }
-        item areaDetails [1] : 'Starter Details Type' subsets starterAssociatedDataTypes {
+        item areaDetails [1] : 'Starter Details Type' subsets associatedDataTypes {
             attribute :>> typeKey = "life.area.details";
             attribute :>> description = "Optional current everyday details about one Area.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = areaType;
@@ -147,7 +143,7 @@ package EverydayLifeStarter {
                 attribute :>> name = "active"; attribute :>> description = "Whether the Area is currently active when known.";
             }
         }
-        item goalDetails [1] : 'Starter Details Type' subsets starterAssociatedDataTypes {
+        item goalDetails [1] : 'Starter Details Type' subsets associatedDataTypes {
             attribute :>> typeKey = "life.goal.details";
             attribute :>> description = "Optional current everyday details about one Goal.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = goalType;
@@ -165,7 +161,7 @@ package EverydayLifeStarter {
                 attribute :>> name = "desiredOutcome"; attribute :>> description = "The desired outcome of the Goal.";
             }
         }
-        item projectDetails [1] : 'Starter Details Type' subsets starterAssociatedDataTypes {
+        item projectDetails [1] : 'Starter Details Type' subsets associatedDataTypes {
             attribute :>> typeKey = "life.project.details";
             attribute :>> description = "Optional current everyday details about one Project.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = projectType;
@@ -183,7 +179,7 @@ package EverydayLifeStarter {
                 attribute :>> name = "nextReviewDate"; attribute :>> description = "The next Project review date.";
             }
         }
-        item taskDetails [1] : 'Starter Details Type' subsets starterAssociatedDataTypes {
+        item taskDetails [1] : 'Starter Details Type' subsets associatedDataTypes {
             attribute :>> typeKey = "life.task.details";
             attribute :>> description = "Optional current everyday details about one Task.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = taskType;
@@ -201,7 +197,7 @@ package EverydayLifeStarter {
                 attribute :>> name = "context"; attribute :>> description = "Owner-provided context for completing the Task.";
             }
         }
-        item eventDetails [1] : 'Starter Details Type' subsets starterAssociatedDataTypes {
+        item eventDetails [1] : 'Starter Details Type' subsets associatedDataTypes {
             attribute :>> typeKey = "life.event.details";
             attribute :>> description = "Optional current everyday details about one Event.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = eventType;
@@ -219,7 +215,7 @@ package EverydayLifeStarter {
                 attribute :>> name = "summary"; attribute :>> description = "A concise summary of the Event.";
             }
         }
-        item routineDetails [1] : 'Starter Details Type' subsets starterAssociatedDataTypes {
+        item routineDetails [1] : 'Starter Details Type' subsets associatedDataTypes {
             attribute :>> typeKey = "life.routine.details";
             attribute :>> description = "Optional current everyday details about one Routine.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = routineType;
@@ -237,7 +233,7 @@ package EverydayLifeStarter {
                 attribute :>> name = "context"; attribute :>> description = "Owner-provided context for carrying out the Routine.";
             }
         }
-        item decisionDetails [1] : 'Starter Details Type' subsets starterAssociatedDataTypes {
+        item decisionDetails [1] : 'Starter Details Type' subsets associatedDataTypes {
             attribute :>> typeKey = "life.decision.details";
             attribute :>> description = "Optional current everyday details about one Decision.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = decisionType;
@@ -252,7 +248,7 @@ package EverydayLifeStarter {
                 attribute :>> name = "rationale"; attribute :>> description = "The recorded rationale for the Decision.";
             }
         }
-        item noteDetails [1] : 'Starter Details Type' subsets starterAssociatedDataTypes {
+        item noteDetails [1] : 'Starter Details Type' subsets associatedDataTypes {
             attribute :>> typeKey = "life.note.details";
             attribute :>> description = "Optional current everyday details about one Note.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = noteType;
@@ -267,7 +263,7 @@ package EverydayLifeStarter {
                 attribute :>> name = "captureDate"; attribute :>> description = "The Note capture date.";
             }
         }
-        item resourceDetails [1] : 'Starter Details Type' subsets starterAssociatedDataTypes {
+        item resourceDetails [1] : 'Starter Details Type' subsets associatedDataTypes {
             attribute :>> typeKey = "life.resource.details";
             attribute :>> description = "Optional current everyday details about one Resource.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = resourceType;
@@ -282,7 +278,7 @@ package EverydayLifeStarter {
                 attribute :>> name = "summary"; attribute :>> description = "A concise summary of the Resource.";
             }
         }
-        item placeDetails [1] : 'Starter Details Type' subsets starterAssociatedDataTypes {
+        item placeDetails [1] : 'Starter Details Type' subsets associatedDataTypes {
             attribute :>> typeKey = "life.place.details";
             attribute :>> description = "Optional current everyday details about one Place.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = placeType;
@@ -298,7 +294,7 @@ package EverydayLifeStarter {
             }
         }
 
-        item belongsTo [1] : 'Starter Link Type' subsets starterLinkTypes {
+        item belongsTo [1] : 'Starter Link Type' subsets linkTypes {
             attribute :>> typeKey = "life.belongs_to";
             attribute :>> description = "Connects work or knowledge to the Area it belongs to.";
             ref item sources [8] redefines permittedSourceTypes;
@@ -312,7 +308,7 @@ package EverydayLifeStarter {
             ref item resourceSource [1] subsets sources = resourceType;
             ref item target [1] redefines permittedTargetTypes = areaType;
         }
-        item supports [1] : 'Starter Link Type' subsets starterLinkTypes {
+        item supports [1] : 'Starter Link Type' subsets linkTypes {
             attribute :>> typeKey = "life.supports";
             attribute :>> description = "Connects work or knowledge to a Goal or Project it supports.";
             ref item sources [7] redefines permittedSourceTypes;
@@ -327,7 +323,7 @@ package EverydayLifeStarter {
             ref item goalTarget [1] subsets targets = goalType;
             ref item projectTarget [1] subsets targets = projectType;
         }
-        item responsibleFor [1] : 'Starter Link Type' subsets starterLinkTypes {
+        item responsibleFor [1] : 'Starter Link Type' subsets linkTypes {
             attribute :>> typeKey = "life.responsible_for";
             attribute :>> description = "Connects a Person or Group to an Area or work item for which it is responsible.";
             ref item sources [2] redefines permittedSourceTypes;
@@ -341,13 +337,13 @@ package EverydayLifeStarter {
             ref item eventTarget [1] subsets targets = eventType;
             ref item routineTarget [1] subsets targets = routineType;
         }
-        item memberOf [1] : 'Starter Link Type' subsets starterLinkTypes {
+        item memberOf [1] : 'Starter Link Type' subsets linkTypes {
             attribute :>> typeKey = "life.member_of";
             attribute :>> description = "Connects a Person to a Group of which the Person is a member.";
             ref item source [1] redefines permittedSourceTypes = personType;
             ref item target [1] redefines permittedTargetTypes = groupType;
         }
-        item involves [1] : 'Starter Link Type' subsets starterLinkTypes {
+        item involves [1] : 'Starter Link Type' subsets linkTypes {
             attribute :>> typeKey = "life.involves";
             attribute :>> description = "Connects a Goal, Project, Task, Event, Routine, or Decision to a participating Person or Group.";
             ref item sources [6] redefines permittedSourceTypes;
@@ -361,7 +357,7 @@ package EverydayLifeStarter {
             ref item personTarget [1] subsets targets = personType;
             ref item groupTarget [1] subsets targets = groupType;
         }
-        item locatedAt [1] : 'Starter Link Type' subsets starterLinkTypes {
+        item locatedAt [1] : 'Starter Link Type' subsets linkTypes {
             attribute :>> typeKey = "life.located_at";
             attribute :>> description = "Connects a Task, Event, Routine, or Group to a Place where it occurs or is located.";
             ref item sources [4] redefines permittedSourceTypes;
@@ -371,7 +367,7 @@ package EverydayLifeStarter {
             ref item groupSource [1] subsets sources = groupType;
             ref item target [1] redefines permittedTargetTypes = placeType;
         }
-        item documents [1] : 'Starter Link Type' subsets starterLinkTypes {
+        item documents [1] : 'Starter Link Type' subsets linkTypes {
             attribute :>> typeKey = "life.documents";
             attribute :>> description = "Connects a Note or Resource to an everyday item it documents.";
             ref item sources [2] redefines permittedSourceTypes;
@@ -391,7 +387,7 @@ package EverydayLifeStarter {
             ref item resourceTarget [1] subsets targets = resourceType;
             ref item placeTarget [1] subsets targets = placeType;
         }
-        item mentions [1] : 'Starter Link Type' subsets starterLinkTypes {
+        item mentions [1] : 'Starter Link Type' subsets linkTypes {
             attribute :>> typeKey = "life.mentions";
             attribute :>> description = "Connects a Note to an everyday item it mentions.";
             ref item source [1] redefines permittedSourceTypes = noteType;
@@ -409,7 +405,7 @@ package EverydayLifeStarter {
             ref item resourceTarget [1] subsets targets = resourceType;
             ref item placeTarget [1] subsets targets = placeType;
         }
-        item dependsOn [1] : 'Starter Link Type' subsets starterLinkTypes {
+        item dependsOn [1] : 'Starter Link Type' subsets linkTypes {
             attribute :>> typeKey = "life.depends_on";
             attribute :>> description = "Connects a Goal, Project, or Task to another Goal, Project, or Task on which it depends.";
             ref item sources [3] redefines permittedSourceTypes;

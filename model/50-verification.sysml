@@ -178,6 +178,10 @@ package VellisVerification {
              * every deterministic finding without reassessment, repair, and
              * validate again; show current/draft continuations expire on their
              * exact relevant changes and clean=false remains accepted. Invalid
+             * definition state with several definitions referencing one removed
+             * key shall identify every dependent by its separately escaped keyed
+             * path while retaining the removed key as the missing reference, so
+             * every dependent is independently repairable.
              * activation preserves live and draft, publishes latest findings, and
              * records rejection. Valid effective activation revalidates latest
              * state and makes exactly one revision. Valid redundant activation
@@ -279,12 +283,12 @@ package VellisVerification {
             doc /*
              * Require confirmation for blank and recommended preselected starter.
              * Blank yields no definitions. Starter yields exactly its modeled
-             * twelve anchor keys, corresponding twelve details types with unchanged
-             * property names/descriptions, nine link keys/descriptions/endpoints,
+             * named anchor, details, and link definitions with unchanged property
+             * names, descriptions, and endpoints,
              * no graph objects, no separate multiplicity objects, details bounds
              * 1..1 and 0..1, and link bounds 0..unbounded. Show all properties are
-             * optional non-nullable, Boolean properties remain Boolean, and the
-             * eight selected date properties accept valid leap dates while rejecting
+             * optional non-nullable, Boolean properties remain Boolean, and its
+             * selected date properties accept valid leap dates while rejecting
              * invalid calendar dates or lexical forms. Backup and v1 starts add no
              * starter and an existing system has no starter-install operation.
              */

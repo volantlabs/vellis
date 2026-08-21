@@ -312,6 +312,12 @@ package VellisRequirements {
          * rejection omits purpose payload unless invalid activation explicitly
          * returns its validation page. A well-formed semantic refusal returns accepted or
          * rejected outcome meaning with concise summary and typed findings.
+         * An optional finding path shall identify the exact request member or
+         * affected-state subject. Public JSON paths shall be RFC 6901 pointers,
+         * with the empty string denoting the whole request. Definition-scoped
+         * affected-state paths shall use /definitions/<escaped-type-key>/... .
+         * Relevant missing, conflicting, or affected identities remain in the
+         * finding's type-key and UUID references.
          * Unexpected runtime or transport failure is an MCP error. Complete
          * response construction shall precede commit, and loss after commit shall
          * never claim rollback. Tool descriptions shall guide cold discovery,
@@ -361,8 +367,8 @@ package VellisRequirements {
         doc /*
          * Fresh setup shall offer blank and the recommended preselected Everyday
          * Life vocabulary and require confirmation. The starter shall contain
-         * exactly the modeled twelve anchors, corresponding twelve details types
-         * with preserved property vocabulary, nine link types and endpoint sets,
+         * exactly its modeled named anchor, details, and link definitions with
+         * preserved property vocabulary and endpoint sets,
          * no graph data, details bounds 1..1 anchors per object and 0..1 objects
          * per anchor, and link bounds 0..unbounded at both ends. Its selected date
          * properties shall be true dates and all properties optional non-nullable.

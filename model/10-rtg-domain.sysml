@@ -436,6 +436,13 @@ package RTG {
         attribute summary : ScalarValues::String;
         attribute typeKeys [*] ordered : 'Type Key';
         attribute uuids [*] ordered : 'Graph UUID';
+        doc /*
+         * When present, path identifies the exact request member or affected-state
+         * subject. Public JSON paths are RFC 6901 pointers and the empty string
+         * denotes the whole request. A definition-scoped affected-state path uses
+         * /definitions/<escaped-type-key>/... . Relevant missing, conflicting,
+         * or affected identities remain in typeKeys or uuids.
+         */
     }
     item def 'Operation Outcome' {
         attribute status : 'Operation Status';
