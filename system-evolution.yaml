@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:5196bb01fedb90c815ae15f40cddb041fc915d01
   target: &phase7_target
     model: sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794
-    implementation: git:9f57ab0138ea919829c6c3f8baf96dfe62e2554a
+    implementation: git:cad469a51bd0b991d83ef80c034e5639ad958557
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:9f57ab0138ea919829c6c3f8baf96dfe62e2554a
+    checkpoint: git:cad469a51bd0b991d83ef80c034e5639ad958557
   observed: *phase7_target
 scope:
   authority_scope:
@@ -459,11 +459,17 @@ work_items:
     nearest_wrong_system: Public paths depend on private hooks, shared SQLite, config edits, or exposed tokens.
     compatibility_effect: Old aliases and private framework behavior are removed.
     non_effects: [No TLS or OAuth., No daemon., No client config parsing.]
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_every_selected_tool_reaches_one_successor_operation, path:tests/vellis/test_mcp_lifecycle_v2.py#test_discovered_schemas_encode_bounds_and_kind_compatible_scalars, path:tests/vellis/test_mcp_lifecycle_v2.py#test_conditional_wire_shapes_fail_before_operation_or_activity, path:tests/vellis/test_mcp_lifecycle_v2.py#test_direct_json_null_is_rejected_for_every_omissible_wire_member, path:tests/vellis/test_mcp_lifecycle_v2.py#test_nested_wire_model_optional_member_inventory_rejects_direct_null, path:tests/vellis/test_mcp_lifecycle_v2.py#test_semantically_dirty_definitions_stage_and_validate_without_adapter_failure, path:tests/vellis/test_mcp_lifecycle_v2.py#test_explicit_empty_allowed_values_survive_draft_inspection_and_validation, path:tests/vellis/test_mcp_lifecycle_v2.py#test_json_native_nested_enums_reach_operations, path:tests/vellis/test_mcp_lifecycle_v2.py#test_unknown_wire_member_is_invalid_arguments_not_domain_result, path:tests/vellis/test_mcp_lifecycle_v2.py#test_real_stdio_initialize_list_and_call, path:tests/vellis/test_mcp_lifecycle_v2.py#test_real_token_protected_http_initialize_list_and_call, path:tests/vellis/test_mcp_lifecycle_v2.py#test_real_loopback_http_without_token_initialize_list_and_call, path:tests/vellis/test_mcp_lifecycle_v2.py#test_token_file_bytes_are_exact_and_never_whitespace_normalized, path:tests/vellis/test_mcp_lifecycle_v2.py#test_server_startup_failures_name_stage_action_and_leave_memory_unchanged, path:tests/vellis/test_mcp_lifecycle_v2.py#test_setup_parser_has_no_unselected_yes_option, path:tests/vellis/test_mcp_lifecycle_v2.py#test_setup_rejects_context_incompatible_v1_flags_without_effects, path:tests/vellis/test_mcp_lifecycle_v2.py#test_interactive_setup_explicitly_offers_each_non_v1_mode, path:tests/vellis/test_mcp_lifecycle_v2.py#test_interactive_v1_previews_and_binds_exact_confirmation_digests, path:tests/vellis/test_mcp_lifecycle_v2.py#test_http_setup_with_selected_client_prints_ordered_secret_free_next_steps, path:tests/vellis/test_mcp_lifecycle_v2.py#test_reachable_http_setup_registers_selected_client_when_environment_is_ready, path:tests/vellis/test_mcp_lifecycle_v2.py#test_guided_http_setup_and_rotation_never_print_or_store_token, path:tests/vellis/test_mcp_lifecycle_v2.py#test_token_permissions_are_fixed_before_atomic_publication, path:tests/vellis/test_mcp_lifecycle_v2.py#test_post_publication_token_durability_failure_says_token_changed, path:tests/vellis/test_mcp_lifecycle_v2.py#test_client_replacement_probes_before_remove_and_reports_recovery, path:tests/vellis/test_mcp_lifecycle_v2.py#test_add_invocation_exception_after_removal_reports_changed_state_and_recovery, path:tests/vellis/test_mcp_lifecycle_v2.py#test_existing_client_requires_replace_without_external_mutation, path:tests/vellis/test_mcp_lifecycle_v2.py#test_successful_add_with_failed_final_probe_reports_changed_unconfirmed_readiness, path:tests/vellis/test_mcp_lifecycle_v2.py#test_claude_http_registration_checks_public_help_and_keeps_token_out_of_argv, path:tests/vellis/test_mcp_lifecycle_v2.py#test_claude_http_refuses_help_that_only_mentions_headers, command:just package-check, path:docs/http-operation.md#http-operation, path:docs/v2-simplification-phase7-evidence.md#evidence-status]
     blocker: null
-    checkpoint: null
+    checkpoint: git:cad469a51bd0b991d83ef80c034e5639ad958557
+  # Phase 7 clean review pair on staged tree
+  # ab94a13005dfd1545e18f9390a201e3078222d09:
+  # /root/phase7_authority_review_11 — authority and conformance — clean.
+  # /root/phase7_engineering_review_11 — engineering and evidence — clean.
+  # Manager independently passed F821, lint, typecheck, 553 successor tests,
+  # C901 <= 10, package, model/reference/evolution/skills, and staged diff checks.
   - id: W008
     order: 9
     label: Subtract predecessor machinery, synchronize documentation, and close
@@ -477,7 +483,7 @@ work_items:
     nearest_wrong_system: Runtime passes while old paths, tests, claims, or campaign gates remain.
     compatibility_effect: The unreleased branch exposes only rebaselined v2.
     non_effects: [No campaign-engine redesign., No deferred placeholders., No protected user-data access.]
-    lifecycle: pending
+    lifecycle: active
     implementation_status: absent
     evidence_refs: []
     blocker: null
