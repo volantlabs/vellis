@@ -27,7 +27,7 @@ from apps.rtg_knowledge_graph.starter_schema import (
 )
 
 JsonObject = dict[str, Any]
-CLIENTS = ("codex", "claude-code", "claude-desktop", "generic-json")
+CLIENTS = ("codex", "claude-code", "claude-desktop", "opencode", "generic-json")
 FIRST_PROMPT = (
     "Help me start using Vellis to remember and organize things across my personal life, "
     "household or family responsibilities, and work. Use the schema already installed. "
@@ -81,6 +81,8 @@ def detected_clients(*, home: Path | None = None) -> tuple[str, ...]:
         detected.append("claude-code")
     if _claude_desktop_config_path(home=home).parent.exists():
         detected.append("claude-desktop")
+    if shutil.which("opencode"):
+        detected.append("opencode")
     return tuple(detected)
 
 
@@ -218,6 +220,8 @@ def register_client(
         )
     if client == "claude-desktop":
         return _merge_desktop_config(server, env=env)
+    if client == "opencode":
+        return _merge_opencode_config(server, env=env)
     if client == "generic-json":
         target = data_dir / "setup" / "mcp-config.json"
         desired = {"mcpServers": {MCP_SERVER_NAME: server}}
@@ -394,6 +398,41 @@ def _merge_desktop_config(server: JsonObject, *, env: Mapping[str, str] | None) 
     return "replaced" if replaced else "configured"
 
 
+def _opencode_config_path(
+    *,
+    home: Path | None = None,
+    env: Mapping[str, str] | None = None,
+) -> Path:
+    user_home = home or _home(env)
+    return user_home / ".config" / "opencode" / "opencode.json"
+
+
+def _to_opencode_server(server: JsonObject) -> JsonObject:
+    command: list[str] = [str(server["command"]), *server.get("args", [])]
+    result: JsonObject = {"type": "local", "command": command, "enabled": True}
+    if isinstance(server.get("cwd"), str):
+        result["cwd"] = server["cwd"]
+    return result
+
+
+def _merge_opencode_config(
+    server: JsonObject, *, env: Mapping[str, str] | None
+) -> str:
+    path = _opencode_config_path(home=_home(env), env=env)
+    value = _read_json(path)
+    servers = value.setdefault("mcp", {})
+    if not isinstance(servers, dict):
+        raise VellisStartupFailed(f"{path} contains a non-object mcp value")
+    opencode_server = _to_opencode_server(server)
+    if servers.get(MCP_SERVER_NAME) == opencode_server:
+        return "already_configured"
+    replaced = MCP_SERVER_NAME in servers
+    _backup(path)
+    servers[MCP_SERVER_NAME] = opencode_server
+    _atomic_json_write(path, value)
+    return "replaced" if replaced else "configured"
+
+
 def _registration_check(
     client: str,
     server: JsonObject,
@@ -412,6 +451,11 @@ def _registration_check(
             value = _read_json(_claude_desktop_config_path(home=_home(env), env=env))
             servers = value.get("mcpServers", {})
             current = servers.get(MCP_SERVER_NAME) if isinstance(servers, dict) else None
+        elif client == "opencode":
+            value = _read_json(_opencode_config_path(home=_home(env), env=env))
+            servers = value.get("mcp", {})
+            current = servers.get(MCP_SERVER_NAME) if isinstance(servers, dict) else None
+            expected = _to_opencode_server(server)
         else:
             path = data_dir / "setup" / "mcp-config.json"
             value = _read_json(path)
