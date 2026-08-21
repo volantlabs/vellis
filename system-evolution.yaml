@@ -18,13 +18,13 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:5196bb01fedb90c815ae15f40cddb041fc915d01
-  target: &phase4_target
+  target: &phase5_target
     model: sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794
-    implementation: git:eba341978d18e4362d4aad875445a7d070ec1d58
+    implementation: git:93a97fd73118caae68ea0d1d31aa329aa2f0400d
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:eba341978d18e4362d4aad875445a7d070ec1d58
-  observed: *phase4_target
+    checkpoint: git:93a97fd73118caae68ea0d1d31aa329aa2f0400d
+  observed: *phase5_target
 scope:
   authority_scope:
     - owner-plan:Vellis-v2-Simplification-Rebaseline
@@ -409,11 +409,18 @@ work_items:
     nearest_wrong_system: Version tables coexist with replay, snapshot APIs, or duplicated mutation payloads.
     compatibility_effect: The Phase 5 successor uses indexed history and SQLite recovery; predecessor replay, snapshot, tail, and preserve reachability remains W008 subtraction work.
     non_effects: [No activity hash chain., No pruning., No checkpoint framework.]
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs: [path:docs/v2-simplification-phase5-evidence.md#implemented-distinction, path:docs/v2-simplification-phase5-evidence.md#evidence-status, command:uv run pytest -q tests/vellis/test_domain_v2.py tests/vellis/test_canonical_encoding_v2.py tests/vellis/test_storage_v2.py tests/vellis/test_query_v2_successor.py tests/vellis/test_change_draft_v2.py tests/vellis/test_history_recovery_v2.py, command:just lint, command:just typecheck, command:just model-check, command:just model-reference-check, command:just system-evolution-check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:93a97fd73118caae68ea0d1d31aa329aa2f0400d
+  # Phase 5 clean review pair inspected shared staged tree token
+  # d4290550755b4c93e5f5d3f11fdffbfbddd48547, preserved by checkpoint
+  # git:93a97fd73118caae68ea0d1d31aa329aa2f0400d.
+  # /root/phase5_authority_review_6 — authority and conformance — clean.
+  # /root/phase5_engineering_review_6 — engineering and evidence — clean.
+  # Manager independently passed F821, lint, typecheck, 243 successor tests,
+  # C901 <= 10, model/reference/evolution checks, and staged diff validation.
   - id: W006
     order: 7
     label: Implement streamed v1 initialization
@@ -427,7 +434,7 @@ work_items:
     nearest_wrong_system: Import silently loses data or retains the whole graph.
     compatibility_effect: One v1 snapshot initializes v2; no v1 history or storage migration.
     non_effects: [No v1 storage open., No in-place migration., No date inference.]
-    lifecycle: pending
+    lifecycle: active
     implementation_status: absent
     evidence_refs: []
     blocker: null
