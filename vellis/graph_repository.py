@@ -46,6 +46,20 @@ def insert_graph_versions(
     return tuple(descriptors)
 
 
+def insert_graph_version(
+    connection: sqlite3.Connection,
+    value: GraphObject,
+    definitions: tuple[TypeDefinition, ...],
+    revision: int,
+) -> tuple[RowDescriptor, ...]:
+    """Insert one object while a streaming initializer owns dependency order."""
+    if _required_system(value).last_changed_revision != revision:
+        raise ValueError("object lastChangedRevision must equal its introducing revision")
+    _reserve_identity(connection, value, revision)
+    definition_map = {definition.type_key: definition for definition in definitions}
+    return tuple(_insert_object(connection, value, definition_map, revision))
+
+
 def graph_descriptors(
     objects: tuple[GraphObject, ...],
     definitions: tuple[TypeDefinition, ...],

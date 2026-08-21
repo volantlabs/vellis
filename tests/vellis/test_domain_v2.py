@@ -37,9 +37,11 @@ from vellis.domain import (
 )
 from vellis.domain_validation import (
     definition_set_findings,
+    graph_cardinality_findings,
     graph_findings,
     property_definition_findings,
     property_value_findings,
+    type_definition_findings,
 )
 
 PERSON_UUID = "12345678-1234-4234-8234-123456789abc"
@@ -57,6 +59,59 @@ def test_uuid_input_accepts_hyphenated_uppercase_and_returns_lowercase() -> None
     ):
         with pytest.raises(ValueError, match="hyphenated UUID"):
             canonical_uuid(malformed)
+
+
+def test_dynamic_domain_finding_paths_are_rfc6901_pointers() -> None:
+    link_type = LinkTypeDefinition(
+        "link/type~key",
+        "Special link.",
+        ("missing/source~type",),
+        ("Person",),
+        Cardinality(0),
+        Cardinality(0),
+        system=SYSTEM,
+    )
+    definition_paths = {
+        finding.path for finding in type_definition_findings(link_type, (), require_system=True)
+    }
+    assert (
+        "/definitions/link~1type~0key/permittedSourceTypeKeys/missing~1source~0type"
+        in definition_paths
+    )
+
+    property_name = "required/property~name"
+    property_paths = {
+        finding.path
+        for finding in property_value_findings(
+            (),
+            (PropertyDefinition(property_name, "Special property.", ValueKind.TEXT, True),),
+            path=f"/objects/{DATA_UUID}/properties",
+        )
+    }
+    assert f"/objects/{DATA_UUID}/properties/required~1property~0name" in property_paths
+
+    data_type = AssociatedDataTypeDefinition(
+        "data/type~key",
+        "Special data.",
+        ("Person",),
+        (),
+        Cardinality(1, 1),
+        Cardinality(0),
+        SYSTEM,
+    )
+    data = AssociatedData(DATA_UUID, data_type.type_key, (PERSON_UUID, LINK_UUID), (), SYSTEM)
+    cardinality_paths = {
+        finding.path
+        for finding in graph_cardinality_findings(
+            (
+                Anchor(PERSON_UUID, "Person", "One", SYSTEM),
+                Anchor(LINK_UUID, "Person", "Two", SYSTEM),
+                data,
+            ),
+            (AnchorTypeDefinition("Person", "A person.", SYSTEM), data_type),
+        )
+    }
+    assert f"/objects/{DATA_UUID}" in cardinality_paths
 
 
 def test_safe_integer_boundaries_are_distinct_from_boolean() -> None:

@@ -17,6 +17,7 @@ from vellis.domain_validation import definition_set_findings, graph_object_findi
 from vellis.draft_repository import load_draft_definitions
 from vellis.draft_sql_overlay import install_draft_graph_overlay
 from vellis.graph_repository import load_graph_objects
+from vellis.json_pointer import append_pointer
 
 _BATCH = 100
 
@@ -170,7 +171,7 @@ def _count_finding(count, bound, label, type_key, uuid):
     return Finding(
         FindingCode.CARDINALITY_VIOLATION,
         f"{label} count {count} is outside {bound.minimum}..{bound.maximum}",
-        f"/objects/{uuid}",
+        append_pointer("/objects", uuid),
         type_keys=(type_key,),
         uuids=(uuid,),
     )
@@ -241,7 +242,7 @@ def _unmaterializable_findings(connection):
         yield Finding(
             FindingCode.MISSING,
             "staged partial object has no live base",
-            f"/objects/{uuid}",
+            append_pointer("/objects", uuid),
             uuids=(uuid,),
         )
 

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import struct
-from collections import Counter
 from collections.abc import Iterable, Mapping
 
 import re2
 
+from vellis.cardinality_validation import graph_cardinality_findings
 from vellis.domain import (
     Anchor,
     AssociatedData,
@@ -27,6 +27,7 @@ from vellis.domain import (
     ValueKind,
     canonical_uuid,
 )
+from vellis.json_pointer import append_pointer as _path
 
 
 def scalar_identity(value: ScalarValue) -> tuple[object, ...]:
@@ -43,8 +44,8 @@ def property_definition_findings(
     definition: PropertyDefinition, *, path: str = ""
 ) -> tuple[Finding, ...]:
     findings: list[Finding] = []
-    _require_nonempty(definition.name, f"{path}/name", "property name", findings)
-    _require_nonempty(definition.description, f"{path}/description", "description", findings)
+    _require_nonempty(definition.name, _path(path, "name"), "property name", findings)
+    _require_nonempty(definition.description, _path(path, "description"), "description", findings)
     _validate_allowed_values(definition, path, findings)
     _validate_value_bounds(definition, path, findings)
     _validate_text_constraints(definition, path, findings)
@@ -58,19 +59,25 @@ def definition_set_findings(
     findings: list[Finding] = []
     by_key: dict[str, TypeDefinition] = {}
     for index, definition in enumerate(values):
-        path = f"/definitions/{index}"
-        _require_nonempty(definition.type_key, f"{path}/typeKey", "type key", findings)
-        _require_nonempty(definition.description, f"{path}/description", "description", findings)
+        path = _path("/definitions", index)
+        _require_nonempty(definition.type_key, _path(path, "typeKey"), "type key", findings)
+        _require_nonempty(
+            definition.description, _path(path, "description"), "description", findings
+        )
         if definition.type_key in by_key:
             findings.append(
-                _finding(FindingCode.DUPLICATE, f"{path}/typeKey", "duplicate type key")
+                _finding(
+                    FindingCode.DUPLICATE,
+                    _path(path, "typeKey"),
+                    "duplicate type key",
+                )
             )
         else:
             by_key[definition.type_key] = definition
         _validate_system(definition.system, path, require_system, findings)
         _validate_definition_content(definition, path, findings)
     for index, definition in enumerate(values):
-        _validate_definition_references(definition, by_key, f"/definitions/{index}", findings)
+        _validate_definition_references(definition, by_key, _path("/definitions", index), findings)
     return _ordered(findings)
 
 
@@ -81,10 +88,10 @@ def type_definition_findings(
     require_system: bool,
 ) -> tuple[Finding, ...]:
     """Validate one definition without materializing the complete definition set."""
-    path = f"/definitions/{definition.type_key}"
+    path = _path("/definitions", definition.type_key)
     findings: list[Finding] = []
-    _require_nonempty(definition.type_key, f"{path}/typeKey", "type key", findings)
-    _require_nonempty(definition.description, f"{path}/description", "description", findings)
+    _require_nonempty(definition.type_key, _path(path, "typeKey"), "type key", findings)
+    _require_nonempty(definition.description, _path(path, "description"), "description", findings)
     _validate_system(definition.system, path, require_system, findings)
     _validate_definition_content(definition, path, findings)
     references = {value.type_key: value for value in referenced_definitions}
@@ -118,29 +125,21 @@ def graph_structure_findings(
     object_map: dict[str, GraphObject] = {}
     findings: list[Finding] = []
     for index, value in enumerate(graph):
-        path = f"/objects/{index}"
+        path = _path("/objects", index)
         _validate_object_header(value, definition_map, path, require_system, findings)
         try:
             canonical = canonical_uuid(value.uuid)
         except ValueError as error:
-            findings.append(_finding(FindingCode.INVALID_VALUE, f"{path}/uuid", str(error)))
+            findings.append(_finding(FindingCode.INVALID_VALUE, _path(path, "uuid"), str(error)))
             continue
         if canonical in object_map:
-            findings.append(_finding(FindingCode.DUPLICATE, f"{path}/uuid", "duplicate UUID"))
+            findings.append(_finding(FindingCode.DUPLICATE, _path(path, "uuid"), "duplicate UUID"))
         else:
             object_map[canonical] = value
     for index, value in enumerate(graph):
-        _validate_object_content(value, definition_map, object_map, f"/objects/{index}", findings)
-    return _ordered(findings)
-
-
-def graph_cardinality_findings(
-    objects: Iterable[GraphObject], definitions: Iterable[TypeDefinition]
-) -> tuple[Finding, ...]:
-    findings: list[Finding] = []
-    _validate_complete_cardinality(
-        tuple(objects), {value.type_key: value for value in definitions}, findings
-    )
+        _validate_object_content(
+            value, definition_map, object_map, _path("/objects", index), findings
+        )
     return _ordered(findings)
 
 
@@ -156,7 +155,7 @@ def graph_object_findings(
     object_map = {item.uuid: item for item in referents}
     object_map[value.uuid] = value
     findings: list[Finding] = []
-    path = f"/objects/{value.uuid}"
+    path = _path("/objects", value.uuid)
     _validate_object_header(value, definition_map, path, require_system, findings)
     _validate_object_content(value, definition_map, object_map, path, findings)
     return _ordered(findings)
@@ -172,8 +171,8 @@ def property_value_findings(
     rules = {definition.name: definition for definition in definitions}
     seen: set[str] = set()
     present: dict[str, ScalarValue | None] = {}
-    for index, (name, value) in enumerate(properties):
-        item_path = f"{path}/{index}"
+    for name, value in properties:
+        item_path = _path(path, name)
         if name in seen:
             findings.append(_finding(FindingCode.DUPLICATE, item_path, "duplicate property name"))
         seen.add(name)
@@ -193,7 +192,11 @@ def property_value_findings(
     for name, rule in rules.items():
         if rule.required and name not in present:
             findings.append(
-                _finding(FindingCode.MISSING, f"{path}/{name}", "required property is absent")
+                _finding(
+                    FindingCode.MISSING,
+                    _path(path, name),
+                    "required property is absent",
+                )
             )
     return _ordered(findings)
 
@@ -205,7 +208,7 @@ def _validate_allowed_values(
         return
     identities: set[tuple[object, ...]] = set()
     for index, value in enumerate(definition.allowed_values):
-        item_path = f"{path}/allowedValues/{index}"
+        item_path = _path(path, "allowedValues", index)
         if value.kind is not definition.value_kind:
             findings.append(
                 _finding(FindingCode.KIND_MISMATCH, item_path, "allowed value has another kind")
@@ -232,7 +235,11 @@ def _validate_value_bounds(
     for label, value in (("minimum", definition.minimum), ("maximum", definition.maximum)):
         if value is not None and value.kind is not definition.value_kind:
             findings.append(
-                _finding(FindingCode.KIND_MISMATCH, f"{path}/{label}", "bound has another kind")
+                _finding(
+                    FindingCode.KIND_MISMATCH,
+                    _path(path, label),
+                    "bound has another kind",
+                )
             )
     if definition.minimum is not None and definition.maximum is not None:
         if _compare(definition.minimum, definition.maximum) > 0:
@@ -257,13 +264,17 @@ def _validate_text_constraints(
     if definition.minimum_length is not None and definition.minimum_length < 0:
         findings.append(
             _finding(
-                FindingCode.INVALID_VALUE, f"{path}/minimumLength", "minimum length is negative"
+                FindingCode.INVALID_VALUE,
+                _path(path, "minimumLength"),
+                "minimum length is negative",
             )
         )
     if definition.maximum_length is not None and definition.maximum_length < 0:
         findings.append(
             _finding(
-                FindingCode.INVALID_VALUE, f"{path}/maximumLength", "maximum length is negative"
+                FindingCode.INVALID_VALUE,
+                _path(path, "maximumLength"),
+                "maximum length is negative",
             )
         )
     if definition.minimum_length is not None and definition.maximum_length is not None:
@@ -276,7 +287,11 @@ def _validate_text_constraints(
             re2.compile(definition.pattern)
         except re2.error:
             findings.append(
-                _finding(FindingCode.INVALID_VALUE, f"{path}/pattern", "invalid RE2 pattern")
+                _finding(
+                    FindingCode.INVALID_VALUE,
+                    _path(path, "pattern"),
+                    "invalid RE2 pattern",
+                )
             )
 
 
@@ -288,21 +303,35 @@ def _validate_definition_content(
             findings.append(
                 _finding(
                     FindingCode.MISSING,
-                    f"{path}/permittedAnchorTypeKeys",
+                    _path(path, "permittedAnchorTypeKeys"),
                     "permitted anchor types are empty",
                 )
             )
         _duplicates(
-            definition.permitted_anchor_type_keys, f"{path}/permittedAnchorTypeKeys", findings
+            definition.permitted_anchor_type_keys,
+            _path(path, "permittedAnchorTypeKeys"),
+            findings,
         )
-        _duplicates((value.name for value in definition.properties), f"{path}/properties", findings)
-        for index, value in enumerate(definition.properties):
-            findings.extend(property_definition_findings(value, path=f"{path}/properties/{index}"))
+        _duplicates(
+            (value.name for value in definition.properties),
+            _path(path, "properties"),
+            findings,
+        )
+        for value in definition.properties:
+            findings.extend(
+                property_definition_findings(value, path=_path(path, "properties", value.name))
+            )
         _validate_cardinality(
-            definition.anchors_per_object, f"{path}/anchorsPerObject", 1, findings
+            definition.anchors_per_object,
+            _path(path, "anchorsPerObject"),
+            1,
+            findings,
         )
         _validate_cardinality(
-            definition.objects_per_anchor, f"{path}/objectsPerAnchor", 0, findings
+            definition.objects_per_anchor,
+            _path(path, "objectsPerAnchor"),
+            0,
+            findings,
         )
     elif isinstance(definition, LinkTypeDefinition):
         _validate_link_definition(definition, path, findings)
@@ -315,7 +344,7 @@ def _validate_link_definition(
         findings.append(
             _finding(
                 FindingCode.MISSING,
-                f"{path}/permittedSourceTypeKeys",
+                _path(path, "permittedSourceTypeKeys"),
                 "permitted source types are empty",
             )
         )
@@ -323,14 +352,22 @@ def _validate_link_definition(
         findings.append(
             _finding(
                 FindingCode.MISSING,
-                f"{path}/permittedTargetTypeKeys",
+                _path(path, "permittedTargetTypeKeys"),
                 "permitted target types are empty",
             )
         )
-    _duplicates(definition.permitted_source_type_keys, f"{path}/permittedSourceTypeKeys", findings)
-    _duplicates(definition.permitted_target_type_keys, f"{path}/permittedTargetTypeKeys", findings)
-    _validate_cardinality(definition.links_per_source, f"{path}/linksPerSource", 0, findings)
-    _validate_cardinality(definition.links_per_target, f"{path}/linksPerTarget", 0, findings)
+    _duplicates(
+        definition.permitted_source_type_keys,
+        _path(path, "permittedSourceTypeKeys"),
+        findings,
+    )
+    _duplicates(
+        definition.permitted_target_type_keys,
+        _path(path, "permittedTargetTypeKeys"),
+        findings,
+    )
+    _validate_cardinality(definition.links_per_source, _path(path, "linksPerSource"), 0, findings)
+    _validate_cardinality(definition.links_per_target, _path(path, "linksPerTarget"), 0, findings)
 
 
 def _validate_definition_references(
@@ -346,7 +383,7 @@ def _validate_definition_references(
                 findings.append(
                     _finding(
                         FindingCode.UNKNOWN,
-                        f"{path}/permittedAnchorTypeKeys",
+                        _path(path, "permittedAnchorTypeKeys", key),
                         "unknown anchor type",
                         type_keys=(key,),
                     )
@@ -355,7 +392,7 @@ def _validate_definition_references(
                 findings.append(
                     _finding(
                         FindingCode.KIND_MISMATCH,
-                        f"{path}/permittedAnchorTypeKeys",
+                        _path(path, "permittedAnchorTypeKeys", key),
                         "permitted type is not an anchor",
                         type_keys=(key,),
                     )
@@ -364,13 +401,13 @@ def _validate_definition_references(
         _validate_endpoint_types(
             definition.permitted_source_type_keys,
             definitions,
-            f"{path}/permittedSourceTypeKeys",
+            _path(path, "permittedSourceTypeKeys"),
             findings,
         )
         _validate_endpoint_types(
             definition.permitted_target_type_keys,
             definitions,
-            f"{path}/permittedTargetTypeKeys",
+            _path(path, "permittedTargetTypeKeys"),
             findings,
         )
 
@@ -385,13 +422,18 @@ def _validate_endpoint_types(
         target = definitions.get(key)
         if target is None:
             findings.append(
-                _finding(FindingCode.UNKNOWN, path, "unknown endpoint type", type_keys=(key,))
+                _finding(
+                    FindingCode.UNKNOWN,
+                    _path(path, key),
+                    "unknown endpoint type",
+                    type_keys=(key,),
+                )
             )
         elif target.kind is DefinitionKind.LINK:
             findings.append(
                 _finding(
                     FindingCode.KIND_MISMATCH,
-                    path,
+                    _path(path, key),
                     "link type cannot be an endpoint type",
                     type_keys=(key,),
                 )
@@ -405,14 +447,14 @@ def _validate_object_header(
     require_system: bool,
     findings: list[Finding],
 ) -> None:
-    _require_nonempty(value.type_key, f"{path}/typeKey", "type key", findings)
+    _require_nonempty(value.type_key, _path(path, "typeKey"), "type key", findings)
     _validate_system(value.system, path, require_system, findings)
     definition = definitions.get(value.type_key)
     if definition is None:
         findings.append(
             _finding(
                 FindingCode.UNKNOWN,
-                f"{path}/typeKey",
+                _path(path, "typeKey"),
                 "unknown object type",
                 type_keys=(value.type_key,),
             )
@@ -421,14 +463,14 @@ def _validate_object_header(
         findings.append(
             _finding(
                 FindingCode.KIND_MISMATCH,
-                f"{path}/typeKey",
+                _path(path, "typeKey"),
                 "object and definition kinds differ",
                 type_keys=(value.type_key,),
                 uuids=(value.uuid,),
             )
         )
     if isinstance(value, Anchor):
-        _require_nonempty(value.display_name, f"{path}/displayName", "display name", findings)
+        _require_nonempty(value.display_name, _path(path, "displayName"), "display name", findings)
 
 
 def _validate_object_content(
@@ -456,19 +498,20 @@ def _validate_associated_data(
         findings.append(
             _finding(
                 FindingCode.MISSING,
-                f"{path}/anchorUuids",
+                _path(path, "anchorUuids"),
                 "anchor set is empty",
                 uuids=(value.uuid,),
             )
         )
-    _duplicates(value.anchor_uuids, f"{path}/anchorUuids", findings)
+    _duplicates(value.anchor_uuids, _path(path, "anchorUuids"), findings)
     for anchor_uuid in value.anchor_uuids:
+        anchor_path = _path(path, "anchorUuids", anchor_uuid)
         anchor = objects.get(anchor_uuid)
         if anchor is None:
             findings.append(
                 _finding(
                     FindingCode.UNKNOWN,
-                    f"{path}/anchorUuids",
+                    anchor_path,
                     "anchor does not resolve",
                     uuids=(value.uuid, anchor_uuid),
                 )
@@ -477,7 +520,7 @@ def _validate_associated_data(
             findings.append(
                 _finding(
                     FindingCode.KIND_MISMATCH,
-                    f"{path}/anchorUuids",
+                    anchor_path,
                     "association endpoint is not an anchor",
                     uuids=(value.uuid, anchor_uuid),
                 )
@@ -489,7 +532,7 @@ def _validate_associated_data(
             findings.append(
                 _finding(
                     FindingCode.CONSTRAINT_VIOLATION,
-                    f"{path}/anchorUuids",
+                    anchor_path,
                     "anchor type is not permitted",
                     type_keys=(anchor.type_key,),
                     uuids=(value.uuid, anchor_uuid),
@@ -498,7 +541,7 @@ def _validate_associated_data(
     if isinstance(definition, AssociatedDataTypeDefinition):
         findings.extend(
             property_value_findings(
-                value.properties, definition.properties, path=f"{path}/properties"
+                value.properties, definition.properties, path=_path(path, "properties")
             )
         )
 
@@ -534,7 +577,7 @@ def _validate_link_endpoint(
         findings.append(
             _finding(
                 FindingCode.UNKNOWN,
-                f"{path}/{field}",
+                _path(path, field),
                 "link endpoint does not resolve",
                 uuids=(link.uuid, uuid),
             )
@@ -544,7 +587,7 @@ def _validate_link_endpoint(
         findings.append(
             _finding(
                 FindingCode.KIND_MISMATCH,
-                f"{path}/{field}",
+                _path(path, field),
                 "link cannot be a link endpoint",
                 uuids=(link.uuid, uuid),
             )
@@ -560,109 +603,12 @@ def _validate_link_endpoint(
             findings.append(
                 _finding(
                     FindingCode.CONSTRAINT_VIOLATION,
-                    f"{path}/{field}",
+                    _path(path, field),
                     "endpoint type is not permitted",
                     type_keys=(endpoint.type_key,),
                     uuids=(link.uuid, uuid),
                 )
             )
-
-
-def _validate_complete_cardinality(
-    objects: tuple[GraphObject, ...],
-    definitions: Mapping[str, TypeDefinition],
-    findings: list[Finding],
-) -> None:
-    anchors = tuple(value for value in objects if isinstance(value, Anchor))
-    endpoints = tuple(value for value in objects if not isinstance(value, Link))
-    data = tuple(value for value in objects if isinstance(value, AssociatedData))
-    links = tuple(value for value in objects if isinstance(value, Link))
-    for definition in definitions.values():
-        if isinstance(definition, AssociatedDataTypeDefinition):
-            _validate_data_counts(definition, anchors, data, findings)
-        elif isinstance(definition, LinkTypeDefinition):
-            _validate_link_counts(definition, endpoints, links, findings)
-
-
-def _validate_data_counts(
-    definition: AssociatedDataTypeDefinition,
-    anchors: tuple[Anchor, ...],
-    objects: tuple[AssociatedData, ...],
-    findings: list[Finding],
-) -> None:
-    typed = tuple(value for value in objects if value.type_key == definition.type_key)
-    for value in typed:
-        _check_count(
-            len(value.anchor_uuids),
-            definition.anchors_per_object,
-            "anchors per object",
-            definition.type_key,
-            value.uuid,
-            findings,
-        )
-    counts = Counter(anchor for value in typed for anchor in value.anchor_uuids)
-    for anchor in anchors:
-        if anchor.type_key in definition.permitted_anchor_type_keys:
-            _check_count(
-                counts[anchor.uuid],
-                definition.objects_per_anchor,
-                "objects per anchor",
-                definition.type_key,
-                anchor.uuid,
-                findings,
-            )
-
-
-def _validate_link_counts(
-    definition: LinkTypeDefinition,
-    endpoints: tuple[Anchor | AssociatedData, ...],
-    links: tuple[Link, ...],
-    findings: list[Finding],
-) -> None:
-    typed = tuple(value for value in links if value.type_key == definition.type_key)
-    source_counts = Counter(value.source_uuid for value in typed)
-    target_counts = Counter(value.target_uuid for value in typed)
-    for endpoint in endpoints:
-        if endpoint.type_key in definition.permitted_source_type_keys:
-            _check_count(
-                source_counts[endpoint.uuid],
-                definition.links_per_source,
-                "links per source",
-                definition.type_key,
-                endpoint.uuid,
-                findings,
-            )
-        if endpoint.type_key in definition.permitted_target_type_keys:
-            _check_count(
-                target_counts[endpoint.uuid],
-                definition.links_per_target,
-                "links per target",
-                definition.type_key,
-                endpoint.uuid,
-                findings,
-            )
-
-
-def _check_count(
-    count: int,
-    cardinality: Cardinality,
-    label: str,
-    type_key: str,
-    uuid: str,
-    findings: list[Finding],
-) -> None:
-    if count < cardinality.minimum or (
-        cardinality.maximum is not None and count > cardinality.maximum
-    ):
-        findings.append(
-            _finding(
-                FindingCode.CARDINALITY_VIOLATION,
-                None,
-                f"{label} is {count}, outside its inclusive bound",
-                type_keys=(type_key,),
-                uuids=(uuid,),
-            )
-        )
 
 
 def _validate_property_value(
@@ -745,7 +691,9 @@ def _validate_cardinality(
     if value.minimum < minimum:
         findings.append(
             _finding(
-                FindingCode.INVALID_VALUE, f"{path}/minimum", f"minimum must be at least {minimum}"
+                FindingCode.INVALID_VALUE,
+                _path(path, "minimum"),
+                f"minimum must be at least {minimum}",
             )
         )
     if value.maximum is not None and value.maximum < value.minimum:
@@ -762,14 +710,18 @@ def _validate_system(
         if required:
             findings.append(
                 _finding(
-                    FindingCode.MISSING, f"{path}/system", "canonical system envelope is absent"
+                    FindingCode.MISSING,
+                    _path(path, "system"),
+                    "canonical system envelope is absent",
                 )
             )
         return
     if value.created_revision < 0 or value.last_changed_revision < value.created_revision:
         findings.append(
             _finding(
-                FindingCode.INVALID_VALUE, f"{path}/system", "system revision interval is invalid"
+                FindingCode.INVALID_VALUE,
+                _path(path, "system"),
+                "system revision interval is invalid",
             )
         )
 
@@ -778,7 +730,13 @@ def _duplicates(values: Iterable[str], path: str, findings: list[Finding]) -> No
     seen: set[str] = set()
     for index, value in enumerate(values):
         if value in seen:
-            findings.append(_finding(FindingCode.DUPLICATE, f"{path}/{index}", "duplicate value"))
+            findings.append(
+                _finding(
+                    FindingCode.DUPLICATE,
+                    _path(path, index),
+                    "duplicate value",
+                )
+            )
         seen.add(value)
 
 

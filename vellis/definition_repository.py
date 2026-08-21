@@ -40,6 +40,16 @@ def insert_initial_definitions(
     return insert_definition_versions(connection, definitions, 0)
 
 
+def insert_definition_version(
+    connection: sqlite3.Connection, definition: TypeDefinition, revision: int
+) -> tuple[RowDescriptor, ...]:
+    """Insert one definition while a streaming initializer owns dependency order."""
+    if _required_system(definition).last_changed_revision != revision:
+        raise ValueError("definition lastChangedRevision must equal its introducing revision")
+    _reserve_type_key(connection, definition, revision)
+    return tuple(_insert_definition_version(connection, definition, revision))
+
+
 def insert_definition_versions(
     connection: sqlite3.Connection,
     definitions: tuple[TypeDefinition, ...],
