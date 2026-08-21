@@ -3,13 +3,13 @@ evolution:
   id: vellis-2-pre-release-closure-corrections
   objective: Close bounded pre-release diagnostic, simplicity, evidence, and authority findings without reopening the v2 design.
   observable_distinction: Agents receive repairable exact finding paths, every public bound has one authority, and release evidence discriminates the remaining plausible wrong systems without new product machinery.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: accepted
     reason: The owner-approved closure plan changes starter-count and finding-location authority before implementation proceeds.
     checkpoint: git:c4a9caa4175b3da1ee0ee69ecbaa3e3cd3e974c5
   blocker: null
-  checkpoint: git:d49900a57be85a76683e939b74566a674ccab535
+  checkpoint: git:8be2b70ea3fd9431d3c94f666902a8d388c01706
 baselines:
   status: current
   source: &source
@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:7d007fd0b7e2ac6e8671bc297400f1490dd03a62
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:d49900a57be85a76683e939b74566a674ccab535
+    implementation: git:8be2b70ea3fd9431d3c94f666902a8d388c01706
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:d49900a57be85a76683e939b74566a674ccab535
+    checkpoint: git:8be2b70ea3fd9431d3c94f666902a8d388c01706
   observed: *target
 scope:
   authority_scope:
@@ -319,11 +319,11 @@ work_items:
     nearest_wrong_system: Local fixes pass nominal tests while paths remain unresolvable, limits drift, recovery reports the wrong head or creates private temporary/source artifacts, setup guidance omits required prerequisites, or simplicity and predicate evidence remain ad hoc.
     compatibility_effect: Finding paths become precise, successful backup setup reports the preserved head and reads its static source immutably, and successful backup publication removes only its internal temporary sidecars; wire schemas, commands, tools, database schema/version, starter content, and canonical meaning remain stable.
     non_effects: [Add no registry alternate predicate engine configuration schema relation database version or resolver., Preserve topology-oracle scope and repeated effective-definition glue., Do not alter ordinary live database WAL or SHM behavior.]
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_draft_definition_findings_key_each_dependent_and_preserve_referent, path:tests/vellis/test_query_v2_successor.py#test_strict_numeric_boundary_rejects_an_inclusive_comparison_mutant, path:tests/vellis/test_mcp_lifecycle_v2.py#test_setup_from_backup_reports_the_preserved_head_revision, path:tests/vellis/test_history_recovery_v2.py#test_online_backup_and_initialization_preserve_complete_database_only, path:docs/v2-pre-release-evidence.md#installed-owner-narratives, path:docs/v2-pre-release-evidence.md#verification, command:just check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:8be2b70ea3fd9431d3c94f666902a8d388c01706
   - id: W003
     order: 3
     label: Validate owner narratives and close the pre-release evolution
@@ -343,11 +343,11 @@ work_items:
     nearest_wrong_system: Green internal tests conceal an owner workflow recovery packaging or public-boundary failure.
     compatibility_effect: No public compatibility change beyond W002 diagnostic precision, truthful setup output, private temporary-artifact cleanup, and clarified operating guidance.
     non_effects: [Do not commit prompts or transcripts., Do not invent performance thresholds or speculative features.]
-    lifecycle: pending
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs: [path:docs/v2-pre-release-evidence.md#installed-owner-narratives, path:docs/v2-pre-release-evidence.md#simplicity-and-scope-reassessment, path:docs/v2-pre-release-evidence.md#verification]
     blocker: null
-    checkpoint: null
+    checkpoint: git:8be2b70ea3fd9431d3c94f666902a8d388c01706
 closure:
   finding_disposition: complete
   model_status: accepted
@@ -356,7 +356,7 @@ closure:
   external_status: conforming
   compatibility: Runtime starter content, wire schemas, database schema/version, commands, tools, and canonical meaning remain stable. Finding paths are sharpened, backup setup reports the preserved head instead of revision zero and reads its static source immutably, successful backup publication removes its own private temporary sidecars, and operating guidance states existing query, runtime, and directory constraints.
   reviews:
-    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
-    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: authority and conformance, status: clean, reviewer: /root/final_authority_review_3, checkpoint: git:8be2b70ea3fd9431d3c94f666902a8d388c01706, evidence_refs: [path:docs/v2-pre-release-evidence.md#bounded-correction-outcome, path:docs/v2-pre-release-evidence.md#installed-owner-narratives, command:just model-check]}
+    - {lens: engineering and evidence, status: clean, reviewer: /root/final_engineering_review_3, checkpoint: git:8be2b70ea3fd9431d3c94f666902a8d388c01706, evidence_refs: [path:docs/v2-pre-release-evidence.md#simplicity-and-scope-reassessment, path:docs/v2-pre-release-evidence.md#verification, command:just check]}
   evidence_refs: [path:docs/v2-pre-release-evidence.md#installed-owner-narratives, path:docs/v2-pre-release-evidence.md#simplicity-and-scope-reassessment, path:docs/v2-pre-release-evidence.md#verification, command:just check]
-  checkpoint: null
+  checkpoint: git:8be2b70ea3fd9431d3c94f666902a8d388c01706
