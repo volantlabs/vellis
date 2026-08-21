@@ -73,10 +73,10 @@ findings:
     classification: model gap
     consequence: The compiler carries a general query language where identity lookup and connected pattern matching suffice.
     authority_refs: [owner-plan:sections-3.3-through-3.6]
-    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase3-evidence.md#implemented-distinction, path:docs/v2-simplification-phase3-evidence.md#focused-evidence, path:docs/v2-simplification-phase3-evidence.md#subtraction-and-locality-review]
-    disposition: implementation-work
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase3-evidence.md#implemented-distinction, path:docs/v2-simplification-phase3-evidence.md#focused-evidence, path:docs/v2-simplification-phase3-evidence.md#subtraction-and-locality-review, path:tests/test_repository_policy.py#test_unreleased_predecessor_modules_are_absent, path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: A unified tool name hides existing projection, aggregation, hidden-selector, or two-step machinery.
     compatibility_effect: Prototype query requests and results are unsupported.
   - id: F003
@@ -84,10 +84,10 @@ findings:
     classification: model gap
     consequence: A small change requires reconstructing unrelated content and creates a silent-loss footgun.
     authority_refs: [owner-plan:sections-2.8-and-3.7]
-    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase4-evidence.md#evidence-status]
-    disposition: implementation-work
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase4-evidence.md#evidence-status, path:tests/test_repository_policy.py#test_unreleased_predecessor_modules_are_absent, path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: An upsert-shaped adapter still replaces an entire persisted object.
     compatibility_effect: Mutation becomes field-level with explicit removal and no cascade.
   - id: F004
@@ -95,10 +95,10 @@ findings:
     classification: model gap
     consequence: A bucket of deltas acquires an unnecessary public lifecycle and persisted identities.
     authority_refs: [owner-plan:sections-2.9-and-3.8-through-3.12]
-    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase4-evidence.md#evidence-status]
-    disposition: implementation-work
+    evidence_refs: [path:docs/v2-simplification-model-evidence.md#phase-1-conformance-matrix, path:docs/v2-simplification-phase4-evidence.md#evidence-status, path:tests/test_repository_policy.py#test_unreleased_predecessor_modules_are_absent, path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Draft terminology changes while version, stale status, or assessment identity remains.
     compatibility_effect: Prototype proposal and assessment contracts are removed.
   - id: F005
@@ -117,10 +117,10 @@ findings:
     classification: implementation defect
     consequence: Recovery and historical reads carry several state authorities for a local SQLite product.
     authority_refs: [owner-plan:sections-4.10-and-4.11]
-    evidence_refs: [path:docs/v2-simplification-phase5-evidence.md#predecessor-reachability-and-subtraction, path:docs/v2-simplification-phase5-evidence.md#evidence-status]
-    disposition: implementation-work
+    evidence_refs: [path:docs/v2-simplification-phase5-evidence.md#predecessor-reachability-and-subtraction, path:docs/v2-simplification-phase5-evidence.md#evidence-status, path:tests/test_repository_policy.py#test_unreleased_predecessor_modules_are_absent, path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements]
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Version tables are added while replay remains authoritative or public.
     compatibility_effect: SQLite history, restore, audit, and backup replace snapshot and replay.
   - id: F007
@@ -161,10 +161,10 @@ findings:
     classification: stale baseline
     consequence: Contributors are directed toward replay, assessments, aliases, and a completed campaign gate after removal.
     authority_refs: [owner-plan:phase-8, AGENTS.md]
-    evidence_refs: []
-    disposition: implementation-work
+    evidence_refs: [path:tests/test_repository_policy.py#test_ordinary_check_excludes_inactive_campaign_gate, path:tests/test_repository_policy.py#test_unreleased_predecessor_modules_are_absent, path:README.md#development-setup, path:docs/v2-simplification-phase8-evidence.md#documentation-synchronization]
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Runtime subtraction completes while public claims or ordinary gates still preserve the old system.
     compatibility_effect: Documentation and checks will describe only simplified runnable v2.
 decisions:
@@ -265,8 +265,8 @@ decisions:
     reversible: true
     owner_work_item_id: W008
     evidence_intent: [Complexity decreases., Full gates and black-box scenarios pass., Cold reconstruction finds no obsolete path.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements, path:docs/v2-simplification-phase8-evidence.md#documentation-synchronization, path:docs/v2-simplification-phase8-evidence.md#black-box-scenarios, path:docs/v2-simplification-phase8-evidence.md#final-gates, path:docs/backup-restore.md#backup-and-restore, path:docs/http-operation.md#external-foreground-supervision, path:docs/http-operation.md#external-network-examples, path:docs/http-operation.md#reconcile-a-lost-mutation-response]
 work_items:
   - id: W000
     order: 1
@@ -484,8 +484,8 @@ work_items:
     compatibility_effect: The unreleased branch exposes only rebaselined v2.
     non_effects: [No campaign-engine redesign., No deferred placeholders., No protected user-data access.]
     lifecycle: active
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/test_repository_policy.py#test_ordinary_check_excludes_inactive_campaign_gate, path:tests/test_repository_policy.py#test_unreleased_predecessor_modules_are_absent, path:tests/vellis/test_query_v2_successor.py#test_property_predicate_closed_set, path:tests/vellis/test_query_v2_successor.py#test_null_presence_and_date_timestamp_number_ordering_are_distinct, path:tests/vellis/test_change_draft_v2.py#test_one_activation_reserves_all_new_graph_identities_before_dependents, path:tests/vellis/test_change_draft_v2.py#test_one_activation_reserves_all_new_type_keys_before_dependencies, path:tests/vellis/test_change_draft_v2.py#test_resolved_removal_validates_complete_local_cardinality_peers, path:tests/vellis/test_v1_import_v2.py#test_public_v1_empty_property_descriptions_are_reported_conversions, path:docs/v2-simplification-phase8-evidence.md#subtraction-measurements, path:docs/v2-simplification-phase8-evidence.md#documentation-synchronization, path:docs/v2-simplification-phase8-evidence.md#black-box-scenarios, path:docs/v2-simplification-phase8-evidence.md#final-gates, path:docs/backup-restore.md#backup-and-restore, path:docs/http-operation.md#reconcile-a-lost-mutation-response]
     blocker: null
     checkpoint: null
 closure:

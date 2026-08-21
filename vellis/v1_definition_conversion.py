@@ -156,7 +156,7 @@ def _properties(connection, type_key, payload, pointer):
 
 
 def _property(connection, type_key, name, raw, pointer):
-    description = required_text(raw, "description", pointer)
+    description = _property_description(connection, type_key, name, raw, pointer)
     declared_kinds = _optional_text_collection(raw, "value_kinds", pointer)
     kind, nullable, converted = _infer_property(
         declared_kinds, _property_occurrences(connection, type_key, name)
@@ -185,6 +185,25 @@ def _property(connection, type_key, name, raw, pointer):
         _report_converted_refinements(connection, type_key, name, raw, pointer)
         return base
     return _compatible_constraints(connection, type_key, raw, pointer, base)
+
+
+def _property_description(connection, type_key, name, raw, pointer):
+    value = raw.get("description")
+    if "description" not in raw or value == "":
+        description = f"Imported v1 property {name}."
+        add_disposition(
+            connection,
+            V1Disposition.CONVERTED,
+            "property-description-filled",
+            append_pointer(pointer, "description"),
+            f"empty v1 property description becomes {description!r}",
+            target_type_key=type_key,
+            target_property=name,
+        )
+        return description
+    if not isinstance(value, str):
+        raise V1ImportError(f"{append_pointer(pointer, 'description')} must be text")
+    return value
 
 
 def _property_occurrences(connection, type_key, name):

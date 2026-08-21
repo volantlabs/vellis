@@ -13,8 +13,8 @@ Vellis treats one durable canonical ledger as the authority for personal memory 
 work independent of accumulated history and bounded historical selection efficient. Materialized
 projections, indexes, caches, checkpoints, snapshot cadence, and persistence technology remain
 implementation choices rather than modeled subsystems. Vellis currently selects one SQLite-owned
-live and historical state: immutable object and definition values, membership intervals, the sole
-prospective overlay, complete assessments, canonical events, and activity history are normalized and
+live and historical state: immutable object and definition values, membership intervals, one
+normalized draft bucket, canonical records, validation backing, and activity history are normalized and
 addressable through identity and semantic indexes. Maintained semantic summaries make ordinary
 transition identity proportional to the change rather than the stored population. No production operation constructs or retains a
 complete graph, definition set, canonical state, or canonical change. Ordinary work uses affected

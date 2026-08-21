@@ -5,7 +5,7 @@ software engineering with textual SysML v2. The accepted model under [`model/`](
 and system authority. Markdown describes how to work with that authority without restating it as a
 second contract.
 
-The active v2 rebaseline deliberately removes prototype complexity. The successor is a scalar
+Vellis v2 deliberately removes prototype complexity. It is a scalar
 Reified Type Graph with local cardinality, progressive discovery, one bounded identity-or-pattern
 query, field-level graph patches, one durable draft, indexed current and historical state, separate
 canonical and activity ledgers, restore, audit, SQLite backup, streamed v1 initialization, and
@@ -19,18 +19,20 @@ STDIO or bearer-protected HTTP for one owner.
   [`docs/implementation-method.md`](docs/implementation-method.md) describe the model-first method.
 - [`docs/mcp-realization.md`](docs/mcp-realization.md) describes the non-normative MCP realization.
 - [`docs/http-operation.md`](docs/http-operation.md) covers HTTP security and external deployment.
+- [`docs/backup-restore.md`](docs/backup-restore.md) covers online backup, backup initialization, and
+  historical restore.
 - [`docs/v1-initialization.md`](docs/v1-initialization.md) covers v1 export, preview, import, and
   remodeling review.
-- [`system-evolution.yaml`](system-evolution.yaml) is the active execution and evidence index, not
+- [`system-evolution.yaml`](system-evolution.yaml) is the current execution and evidence index, not
   product authority.
-- [`implementation-campaign.yaml`](implementation-campaign.yaml) is the completed historical
-  campaign record and is intentionally stale during the rebaseline.
+- [`implementation-campaign.yaml`](implementation-campaign.yaml) is an inactive historical campaign
+  record; its explicit validation recipes remain available for future campaign work.
 - [`.agents/skills/`](.agents/skills/) contains the portable SysML workflow and Vellis-specific
   extensions.
 
 Start agent-assisted work with [`AGENTS.md`](AGENTS.md). Use `$sysml-reference` for consequential
 SysML or KerML interpretation, `$sysml-modeling` for system meaning, `$sysml-implementation` for a
-bounded accepted slice, `$sysml-evolution` for the active rebaseline, `$rtg-schema-design` for RTG
+bounded accepted slice, `$sysml-evolution` for post-build evolution, `$rtg-schema-design` for RTG
 meaning, and `$documentation-sync` after public or workflow changes.
 
 ## Development setup
@@ -51,16 +53,15 @@ Useful focused checks include:
 - `just system-evolution-check` and `just system-evolution-status`
 - `just test`, `just package-check`, `just lint`, and `just typecheck`
 
-`just check` still includes validation of the completed predecessor implementation campaign. Its two
-known stale-campaign failures remain tracked by F010/W008 until Phase 8 removes that completed
-campaign gate from the ordinary repository check.
+`just check` validates the current model, evolution record, product, package, skills, and repository
+policy.
+The inactive campaign engine has separate explicit recipes and is not an ordinary product gate.
 
 ## Runnable v2 boundary
 
-The successor domain, SQLite persistence, discovery/query, active changes, draft governance,
+The scalar domain, SQLite persistence, discovery/query, active changes, draft governance,
 history/activity, restore/audit/backup, v1 initialization, and MCP/owner boundary are implemented.
-Predecessor production modules remain in the tree only until the Phase 8 subtraction checkpoint;
-the installed `vellis` command and selected MCP tools use the successor paths.
+The unreleased prototype modules and compatibility paths are absent.
 
 The owner command has seven subcommands:
 
@@ -106,6 +107,11 @@ external client-state change with an exact recovery command, never as a rollback
 For HTTP, guided setup creates an owner-private token without printing it. Vellis runs in the
 foreground at `/mcp` and performs no TLS termination or service management. See
 [`docs/http-operation.md`](docs/http-operation.md) before using a non-loopback address.
+
+Use `vellis backup --out ...` for an audited online copy, `vellis setup --from-backup ...` for a
+separate empty destination, and `vellis restore --revision ...` or `--time ...` to publish selected
+historical meaning as a new revision. See [`docs/backup-restore.md`](docs/backup-restore.md) before
+recovering owner data.
 
 The MCP boundary exposes:
 

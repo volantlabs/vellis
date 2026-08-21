@@ -1837,6 +1837,44 @@ def test_property_wide_inference_preserves_scalars_and_exact_converted_json(
     assert _nonnull(stored, "calendarText").value == "2026-08-20"
 
 
+def test_public_v1_empty_property_descriptions_are_reported_conversions(tmp_path: Path) -> None:
+    value = _snapshot()
+    properties = value["schema"]["definitions"][1]["payload"]["properties"]  # type: ignore[index]
+    properties["active"]["description"] = ""  # type: ignore[index]
+    properties["name"].pop("description")  # type: ignore[index]
+    report = tmp_path / "empty-descriptions.json"
+
+    preview = preview_v1_import(
+        _write(tmp_path / "empty-descriptions-source.json", value),
+        report_out=report,
+        recorded_at="2026-08-20T00:00:00Z",
+    )
+
+    assert preview.acceptable
+    destination = tmp_path / "owner" / "vellis.db"
+    initialize_from_v1(
+        tmp_path / "empty-descriptions-source.json",
+        destination,
+        confirmed_source_sha256=preview.source_sha256,
+        confirmed_report_sha256=preview.report_sha256,
+        recorded_at="2026-08-20T00:00:00Z",
+    )
+    definition = next(
+        item
+        for item in read_state(destination).definitions
+        if isinstance(item, AssociatedDataTypeDefinition)
+    )
+    descriptions = {item.name: item.description for item in definition.properties}
+    assert descriptions["active"] == "Imported v1 property active."
+    assert descriptions["name"] == "Imported v1 property name."
+    converted = [
+        item
+        for item in json.loads(report.read_text())["dispositions"]
+        if item["code"] == "property-description-filled"
+    ]
+    assert [item["targetProperty"] for item in converted] == ["active", "name"]
+
+
 def test_exact_local_bounds_map_and_subset_overlap_is_omitted(tmp_path: Path) -> None:
     value = _snapshot()
     constraints = value["constraints"]["constraints"]  # type: ignore[index]

@@ -44,6 +44,15 @@ def test_documented_commands_exist() -> None:
     assert documented <= _just_recipes()
 
 
+def test_ordinary_check_excludes_inactive_campaign_gate() -> None:
+    justfile = (ROOT / "justfile").read_text(encoding="utf-8")
+    check_line = next(line for line in justfile.splitlines() if line.startswith("check:"))
+
+    assert "implementation-campaign-check" not in check_line
+    assert "implementation-campaign-check:" in justfile
+    assert "implementation-campaign-checkpoint-check:" in justfile
+
+
 def test_reference_finder_quotes_untrusted_questions() -> None:
     result = subprocess.run(
         ["just", "--dry-run", "model-reference-find", "$(printf unsafe)"],
@@ -116,6 +125,38 @@ def test_release_metadata_exposes_only_the_selected_owner_command() -> None:
         "vellis": "vellis.__main__:main",
     }
     assert metadata.get("tool", {}).get("uv", {}).get("package") is not False  # type: ignore[union-attr]
+
+
+def test_unreleased_predecessor_modules_are_absent() -> None:
+    removed = {
+        "activity",
+        "canonical",
+        "changes",
+        "client_setup",
+        "definitions",
+        "discovery",
+        "everyday_life",
+        "governance",
+        "graph",
+        "history",
+        "json_value",
+        "mutation_impact",
+        "normalized",
+        "outcomes",
+        "patterns",
+        "preserve",
+        "query",
+        "setup",
+        "sqlite_query",
+        "store",
+        "streaming",
+        "system",
+        "v1",
+        "v1_streaming",
+        "validation",
+    }
+
+    assert not {name for name in removed if (ROOT / "vellis" / f"{name}.py").exists()}
 
 
 def test_unified_owner_command_advertises_only_selected_dispatch_paths() -> None:

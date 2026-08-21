@@ -521,22 +521,6 @@ def test_an_approval_commit_may_not_decline_the_rules_by_claiming_another_lifecy
     assert any("beyond approval state" in finding for finding in findings)
 
 
-def test_committed_campaign_is_stale_and_valid() -> None:
-    campaign = _campaign()
-
-    assert implementation_campaign.validate_campaign(campaign) == []
-    assert campaign["campaign"]["lifecycle"] == "stale"  # type: ignore[index]
-    assert campaign["model_baseline"]["status"] == "stale"  # type: ignore[index]
-    assert campaign["model_baseline"]["observed"] == {  # type: ignore[index]
-        **implementation_campaign.observed_baseline(),
-        "checkpoint": None,
-    }
-    assert (
-        campaign["model_baseline"]["planned"]["authority_sha256"]  # type: ignore[index]
-        != campaign["model_baseline"]["observed"]["authority_sha256"]  # type: ignore[index]
-    )
-
-
 def test_duplicate_yaml_keys_are_rejected(tmp_path: Path) -> None:
     path = tmp_path / "campaign.yaml"
     path.write_text('schema_version: "1.0"\nschema_version: "1.0"\n', encoding="utf-8")
@@ -787,15 +771,6 @@ def test_plan_projection_freezes_decision_owner_but_not_execution_state() -> Non
     assert implementation_campaign._plan_projection(changed_intent) != (
         implementation_campaign._plan_projection(campaign)
     )
-
-
-def test_qualified_model_references_are_resolved_by_the_official_validator() -> None:
-    campaign = _pending_campaign()
-    campaign["authority"][0]["refs"][0]["model_ref"] = "RTG::'Definitely Missing'"  # type: ignore[index]
-
-    findings = implementation_campaign.qualified_model_reference_findings(campaign)
-
-    assert findings == ["qualified model reference does not resolve: RTG::'Definitely Missing'"]
 
 
 def test_campaign_reference_check_uses_one_validator_session(

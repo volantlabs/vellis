@@ -146,39 +146,11 @@ authorizes the dependency-ordered campaign; routine slice completion does not cr
 human approval gates. Each worker stops after one checkpoint or declared pause. Any harness and
 provider may realize these roles as long as durable state and the one-writer boundary remain intact.
 
-For this repository's initial harness trial, using Claude Sonnet at medium reasoning for the manager
-and fresh Opus 5 Medium workers is a non-normative cost/conformance configuration; Opus 5 Low is an
-acceptable manager substitute. Provider and model choice are not part of the portable method or the
-approved implementation plan. Claude workers launch reviewer `Agent` calls once in foreground mode
-with `run_in_background: false`. They may issue both calls in one turn only when the harness blocks
-until both return; otherwise they run the lenses sequentially. They never poll reviewer work with
-background shell commands, sleeps, monitors, or overlapping timers. Without a direct join, use at
-most one foreground five-minute wait followed by one status check.
-
-The manager passes the dispatch `state_token` to its worker. Before mutation, the worker reruns
-`just implementation-campaign-dispatch 0 <state-token>`; a changed token stops stale or duplicate
-work. After activation,
-generate each fixed review prompt with
-`just implementation-campaign-review-frame <work-item> <lens>`, naming the active slice or
-`closure`.
-Before deterministic bookkeeping, validate the candidate compact handoff with
-`just implementation-campaign-worker-result-check <path> <review-state-token> <checkpoint>` and put
-optional JSONL timing, review-count, check-count, and harness-usage telemetry under the ignored
-`.cache/implementation-campaign/` directory. Wait ten minutes only after transient launcher or quota
-failure when no child is live, and stop after three identical failures against one state token.
-Candidate validation binds checkpointed, paused, and failed results to the current campaign, work
-item, and independently recomputed durable state. Paused and failed results carry a reason and no
-checkpoint, passed check, or clean final review pair, and use `review_state_token` to bind the handoff
-to current durable state even when no review ran. They may retain failed or not-run checks and
-finding-bearing review history; completion claims remain checkpoint-specific.
-After the bookkeeping commit changes that token, the manager consumes the result and independently
-runs checkpoint validation; it does not rerun the pre-bookkeeping result check.
-The completed implementation campaign is a stale historical baseline during the active v2
-rebaseline. `system-evolution.yaml` and `just system-evolution-status` report current work. The
-successor boundary pins stable FastMCP and Pydantic versions, has one installed `vellis` executable,
-and supports STDIO or bearer-protected HTTP. Client lifecycle evidence uses public Codex and Claude
-CLIs through fakes unless an explicit owner-authorized closure step permits a real external change;
-repository work never reads or edits client configuration files.
+The portable campaign engine and its explicit campaign recipes remain
+available for a future approved complete-system campaign. They are intentionally separate from
+ordinary `just check`; current post-build work is reconstructed from `system-evolution.yaml`.
+Provider-specific harness trials and completed-campaign narratives do not belong in contributor
+guidance. Repository work never reads or edits real client configuration files.
 
 Vellis checkpoint identifiers are navigation labels in the portable campaign record:
 
@@ -200,13 +172,6 @@ verification, decisions, blockers, evidence, or any other plan-bearing content. 
 blocker changes approval to `changes-required`, clears its approval checkpoint, and puts the campaign
 in `blocked` or `stale`; execution does not continue through that state.
 Every later slice and closure checkpoint preserves that approved plan-bearing projection exactly.
-
-For the completed corrective plan, the approval transition readied only S018 while S001 through S017
-retained their existing checkpoints. S018 owned the missing selected setup behavior; closure owned the
-authorized live client transition. Approval did not itself authorize external client mutation: that
-occurred only at the approved closure step after its dry run exactly matched expected state. The plan
-preserved prior `integration_status: conforming` evidence across the seventeen completed slices while
-keeping A017 and the runnable client boundary partial until S018 and fresh closure rechecked them.
 
 Replanning after slices have completed ends at a renewed approval, which follows the same rule with
 one difference: completed slices keep the checkpoints they earned, including the superseded approved
@@ -273,9 +238,8 @@ advance; amend the sole unpublished checkpoint commit when safe, otherwise reque
 Campaign evidence uses `path:<repo-relative-path>#<test-or-section>` for committed artifacts or
 `command:<exact reproducible command>` for rerunnable checks. A path fragment must resolve to a
 Markdown heading anchor or a Python test node in the current committed state, and a path may not
-escape the repository through a symlink. S001
-chooses the product source and test layout and extends all repository gates to cover it in that same
-checkpoint. Product tests use temporary data locations and never inspect or write `.data/`.
+escape the repository through a symlink. Product tests use temporary data locations and never
+inspect or write `.data/`.
 
 ## Testing authority
 
@@ -290,7 +254,5 @@ acceptance cannot substitute for that semantic review.
 
 Do not introduce realization machinery without a current modeled need. Product source under
 `vellis/` is authored, not generated. The selected MCP tool contract is implemented and runnable over
-local standard input and output, and a real client launching it over that transport is exercised.
-Matching user-scoped Codex and Claude Code entries are configured to launch it. Whole-system live
-closure is complete, with accepted bounded invocations through both named clients and reproducible
-project evidence for the selected boundary.
+local standard input/output and foreground HTTP. Tests exercise public Codex and Claude CLI
+registration without claiming or mutating an owner's real client configuration.

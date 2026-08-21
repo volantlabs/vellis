@@ -64,7 +64,7 @@ def iter_objects(connection, kind: str | None = None) -> Iterator[GraphObject]:
             yield value
 
 
-def load_definitions(connection, keys: tuple[str, ...]) -> tuple[TypeDefinition, ...]:
+def load_candidate_definitions(connection, keys: tuple[str, ...]) -> tuple[TypeDefinition, ...]:
     """Decode only selected staged candidate definitions in exact key order."""
     values: list[TypeDefinition] = []
     for key in keys:

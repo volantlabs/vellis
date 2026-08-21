@@ -23,10 +23,9 @@ Connect an MCP client to that foreground v1 process, call its documented
 `migration`—as one JSON file. Then stop v1. V2 consumes only that file; it never opens
 the old directory.
 
-The Phase 7 `vellis setup --from-v1` command will expose preview and digest-bound
-confirmation. Until that adapter lands, the successor operation boundary is
-`preview_v1_import` followed by `initialize_from_v1` with the exact reported source
-and report SHA-256 values.
+Run `vellis setup --from-v1 SNAPSHOT --preview --report-out REPORT` to preview without a
+destination. Publish only after reviewing the report, using the exact displayed source and report
+SHA-256 values with `--confirm-source-digest` and `--confirm-report-digest`.
 
 ## What the report means
 

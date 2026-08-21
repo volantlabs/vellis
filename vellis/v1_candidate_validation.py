@@ -9,7 +9,7 @@ from vellis.domain_validation import graph_object_findings, type_definition_find
 from vellis.v1_candidate import (
     iter_definitions,
     iter_objects,
-    load_definitions,
+    load_candidate_definitions,
     load_objects,
 )
 
@@ -19,7 +19,7 @@ def staged_candidate_findings(connection) -> Iterator[Finding]:
     for definition in iter_definitions(connection):
         yield from type_definition_findings(
             definition,
-            load_definitions(connection, _definition_references(definition)),
+            load_candidate_definitions(connection, _definition_references(definition)),
             require_system=True,
         )
     for value in iter_objects(connection):
@@ -27,7 +27,7 @@ def staged_candidate_findings(connection) -> Iterator[Finding]:
         type_keys = tuple(sorted({value.type_key, *(item.type_key for item in referents)}))
         yield from graph_object_findings(
             value,
-            load_definitions(connection, type_keys),
+            load_candidate_definitions(connection, type_keys),
             referents,
             require_system=True,
         )

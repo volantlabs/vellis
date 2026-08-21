@@ -127,62 +127,65 @@ def _prepare_object(connection, state, uuid):
 
 
 def _publish_definition_changes(connection, state, revision):
-    rows = connection.execute(
-        """SELECT key, operation FROM temp.activation_change
-           WHERE category = 'definition' ORDER BY key"""
+    rows = tuple(
+        connection.execute(
+            """SELECT key, operation FROM temp.activation_change
+               WHERE category = 'definition' ORDER BY key"""
+        )
     )
+    keys = tuple(str(row[0]) for row in rows)
+    values = []
     for key, operation in rows:
         key = str(key)
-        value = None
         if str(operation) != "remove":
             proposed = load_draft_definitions(
                 connection, load_definitions(connection, state, (key,)), (key,)
             )
-            value = _canonical_definition(connection, proposed[0], revision)
-        _store_descriptors(
-            connection, "retired", close_definition_versions(connection, (key,), revision)
-        )
-        if value is not None:
-            _store_descriptors(
-                connection,
-                "introduced",
-                insert_definition_versions(connection, (value,), revision),
-            )
+            values.append(_canonical_definition(connection, proposed[0], revision))
+    _store_descriptors(connection, "retired", close_definition_versions(connection, keys, revision))
+    _store_descriptors(
+        connection,
+        "introduced",
+        insert_definition_versions(connection, tuple(values), revision),
+    )
 
 
 def _publish_graph_changes(connection, state, revision):
-    rows = connection.execute(
-        """SELECT key, operation FROM temp.activation_change
-           WHERE category = 'object' ORDER BY key"""
+    rows = tuple(
+        connection.execute(
+            """SELECT key, operation FROM temp.activation_change
+               WHERE category = 'object' ORDER BY key"""
+        )
     )
+    uuids = tuple(str(row[0]) for row in rows)
+    values = []
+    type_keys = set()
     for uuid, operation in rows:
         uuid = str(uuid)
-        value = None
-        definitions = ()
         if str(operation) != "remove":
             current = load_graph_objects(connection, state, (uuid,))
             proposed, _ = load_draft_graph(connection, current, (uuid,))
             value = _canonical_draft_object(connection, proposed[0], revision)
-            definitions = load_draft_definitions(
-                connection,
-                load_definitions(connection, state, (value.type_key,)),
-                (value.type_key,),
-            )
-        _store_descriptors(
-            connection, "retired", close_graph_versions(connection, (uuid,), revision)
+            values.append(value)
+            type_keys.add(value.type_key)
+    keys = tuple(sorted(type_keys))
+    definitions = (
+        ()
+        if not keys
+        else load_draft_definitions(
+            connection,
+            load_definitions(connection, state, keys),
+            keys,
         )
-        close_search_versions(connection, (uuid,), revision)
-        if value is not None:
-            _insert_graph_change(connection, value, definitions, revision)
-
-
-def _insert_graph_change(connection, value, definitions, revision):
+    )
+    _store_descriptors(connection, "retired", close_graph_versions(connection, uuids, revision))
+    close_search_versions(connection, uuids, revision)
     _store_descriptors(
         connection,
         "introduced",
-        insert_graph_versions(connection, (value,), definitions, revision),
+        insert_graph_versions(connection, tuple(values), definitions, revision),
     )
-    insert_search_versions(connection, (value,), revision)
+    insert_search_versions(connection, tuple(values), revision)
 
 
 def _create_descriptor_work(connection):

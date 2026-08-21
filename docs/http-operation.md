@@ -44,6 +44,84 @@ wrap that exact command in an owner-managed systemd or launchd unit. Vellis owns
 its lifecycle. Likewise, a Tailscale route, SSH forwarding command, or TLS proxy remains external
 infrastructure rather than Vellis state.
 
+## External foreground supervision
+
+For a Linux user service, place this owner-managed unit at
+`~/.config/systemd/user/vellis.service`, replacing both absolute paths:
+
+```ini
+[Unit]
+Description=Vellis foreground HTTP server
+
+[Service]
+Type=simple
+ExecStart=/absolute/path/to/vellis serve --transport http --data-dir /absolute/path/to/vellis-data --host 127.0.0.1 --port 8000
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+Then use `systemctl --user daemon-reload`, `systemctl --user enable --now vellis`, and
+`systemctl --user status vellis`. Systemd, not Vellis, owns restart and login lifecycle.
+
+On macOS, an owner-managed `~/Library/LaunchAgents/local.vellis.plist` can run the same foreground
+process:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>local.vellis</string>
+  <key>ProgramArguments</key><array>
+    <string>/absolute/path/to/vellis</string>
+    <string>serve</string><string>--transport</string><string>http</string>
+    <string>--data-dir</string><string>/absolute/path/to/vellis-data</string>
+    <string>--host</string><string>127.0.0.1</string>
+    <string>--port</string><string>8000</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+</dict></plist>
+```
+
+Load or remove it with `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.vellis.plist`
+and `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/local.vellis.plist`. Launchd, not Vellis,
+owns that registration and lifecycle.
+
+## External network examples
+
+- Tailscale: obtain the server's Tailscale IPv4 address with `tailscale ip -4`, then run Vellis with
+  `--host 100.x.y.z --port 8000` and connect to `http://100.x.y.z:8000/mcp`. Non-loopback Vellis still
+  requires its bearer token; Tailscale routing and encryption remain external.
+- SSH: keep Vellis on `127.0.0.1:8000`, then run
+  `ssh -N -L 18000:127.0.0.1:8000 owner@vellis-host` on the client and connect to
+  `http://127.0.0.1:18000/mcp`. SSH owns the encrypted tunnel.
+- External TLS: keep Vellis on loopback and configure an external Caddy instance with
+  `memory.example.com { reverse_proxy 127.0.0.1:8000 }`; clients use
+  `https://memory.example.com/mcp`. Caddy owns certificates and TLS termination. Keep Vellis bearer
+  authentication enabled behind the proxy.
+
+## Reconcile a lost mutation response
+
+If the connection fails after sending a change, activation, or restore request, do not assume either
+rollback or commit and do not retry immediately.
+
+1. Reconnect and read current state with `rtg_type_summary` or the relevant `rtg_query`; record its
+   `evaluatedRevision`.
+2. Use `rtg_history` on the canonical ledger after the revision observed before the lost request.
+   Then inspect the corresponding activity interval for the capability, outcome, evaluated revision,
+   and resulting revision.
+3. If history shows the intended canonical change, treat it as committed and do not replay it. If
+   activity shows an accepted redundant request, there is intentionally no resulting revision.
+4. If neither ledger contains the request and current revision is unchanged, retry with the original
+   `expectedRevision`. If another revision has appeared, reread current state and construct a new
+   request; the old expected revision should be allowed to reject as stale rather than being guessed
+   forward.
+
+This procedure reconciles durable truth; Vellis never reports a post-commit transport failure as a
+rollback.
+
 Token rotation writes a new private token atomically, but a running Vellis HTTP process keeps the
 old credential it read at startup. Stop and restart the foreground server before reconnecting every
 HTTP client with the new token. Vellis reports supported named client entries that must be

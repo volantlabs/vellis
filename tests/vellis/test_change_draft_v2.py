@@ -38,6 +38,7 @@ from vellis.domain import (
     DraftState,
     FindingCode,
     GraphChangeRequest,
+    Link,
     LinkTypeDefinition,
     LinkUpsert,
     OperationStatus,
@@ -76,6 +77,10 @@ PERSON_2 = "22222222-2222-4222-8222-222222222222"
 GROUP = "33333333-3333-4333-8333-333333333333"
 DATA = "44444444-4444-4444-8444-444444444444"
 LINK = "55555555-5555-4555-8555-555555555555"
+GROUP_2 = "66666666-6666-4666-8666-666666666666"
+GROUP_3 = "77777777-7777-4777-8777-777777777777"
+LINK_2 = "88888888-8888-4888-8888-888888888888"
+LINK_3 = "99999999-9999-4999-8999-999999999999"
 
 
 def _definitions():
@@ -219,6 +224,45 @@ def test_removal_never_cascades_and_names_surviving_dependents(tmp_path: Path) -
     )
     assert accepted.resulting_revision == 2
     assert set(_objects(path)) == {PERSON_2, GROUP, DATA}
+
+
+def test_resolved_removal_validates_complete_local_cardinality_peers(tmp_path: Path) -> None:
+    path = _database(tmp_path)
+    _seed(path)
+    populated = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            1,
+            (
+                AnchorUpsert(GROUP_2, "test.group", "Alternate"),
+                AnchorUpsert(GROUP_3, "test.group", "Intact"),
+                LinkUpsert(LINK_2, "test.member", PERSON_2, GROUP),
+                LinkUpsert(LINK_3, "test.member", PERSON, GROUP_3),
+            ),
+        ),
+    )
+    assert populated.resulting_revision == 2
+
+    resolved = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            2,
+            (LinkUpsert(LINK_2, target_uuid=GROUP_2),),
+            (GROUP, LINK),
+        ),
+    )
+
+    assert resolved.status is OperationStatus.ACCEPTED
+    assert resolved.resulting_revision == 3
+    objects = _objects(path)
+    assert GROUP not in objects
+    assert LINK not in objects
+    repointed = objects[LINK_2]
+    intact = objects[LINK_3]
+    assert isinstance(repointed, Link)
+    assert repointed.target_uuid == GROUP_2
+    assert isinstance(intact, Link)
+    assert intact.target_uuid == GROUP_3
 
 
 def test_batch_permutations_produce_the_same_final_state(tmp_path: Path) -> None:
@@ -1082,6 +1126,62 @@ def test_draft_only_addition_has_no_system_until_activation(tmp_path: Path) -> N
     live = _objects(path)[addition]
     assert live.system is not None
     assert (live.system.created_revision, live.system.last_changed_revision) == (1, 1)
+
+
+def test_one_activation_reserves_all_new_graph_identities_before_dependents(tmp_path: Path) -> None:
+    path = _database(tmp_path)
+    link = "00000000-0000-4000-8000-000000000001"
+    data = "11111111-0000-4000-8000-000000000001"
+    group = "eeeeeeee-0000-4000-8000-000000000001"
+    person = "ffffffff-0000-4000-8000-000000000001"
+    staged = change_draft(
+        path,
+        DraftChangeRequest(
+            object_upserts=(
+                LinkUpsert(link, "test.member", person, group),
+                AssociatedDataUpsert(data, "test.details", (person,)),
+                AnchorUpsert(group, "test.group", "Team"),
+                AnchorUpsert(person, "test.person", "Alice"),
+            )
+        ),
+    )
+
+    assert staged.outcome.status is OperationStatus.ACCEPTED
+    assessment = validate_state(path, ValidationRequest(ValidationScope.DRAFT, 100))
+    assert assessment.payload is not None and assessment.payload.clean is True
+    activated = activate_draft(path)
+    assert activated.outcome.status is OperationStatus.ACCEPTED
+    assert activated.outcome.resulting_revision == 1
+    assert set(_objects(path)) == {link, data, group, person}
+
+
+def test_one_activation_reserves_all_new_type_keys_before_dependencies(tmp_path: Path) -> None:
+    path = _database(tmp_path)
+    dependent = AssociatedDataTypeDefinition(
+        "aaa.details",
+        "Lexically first dependent",
+        ("zzz.anchor",),
+        (),
+        Cardinality(1, 1),
+        Cardinality(0),
+    )
+    anchor = AnchorTypeDefinition("zzz.anchor", "Lexically later anchor")
+    changed = change_draft(
+        path,
+        DraftChangeRequest(definition_upserts=(dependent, anchor)),
+    )
+    assert changed.outcome.status is OperationStatus.ACCEPTED
+    validated = validate_state(path, ValidationRequest(ValidationScope.DRAFT, limit=1_000))
+    assert validated.payload is not None and validated.payload.clean is True
+
+    activated = activate_draft(path)
+
+    assert activated.outcome.status is OperationStatus.ACCEPTED
+    assert activated.outcome.resulting_revision == 1
+    assert {value.type_key for value in read_state(path).definitions} >= {
+        "aaa.details",
+        "zzz.anchor",
+    }
 
 
 def test_draft_reactivation_preserves_original_creation_metadata(tmp_path: Path) -> None:

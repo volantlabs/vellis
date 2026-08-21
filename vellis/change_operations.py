@@ -383,12 +383,28 @@ def _validation_closure(connection, state, commanded_uuids, current, proposed):
     closure_uuids = dependent_uuids | cardinality_uuids | set(commanded_uuids)
     closure_uuids.update(_dependent_referents(connection, dependent_uuids))
     closure_uuids.update(_referenced_uuids((*current, *proposed)))
-    graph = load_graph_objects(connection, state, tuple(sorted(closure_uuids)))
+    graph = _load_structural_closure(connection, state, closure_uuids)
     header_keys = tuple(sorted({value.type_key for value in graph} - definition_keys))
     if header_keys:
         extra = load_definitions(connection, state, header_keys)
         definitions = tuple({value.type_key: value for value in (*definitions, *extra)}.values())
     return graph, definitions, cardinality_definitions, cardinality_uuids
+
+
+def _load_structural_closure(connection, state, initial_uuids):
+    """Load every referent needed to validate the selected local closure."""
+    requested = set(initial_uuids)
+    objects = {
+        value.uuid: value
+        for value in load_graph_objects(connection, state, tuple(sorted(requested)))
+    }
+    while True:
+        missing = _referenced_uuids(tuple(objects.values())) - requested
+        if not missing:
+            return tuple(objects[key] for key in sorted(objects))
+        requested.update(missing)
+        loaded = load_graph_objects(connection, state, tuple(sorted(missing)))
+        objects.update((value.uuid, value) for value in loaded)
 
 
 def _semantic_impacts(current, proposed):
