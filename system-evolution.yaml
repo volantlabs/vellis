@@ -9,7 +9,7 @@ evolution:
     reason: The owner-approved closure plan changes starter-count and finding-location authority before implementation proceeds.
     checkpoint: git:c4a9caa4175b3da1ee0ee69ecbaa3e3cd3e974c5
   blocker: null
-  checkpoint: null
+  checkpoint: git:d49900a57be85a76683e939b74566a674ccab535
 baselines:
   status: current
   source: &source
@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:7d007fd0b7e2ac6e8671bc297400f1490dd03a62
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:c4a9caa4175b3da1ee0ee69ecbaa3e3cd3e974c5
+    implementation: git:d49900a57be85a76683e939b74566a674ccab535
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:c4a9caa4175b3da1ee0ee69ecbaa3e3cd3e974c5
+    checkpoint: git:d49900a57be85a76683e939b74566a674ccab535
   observed: *target
 scope:
   authority_scope:
@@ -244,7 +244,7 @@ work_items:
     nearest_wrong_system: The model removes useful named starter content or still permits indistinguishable affected-state subjects.
     compatibility_effect: Runtime starter content and wire fields remain unchanged; diagnostic paths become more precise in W002.
     non_effects: [Preserve every named starter definition property endpoint nested bound and runtime value., Add no model element public field finding code or operation.]
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_storage_v2.py#test_starter_has_exact_small_typed_vocabulary_and_no_graph
@@ -252,13 +252,13 @@ work_items:
       - command:just model-reference-check
       - command:just system-evolution-check
     blocker: null
-    checkpoint: null
+    checkpoint: git:d49900a57be85a76683e939b74566a674ccab535
   - id: W002
     order: 2
     label: Repair diagnostics and make simplicity durable
     kind: implementation
     dependencies: [W001]
-    planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
+    planned_baseline: {dimension: model, identity: "sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc"}
     finding_ids: [F003, F004, F005, F006, F008, F009, F010, F011]
     decision_ids: [D001, D002, D003, D004]
     authority:
@@ -272,7 +272,7 @@ work_items:
     nearest_wrong_system: Local fixes pass nominal tests while paths remain unresolvable, limits drift, or simplicity and predicate evidence remain ad hoc.
     compatibility_effect: Only finding paths change publicly; all other behavior, schema, commands, tools, and starter content remain stable.
     non_effects: [Add no registry alternate predicate engine configuration schema relation database version or resolver., Preserve topology-oracle scope and repeated effective-definition glue.]
-    lifecycle: pending
+    lifecycle: active
     implementation_status: not evaluated
     evidence_refs: []
     blocker: null
@@ -303,7 +303,7 @@ work_items:
     checkpoint: null
 closure:
   finding_disposition: open
-  model_status: not evaluated
+  model_status: accepted
   implementation_status: not evaluated
   integration_status: not evaluated
   external_status: not evaluated
