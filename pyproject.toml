@@ -19,18 +19,15 @@ classifiers = [
     "Topic :: Database",
 ]
 dependencies = [
-    # Pinned exactly, without a global prerelease allowance: the selected boundary is a
-    # beta and the campaign records that choice, so a floating range would let it move
-    # without anyone deciding to.
-    "fastmcp==4.0.0b1",
-    "fastmcp-slim==4.0.0b1",
-    "google-re2>=1.1,<2",
-    "ijson>=3.5.1",
+    "fastmcp==3.4.5",
+    "pydantic==2.13.4",
+    "uvicorn==0.52.1",
+    "google-re2==1.1.20251105",
+    "ijson==3.5.1",
 ]
 
 [project.scripts]
 vellis = "vellis.__main__:main"
-vellis-rtg-knowledge-graph = "vellis.__main__:main"
 
 [project.urls]
 Repository = "https://github.com/volantlabs/vellis"

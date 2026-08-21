@@ -173,20 +173,12 @@ to current durable state even when no review ran. They may retain failed or not-
 finding-bearing review history; completion claims remain checkpoint-specific.
 After the bookkeeping commit changes that token, the manager consumes the result and independently
 runs checkpoint validation; it does not rerun the pre-bookkeeping result check.
-The completed campaign's plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO,
-and selected clean macOS onboarding through a documented Python setup path. Vellis 2.0.0 now packages
-that path behind both released executable names while retaining the Python module forms. The
-pins, the STDIO boundary, and the setup path's three starting inputs — a confirmed fresh vocabulary,
-a canonical snapshot document, and a confirmed v1 snapshot — are implemented, and a client launching
-the server as a subprocess is exercised end to end, including the exact command an owner would
-register. Closure configured and verified both supported clients on this machine; that effect changed
-client-owned configuration rather than this repository.
-
-That selected client-configuration behavior was not built by its original owners. Closure caught the
-escaped implementation defect after all original slices had checkpointed, so the renewed approved
-plan preserved the choice and allocated it to corrective slice S018, with the live dry run and
-registration completed at closure. That campaign is now the completed-but-stale source baseline;
-`system-evolution.yaml` and `just system-evolution-status` report the current post-build work.
+The completed implementation campaign is a stale historical baseline during the active v2
+rebaseline. `system-evolution.yaml` and `just system-evolution-status` report current work. The
+successor boundary pins stable FastMCP and Pydantic versions, has one installed `vellis` executable,
+and supports STDIO or bearer-protected HTTP. Client lifecycle evidence uses public Codex and Claude
+CLIs through fakes unless an explicit owner-authorized closure step permits a real external change;
+repository work never reads or edits client configuration files.
 
 Vellis checkpoint identifiers are navigation labels in the portable campaign record:
 

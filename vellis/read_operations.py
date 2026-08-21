@@ -26,6 +26,7 @@ from vellis.draft_read_operations import (
 from vellis.draft_repository import load_draft_definitions, load_draft_graph
 from vellis.draft_sql_overlay import install_draft_graph_overlay
 from vellis.graph_repository import load_graph_objects
+from vellis.public_wire import public_result
 from vellis.query_domain import (
     GraphQuery,
     IdentityObjectSelection,
@@ -575,7 +576,7 @@ def _append_read_activity(
             "resultShape": result_shape,
             "findings": wire_value(result.findings),
         },
-        verbose_payload={"request": request_payload, "response": wire_value(result)},
+        verbose_payload={"request": request_payload, "response": public_result(result)},
     )
 
 

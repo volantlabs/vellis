@@ -30,8 +30,10 @@ from vellis.draft_repository import (
     load_draft_graph,
 )
 from vellis.graph_repository import load_graph_objects
+from vellis.public_wire import public_result
 from vellis.sqlite_values import property_from_row
 from vellis.state_repository import resolve_state
+from vellis.wire import serialize_wire
 
 
 def inspect_draft(
@@ -61,7 +63,7 @@ def inspect_draft(
         else:
             assert request.limit is not None
             result = _fresh(connection, request, state.evaluated_revision)
-        _serialize(result)
+        serialize_wire(result)
         append_activity(
             connection,
             capability="rtg_draft_inspect",
@@ -82,7 +84,7 @@ def inspect_draft(
                 ),
                 "findings": _wire(result.outcome.findings),
             },
-            verbose_payload={"request": _wire(request), "response": _wire(result)},
+            verbose_payload={"request": _wire(request), "response": public_result(result)},
         )
         connection.commit()
         return result
@@ -397,7 +399,3 @@ def _wire(value):
     if hasattr(value, "value"):
         return _wire(value.value)
     return value
-
-
-def _serialize(value):
-    json.dumps(_wire(value), allow_nan=False, separators=(",", ":"), sort_keys=True)

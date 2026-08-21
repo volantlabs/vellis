@@ -20,6 +20,7 @@ from vellis.domain import (
 )
 from vellis.draft_read_operations import draft_neighborhoods
 from vellis.draft_repository import load_draft_definitions
+from vellis.public_wire import public_result
 from vellis.query_domain import (
     PUBLIC_ITEM_LIMIT,
     DefinitionNeighborhood,
@@ -416,5 +417,5 @@ def _append_discovery_activity(
             "resultShape": result_shape,
             "findings": wire_value(result.findings),
         },
-        verbose_payload={"request": request_payload, "response": wire_value(result)},
+        verbose_payload={"request": request_payload, "response": public_result(result)},
     )

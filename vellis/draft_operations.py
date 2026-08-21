@@ -28,6 +28,7 @@ from vellis.domain import (
     ObjectKind,
     OperationOutcome,
     OperationStatus,
+    PropertyDefinition,
 )
 from vellis.draft_activation import prepare_activation_changes, publish_activation_revision
 from vellis.draft_analysis import draft_counts
@@ -45,7 +46,9 @@ from vellis.draft_repository import (
 )
 from vellis.draft_sql_overlay import remove_draft_graph_overlay
 from vellis.effective_validation import effective_findings
+from vellis.public_wire import public_result
 from vellis.state_repository import resolve_state
+from vellis.wire import serialize_wire
 
 
 def change_draft(
@@ -83,7 +86,7 @@ def change_draft(
                 ),
                 counts,
             )
-        _serialize(result)
+        serialize_wire(result)
         append_activity(
             connection,
             capability="rtg_draft_change",
@@ -106,7 +109,7 @@ def change_draft(
                 ),
                 "findings": _wire(result.outcome.findings),
             },
-            verbose_payload={"request": _wire(request), "response": _wire(result)},
+            verbose_payload={"request": _wire(request), "response": public_result(result)},
         )
         connection.commit()
         return result
@@ -133,7 +136,7 @@ def validate_state(
             result = _continue_validation(connection, request, state.evaluated_revision)
         else:
             result = _fresh_validation(connection, request, state.evaluated_revision)
-        _serialize(result)
+        serialize_wire(result)
         append_activity(
             connection,
             capability="rtg_validate",
@@ -148,7 +151,7 @@ def validate_state(
                 "totalFindings": None if result.payload is None else result.payload.total_findings,
                 "findings": _validation_activity_findings(connection, request.scope.value, result),
             },
-            verbose_payload={"request": _wire(request), "response": _wire(result)},
+            verbose_payload={"request": _wire(request), "response": public_result(result)},
         )
         connection.commit()
         return result
@@ -176,7 +179,7 @@ def discard_draft(
             (),
             state.evaluated_revision,
         )
-        _serialize(result)
+        serialize_wire(result)
         append_activity(
             connection,
             capability="rtg_draft_discard",
@@ -187,7 +190,7 @@ def discard_draft(
             resulting_revision=None,
             summary=result.summary,
             semantic_payload={"draftWasPresent": was_present},
-            verbose_payload={"request": {}, "response": _wire(result)},
+            verbose_payload={"request": {}, "response": public_result(result)},
         )
         connection.commit()
         return result
@@ -244,7 +247,7 @@ def activate_draft(
                 ),
                 payload,
             )
-            _serialize(result)
+            serialize_wire(result)
             _append_activation(connection, result, initiator, source)
             connection.commit()
             return result
@@ -260,7 +263,7 @@ def activate_draft(
                 ),
                 ValidationPayload(0, True, (), None, 0, 0),
             )
-            _serialize(result)
+            serialize_wire(result)
             _append_activation(connection, result, initiator, source)
             connection.commit()
             return result
@@ -279,7 +282,7 @@ def activate_draft(
             ),
             ValidationPayload(0, True, (), None, 0, 0),
         )
-        _serialize(result)
+        serialize_wire(result)
         _append_activation(connection, result, initiator, source)
         connection.commit()
         return result
@@ -564,7 +567,7 @@ def _draft_request_findings(connection, request):
 
 
 def _append_activation(connection, result, initiator, source):
-    _serialize(result)
+    serialize_wire(result)
     semantic: dict[str, object] = {
         "findings": _validation_activity_findings(connection, "draft", result)
     }
@@ -580,7 +583,7 @@ def _append_activation(connection, result, initiator, source):
         resulting_revision=result.outcome.resulting_revision,
         summary=result.outcome.summary,
         semantic_payload=semantic,
-        verbose_payload={"request": {}, "response": _wire(result)},
+        verbose_payload={"request": {}, "response": public_result(result)},
     )
 
 
@@ -642,6 +645,11 @@ def _wire(value):
             field.name: _wire(getattr(value, field.name))
             for field in fields(value)
             if not field.name.startswith("_")
+            and not (
+                isinstance(value, PropertyDefinition)
+                and field.name == "allowed_values"
+                and not value.allowed_values_present
+            )
         }
     if hasattr(value, "wire_value"):
         return value.wire_value()
@@ -659,7 +667,3 @@ def _validation_activity_findings(connection, scope, result):
             "SELECT finding FROM validation_finding WHERE scope = ? ORDER BY ordinal", (scope,)
         )
     ]
-
-
-def _serialize(value):
-    json.dumps(_wire(value), ensure_ascii=False, allow_nan=False)

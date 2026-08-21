@@ -25,7 +25,7 @@ from vellis.domain import (
     TypeDefinition,
     ValueKind,
 )
-from vellis.sqlite_values import bound_columns, bound_from_row, property_columns, property_from_row
+from vellis.sqlite_values import property_columns, property_from_row
 
 
 def draft_present(connection: sqlite3.Connection) -> bool:
@@ -414,19 +414,28 @@ def _overlay_data(connection, row, existing, type_key):
 
 
 def _stage_property_definition(connection, type_key: str, prop: PropertyDefinition) -> None:
-    columns = {**bound_columns(prop.minimum, "minimum"), **bound_columns(prop.maximum, "maximum")}
+    columns = {
+        **_draft_bound_columns(prop.minimum, "minimum"),
+        **_draft_bound_columns(prop.maximum, "maximum"),
+    }
     connection.execute(
         """INSERT INTO draft_property_definition_entry(
            type_key, property_name, description, value_kind, required, nullable,
-           minimum_kind, minimum_integer, minimum_number, minimum_date,
+           allowed_values_present,
+           minimum_kind, minimum_boolean, minimum_integer, minimum_number, minimum_text,
+           minimum_date,
            minimum_timestamp_epoch_seconds, minimum_timestamp_nanosecond, minimum_timestamp_text,
-           maximum_kind, maximum_integer, maximum_number, maximum_date,
+           maximum_kind, maximum_boolean, maximum_integer, maximum_number, maximum_text,
+           maximum_date,
            maximum_timestamp_epoch_seconds, maximum_timestamp_nanosecond, maximum_timestamp_text,
            minimum_length, maximum_length, pattern)
            VALUES (:type_key, :property_name, :description, :value_kind, :required, :nullable,
-           :minimum_kind, :minimum_integer, :minimum_number, :minimum_date,
+           :allowed_values_present,
+           :minimum_kind, :minimum_boolean, :minimum_integer, :minimum_number, :minimum_text,
+           :minimum_date,
            :minimum_timestamp_epoch_seconds, :minimum_timestamp_nanosecond, :minimum_timestamp_text,
-           :maximum_kind, :maximum_integer, :maximum_number, :maximum_date,
+           :maximum_kind, :maximum_boolean, :maximum_integer, :maximum_number, :maximum_text,
+           :maximum_date,
            :maximum_timestamp_epoch_seconds, :maximum_timestamp_nanosecond, :maximum_timestamp_text,
            :minimum_length, :maximum_length, :pattern)""",
         {
@@ -437,6 +446,7 @@ def _stage_property_definition(connection, type_key: str, prop: PropertyDefiniti
             "value_kind": prop.value_kind.value,
             "required": int(prop.required),
             "nullable": int(prop.nullable),
+            "allowed_values_present": int(prop.allowed_values_present),
             "minimum_length": None if prop.minimum_length is None else str(prop.minimum_length),
             "maximum_length": None if prop.maximum_length is None else str(prop.maximum_length),
             "pattern": prop.pattern,
@@ -526,14 +536,57 @@ def _draft_properties(connection, key: str) -> tuple[PropertyDefinition, ...]:
                 bool(row["required"]),
                 bool(row["nullable"]),
                 allowed,
-                bound_from_row(row, "minimum"),
-                bound_from_row(row, "maximum"),
+                _draft_bound_from_row(row, "minimum"),
+                _draft_bound_from_row(row, "maximum"),
                 _optional_int(row["minimum_length"]),
                 _optional_int(row["maximum_length"]),
                 None if row["pattern"] is None else str(row["pattern"]),
+                bool(row["allowed_values_present"]),
             )
         )
     return tuple(result)
+
+
+def _draft_bound_columns(value, prefix: str) -> dict[str, object]:
+    names = (
+        "boolean_value",
+        "integer_value",
+        "number_value",
+        "text_value",
+        "date_value",
+        "timestamp_epoch_seconds",
+        "timestamp_nanosecond",
+        "timestamp_text",
+    )
+    columns: dict[str, object] = {f"{prefix}_kind": None}
+    columns.update({f"{prefix}_{name.removesuffix('_value')}": None for name in names})
+    if value is None:
+        return columns
+    encoded = property_columns(value, value.kind)
+    columns[f"{prefix}_kind"] = value.kind.value
+    for name in names:
+        columns[f"{prefix}_{name.removesuffix('_value')}"] = encoded[name]
+    return columns
+
+
+def _draft_bound_from_row(row, prefix: str):
+    kind = row[f"{prefix}_kind"]
+    if kind is None:
+        return None
+    return property_from_row(
+        {
+            "is_null": 0,
+            "value_kind": kind,
+            "boolean_value": row[f"{prefix}_boolean"],
+            "integer_value": row[f"{prefix}_integer"],
+            "number_value": row[f"{prefix}_number"],
+            "text_value": row[f"{prefix}_text"],
+            "date_value": row[f"{prefix}_date"],
+            "timestamp_epoch_seconds": row[f"{prefix}_timestamp_epoch_seconds"],
+            "timestamp_nanosecond": row[f"{prefix}_timestamp_nanosecond"],
+            "timestamp_text": row[f"{prefix}_timestamp_text"],
+        }
+    )
 
 
 def _delete_definition_children(connection, key):

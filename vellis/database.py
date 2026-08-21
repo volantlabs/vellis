@@ -539,16 +539,21 @@ CREATE TABLE draft_property_definition_entry (
     ),
     required INTEGER NOT NULL CHECK (required IN (0, 1)),
     nullable INTEGER NOT NULL CHECK (nullable IN (0, 1)),
+    allowed_values_present INTEGER NOT NULL CHECK (allowed_values_present IN (0, 1)),
     minimum_kind TEXT,
+    minimum_boolean INTEGER CHECK (minimum_boolean IN (0, 1)),
     minimum_integer INTEGER,
     minimum_number REAL,
+    minimum_text TEXT,
     minimum_date TEXT,
     minimum_timestamp_epoch_seconds INTEGER,
     minimum_timestamp_nanosecond INTEGER,
     minimum_timestamp_text TEXT,
     maximum_kind TEXT,
+    maximum_boolean INTEGER CHECK (maximum_boolean IN (0, 1)),
     maximum_integer INTEGER,
     maximum_number REAL,
+    maximum_text TEXT,
     maximum_date TEXT,
     maximum_timestamp_epoch_seconds INTEGER,
     maximum_timestamp_nanosecond INTEGER,
@@ -558,30 +563,38 @@ CREATE TABLE draft_property_definition_entry (
     pattern TEXT,
     PRIMARY KEY (type_key, property_name),
     CHECK (
-        (minimum_integer IS NOT NULL) + (minimum_number IS NOT NULL)
+        (minimum_boolean IS NOT NULL) + (minimum_integer IS NOT NULL)
+        + (minimum_number IS NOT NULL) + (minimum_text IS NOT NULL)
         + (minimum_date IS NOT NULL) + (minimum_timestamp_text IS NOT NULL)
         = (minimum_kind IS NOT NULL)
     ),
     CHECK (
-        (maximum_integer IS NOT NULL) + (maximum_number IS NOT NULL)
+        (maximum_boolean IS NOT NULL) + (maximum_integer IS NOT NULL)
+        + (maximum_number IS NOT NULL) + (maximum_text IS NOT NULL)
         + (maximum_date IS NOT NULL) + (maximum_timestamp_text IS NOT NULL)
         = (maximum_kind IS NOT NULL)
     ),
     CHECK (
-        (minimum_kind IS NULL AND minimum_integer IS NULL AND minimum_number IS NULL
-            AND minimum_date IS NULL AND minimum_timestamp_text IS NULL)
+        (minimum_kind IS NULL AND minimum_boolean IS NULL AND minimum_integer IS NULL
+            AND minimum_number IS NULL AND minimum_text IS NULL AND minimum_date IS NULL
+            AND minimum_timestamp_text IS NULL)
+        OR (minimum_kind = 'boolean' AND minimum_boolean IS NOT NULL)
         OR (minimum_kind = 'integer' AND minimum_integer IS NOT NULL)
         OR (minimum_kind = 'number' AND minimum_number IS NOT NULL)
+        OR (minimum_kind = 'text' AND minimum_text IS NOT NULL)
         OR (minimum_kind = 'date' AND minimum_date IS NOT NULL)
         OR (minimum_kind = 'timestamp' AND minimum_timestamp_text IS NOT NULL
             AND minimum_timestamp_epoch_seconds IS NOT NULL
             AND minimum_timestamp_nanosecond IS NOT NULL)
     ),
     CHECK (
-        (maximum_kind IS NULL AND maximum_integer IS NULL AND maximum_number IS NULL
-            AND maximum_date IS NULL AND maximum_timestamp_text IS NULL)
+        (maximum_kind IS NULL AND maximum_boolean IS NULL AND maximum_integer IS NULL
+            AND maximum_number IS NULL AND maximum_text IS NULL AND maximum_date IS NULL
+            AND maximum_timestamp_text IS NULL)
+        OR (maximum_kind = 'boolean' AND maximum_boolean IS NOT NULL)
         OR (maximum_kind = 'integer' AND maximum_integer IS NOT NULL)
         OR (maximum_kind = 'number' AND maximum_number IS NOT NULL)
+        OR (maximum_kind = 'text' AND maximum_text IS NOT NULL)
         OR (maximum_kind = 'date' AND maximum_date IS NOT NULL)
         OR (maximum_kind = 'timestamp' AND maximum_timestamp_text IS NOT NULL
             AND maximum_timestamp_epoch_seconds IS NOT NULL

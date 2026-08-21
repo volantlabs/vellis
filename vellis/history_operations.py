@@ -20,6 +20,7 @@ from vellis.history_domain import (
     TimeHistoryRange,
 )
 from vellis.history_repository import history_head, select_history
+from vellis.public_wire import public_result
 from vellis.wire import serialize_wire, wire_value
 
 
@@ -140,7 +141,7 @@ def configure_activity_mode(
             semantic_payload={"previousMode": previous, "resultingMode": mode.value},
             verbose_payload={
                 "request": {"activityMode": mode.value},
-                "response": wire_value(result),
+                "response": public_result(result),
             },
         )
         connection.commit()

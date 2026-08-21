@@ -34,8 +34,10 @@ from vellis.domain import (
 )
 from vellis.domain_validation import graph_cardinality_findings, graph_structure_findings
 from vellis.graph_repository import close_graph_versions, insert_graph_versions, load_graph_objects
+from vellis.public_wire import public_result
 from vellis.search_repository import close_search_versions, insert_search_versions
 from vellis.state_repository import resolve_state
+from vellis.wire import serialize_wire
 
 
 def apply_graph_change(
@@ -90,7 +92,7 @@ def apply_graph_change(
                 tuple(findings),
                 state.evaluated_revision,
             )
-            _serialize_outcome(result)
+            serialize_wire(result)
             append_activity(
                 connection,
                 capability="rtg_change",
@@ -101,7 +103,7 @@ def apply_graph_change(
                 resulting_revision=None,
                 summary=result.summary,
                 semantic_payload={"request": _wire(request), "findings": _wire(result.findings)},
-                verbose_payload={"request": _wire(request), "response": _wire(result)},
+                verbose_payload={"request": _wire(request), "response": public_result(result)},
             )
             connection.commit()
             return result
@@ -113,7 +115,7 @@ def apply_graph_change(
                 (),
                 state.evaluated_revision,
             )
-            _serialize_outcome(result)
+            serialize_wire(result)
             append_activity(
                 connection,
                 capability="rtg_change",
@@ -124,7 +126,7 @@ def apply_graph_change(
                 resulting_revision=None,
                 summary=result.summary,
                 semantic_payload=canonical_activity_effect(connection, None),
-                verbose_payload={"request": _wire(request), "response": _wire(result)},
+                verbose_payload={"request": _wire(request), "response": public_result(result)},
             )
             connection.commit()
             return result
@@ -146,7 +148,7 @@ def apply_graph_change(
             state.evaluated_revision,
             revision,
         )
-        _serialize_outcome(result)
+        serialize_wire(result)
         append_activity(
             connection,
             capability="rtg_change",
@@ -157,7 +159,7 @@ def apply_graph_change(
             resulting_revision=revision,
             summary=result.summary,
             semantic_payload=canonical_activity_effect(connection, revision),
-            verbose_payload={"request": _wire(request), "response": _wire(result)},
+            verbose_payload={"request": _wire(request), "response": public_result(result)},
         )
         connection.commit()
         return result
@@ -695,7 +697,3 @@ def _wire(value):
     if hasattr(value, "value") and isinstance(value.value, str):
         return value.value
     return value
-
-
-def _serialize_outcome(value: OperationOutcome) -> None:
-    json.dumps(_wire(value), allow_nan=False, ensure_ascii=False)

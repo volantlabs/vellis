@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier, Lock
@@ -334,21 +335,141 @@ def test_active_noop_records_activity_without_revision(tmp_path: Path) -> None:
     assert read_state(path).evaluated_revision == 1
 
 
-def test_failure_before_serialization_rolls_back_every_effect(tmp_path: Path, monkeypatch) -> None:
+@pytest.mark.parametrize("variant", ("rejected", "noop", "effective"))
+def test_failure_before_serialization_rolls_back_every_active_change_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variant: str
+) -> None:
     path = _database(tmp_path)
     _seed(path)
-    before = read_state(path)
+    before = _persistent_snapshot(path)
 
     def fail(_value):
         raise RuntimeError("serialization failed")
 
-    monkeypatch.setattr(change_module, "_serialize_outcome", fail)
+    monkeypatch.setattr(change_module, "serialize_wire", fail)
     with pytest.raises(RuntimeError, match="serialization failed"):
-        apply_graph_change(
-            path, GraphChangeRequest(1, (AnchorUpsert(PERSON, display_name="Changed"),))
-        )
-    assert read_state(path) == before
+        if variant == "rejected":
+            apply_graph_change(path, GraphChangeRequest(0))
+        elif variant == "noop":
+            apply_graph_change(path, GraphChangeRequest(1))
+        else:
+            apply_graph_change(
+                path, GraphChangeRequest(1, (AnchorUpsert(PERSON, display_name="Changed"),))
+            )
+    assert _persistent_snapshot(path) == before
     assert audit_database(path).clean
+
+
+def _persistent_snapshot(path: Path) -> str:
+    with sqlite3.connect(path) as connection:
+        return "\n".join(connection.iterdump())
+
+
+@pytest.mark.parametrize("variant", ("missing", "invalid", "redundant", "effective"))
+def test_shared_public_projection_failure_rolls_back_every_activation_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variant: str
+) -> None:
+    path = _database(tmp_path)
+    _seed(path)
+    if variant == "invalid":
+        change_draft(
+            path,
+            DraftChangeRequest(
+                object_upserts=(
+                    AnchorUpsert("99999999-9999-4999-8999-999999999999", display_name="No type"),
+                )
+            ),
+        )
+    elif variant == "redundant":
+        change_draft(
+            path,
+            DraftChangeRequest(object_upserts=(AnchorUpsert(PERSON, display_name="Alice"),)),
+        )
+    elif variant == "effective":
+        change_draft(
+            path,
+            DraftChangeRequest(object_upserts=(AnchorUpsert(PERSON, display_name="Changed"),)),
+        )
+    before = _persistent_snapshot(path)
+
+    def fail(_value):
+        raise RuntimeError("public projection failed")
+
+    monkeypatch.setattr("vellis.wire.public_result", fail)
+    with pytest.raises(RuntimeError, match="public projection failed"):
+        activate_draft(path)
+    assert _persistent_snapshot(path) == before
+
+
+@pytest.mark.parametrize("capability", ("change", "inspect", "validate", "activate", "discard"))
+def test_shared_public_projection_failure_rolls_back_every_draft_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capability: str
+) -> None:
+    path = _database(tmp_path)
+    _seed(path)
+    if capability != "change":
+        change_draft(
+            path,
+            DraftChangeRequest(object_upserts=(AnchorUpsert(PERSON, display_name="Draft"),)),
+        )
+    before = _persistent_snapshot(path)
+
+    def fail(_value):
+        raise RuntimeError("public projection failed")
+
+    monkeypatch.setattr("vellis.wire.public_result", fail)
+    with pytest.raises(RuntimeError, match="public projection failed"):
+        if capability == "change":
+            change_draft(
+                path,
+                DraftChangeRequest(object_upserts=(AnchorUpsert(PERSON, display_name="Draft"),)),
+            )
+        elif capability == "inspect":
+            inspect_draft(path, DraftInspectionRequest(limit=1))
+        elif capability == "validate":
+            validate_state(path, ValidationRequest(ValidationScope.DRAFT, 1))
+        elif capability == "activate":
+            activate_draft(path)
+        else:
+            discard_draft(path)
+    assert _persistent_snapshot(path) == before
+
+
+@pytest.mark.parametrize("capability", ("inspect", "validate"))
+def test_shared_public_projection_failure_rolls_back_continuation_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capability: str
+) -> None:
+    path = _database(tmp_path)
+    _seed(path)
+    change_draft(
+        path,
+        DraftChangeRequest(
+            object_upserts=(
+                AnchorUpsert("99999999-9999-4999-8999-999999999991", display_name="One"),
+                AnchorUpsert("99999999-9999-4999-8999-999999999992", display_name="Two"),
+            )
+        ),
+    )
+    if capability == "inspect":
+        first = inspect_draft(path, DraftInspectionRequest(limit=1))
+    else:
+        first = validate_state(path, ValidationRequest(ValidationScope.DRAFT, 1))
+    assert first.payload is not None and first.payload.cursor is not None
+    before = _persistent_snapshot(path)
+
+    def fail(_value):
+        raise RuntimeError("public projection failed")
+
+    monkeypatch.setattr("vellis.wire.public_result", fail)
+    with pytest.raises(RuntimeError, match="public projection failed"):
+        if capability == "inspect":
+            inspect_draft(path, DraftInspectionRequest(cursor=first.payload.cursor))
+        else:
+            validate_state(
+                path,
+                ValidationRequest(ValidationScope.DRAFT, cursor=first.payload.cursor),
+            )
+    assert _persistent_snapshot(path) == before
 
 
 @pytest.mark.parametrize("capability", ("change", "inspect", "validate", "activate", "discard"))

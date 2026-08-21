@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from dataclasses import fields, is_dataclass
 
-from vellis.domain import ScalarValue, TimestampValue
+from vellis.domain import PropertyDefinition, ScalarValue, TimestampValue
+from vellis.public_wire import public_result
 
 
 def wire_value(value):
@@ -24,6 +25,11 @@ def wire_value(value):
             field.name: wire_value(getattr(value, field.name))
             for field in fields(value)
             if not field.name.startswith("_")
+            and not (
+                isinstance(value, PropertyDefinition)
+                and field.name == "allowed_values"
+                and not value.allowed_values_present
+            )
         }
     if hasattr(value, "value") and isinstance(value.value, str):
         return value.value
@@ -31,8 +37,11 @@ def wire_value(value):
 
 
 def serialize_wire(value) -> str:
+    # The same public projection used by MCP is constructed before an operation commits.
+    # Keeping one projection closes the post-commit "internal form serialized, public form
+    # failed" gap without giving the transport transaction ownership.
     return json.dumps(
-        wire_value(value),
+        public_result(value),
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),

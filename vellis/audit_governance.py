@@ -209,7 +209,7 @@ def _definition_roles_invalid(connection, key, kind):
 
 def _allowed_value_rows_invalid(connection, key):
     properties = connection.execute(
-        """SELECT property_name, value_kind, required, nullable
+        """SELECT property_name, value_kind, required, nullable, allowed_values_present
            FROM draft_property_definition_entry
            WHERE type_key = ? ORDER BY property_name""",
         (key,),
@@ -217,12 +217,16 @@ def _allowed_value_rows_invalid(connection, key):
     for prop in properties:
         if prop["required"] not in (0, 1) or prop["nullable"] not in (0, 1):
             return True
+        if prop["allowed_values_present"] not in (0, 1):
+            return True
         ordinal = 0
         rows = connection.execute(
             """SELECT * FROM draft_property_definition_allowed_value
                WHERE type_key = ? AND property_name = ? ORDER BY ordinal""",
             (key, prop["property_name"]),
-        )
+        ).fetchall()
+        if not bool(prop["allowed_values_present"]) and rows:
+            return True
         for row in rows:
             if int(row["ordinal"]) != ordinal:
                 return True

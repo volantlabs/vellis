@@ -204,6 +204,15 @@ def property_value_findings(
 def _validate_allowed_values(
     definition: PropertyDefinition, path: str, findings: list[Finding]
 ) -> None:
+    if definition.allowed_values_present and not definition.allowed_values:
+        findings.append(
+            _finding(
+                FindingCode.INVALID_VALUE,
+                _path(path, "allowedValues"),
+                "allowed values must be nonempty when supplied",
+            )
+        )
+        return
     if not definition.allowed_values:
         return
     identities: set[tuple[object, ...]] = set()

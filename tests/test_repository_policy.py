@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import re
 import subprocess
 import tomllib
@@ -104,7 +103,7 @@ def _metadata() -> dict[str, object]:
         return tomllib.load(source)
 
 
-def test_release_metadata_restores_installable_package_and_legacy_commands() -> None:
+def test_release_metadata_exposes_only_the_selected_owner_command() -> None:
     metadata = _metadata()
 
     assert metadata["build-system"] == {  # type: ignore[index]
@@ -115,19 +114,16 @@ def test_release_metadata_restores_installable_package_and_legacy_commands() -> 
     assert project["name"] == "vellis"  # type: ignore[index]
     assert project["scripts"] == {  # type: ignore[index]
         "vellis": "vellis.__main__:main",
-        "vellis-rtg-knowledge-graph": "vellis.__main__:main",
     }
     assert metadata.get("tool", {}).get("uv", {}).get("package") is not False  # type: ignore[union-attr]
 
 
-def test_unified_owner_command_advertises_all_dispatch_paths() -> None:
-    output = io.StringIO()
-
-    assert owner_command.main(["--help"], stdout=output) == owner_command.EXIT_SUCCESS
-
-    help_text = output.getvalue()
-    for command in ("setup", "preserve", "restore", "serve", "serve-mcp"):
+def test_unified_owner_command_advertises_only_selected_dispatch_paths() -> None:
+    help_text = owner_command._parser().format_help()
+    for command in ("setup", "connect", "serve", "backup", "restore", "audit", "configure"):
         assert command in help_text
+    for removed in ("preserve", "serve-mcp"):
+        assert removed not in help_text
 
 
 def test_version_is_consistent_across_metadata_runtime_and_lock() -> None:

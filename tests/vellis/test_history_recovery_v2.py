@@ -15,6 +15,7 @@ import vellis.activity_repository as activity_module
 import vellis.audit as audit_module
 import vellis.backup_operations as backup_module
 import vellis.change_operations as change_module
+import vellis.discovery_operations as discovery_module
 import vellis.history_repository as history_repository
 import vellis.restore_operations as restore_module
 import vellis.state_validation_repository as validation_module
@@ -71,6 +72,7 @@ from vellis.operations import initialize_with_definitions, read_state
 from vellis.query_domain import GraphQuery, IdentityObjectSelection, IdentitySelection
 from vellis.read_operations import query_graph
 from vellis.restore_operations import restore_state
+from vellis.settings_operations import HttpTokenChangedError, record_http_token_rotation
 
 PERSON = "11111111-1111-4111-8111-111111111111"
 DATA = "22222222-2222-4222-8222-222222222222"
@@ -708,6 +710,91 @@ def test_restore_serialization_failure_rolls_back_revision_and_activity(
     assert read_state(path) == before
     assert _activity_count(path) == activity
     assert audit_database(path).clean
+
+
+def _persistent_snapshot(path: Path) -> str:
+    with sqlite3.connect(path) as connection:
+        return "\n".join(connection.iterdump())
+
+
+@pytest.mark.parametrize(
+    "capability", ("summary", "inspect", "query", "history", "configure", "restore")
+)
+def test_shared_public_projection_precedes_every_other_public_commit_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capability: str
+) -> None:
+    path = _database(tmp_path)
+    _seed(path)
+    if capability == "restore":
+        apply_graph_change(
+            path,
+            GraphChangeRequest(1, (AnchorUpsert(PERSON, display_name="Changed"),)),
+        )
+    before = _persistent_snapshot(path)
+
+    def fail(_value):
+        raise RuntimeError("public projection failed")
+
+    monkeypatch.setattr("vellis.wire.public_result", fail)
+    with pytest.raises(RuntimeError, match="public projection failed"):
+        if capability == "summary":
+            type_summary(path)
+        elif capability == "inspect":
+            discovery_module.type_inspect(path, ("test.person",))
+        elif capability == "query":
+            query_graph(
+                path,
+                GraphQuery(IdentitySelection((IdentityObjectSelection(PERSON),))),
+            )
+        elif capability == "history":
+            inspect_history(path, HistoryRequest(HistoryKind.CANONICAL, 10))
+        elif capability == "configure":
+            configure_activity_mode(path, ActivityMode.VERBOSE)
+        else:
+            restore_state(path, RevisionState(1))
+    assert _persistent_snapshot(path) == before
+
+
+def test_settings_public_projection_failure_precedes_token_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = _database(tmp_path)
+    before = _persistent_snapshot(path)
+    published = False
+
+    def publish() -> None:
+        nonlocal published
+        published = True
+
+    def fail(_value):
+        raise RuntimeError("public projection failed")
+
+    monkeypatch.setattr("vellis.wire.public_result", fail)
+    with pytest.raises(RuntimeError, match="public projection failed"):
+        record_http_token_rotation(path, publish)
+    assert not published
+    assert _persistent_snapshot(path) == before
+
+
+def test_settings_post_token_activity_failure_preserves_changed_truth(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = _database(tmp_path)
+    before = _persistent_snapshot(path)
+    published = False
+
+    def publish() -> None:
+        nonlocal published
+        published = True
+
+    monkeypatch.setattr(
+        "vellis.settings_operations.append_activity",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("activity failed")),
+    )
+    with pytest.raises(HttpTokenChangedError, match="token changed"):
+        record_http_token_rotation(path, publish)
+    assert published
+    assert _persistent_snapshot(path) == before
 
 
 def test_audit_and_restore_retain_only_one_selected_record_at_a_time(

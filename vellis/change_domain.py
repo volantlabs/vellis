@@ -8,6 +8,7 @@ from enum import StrEnum
 from vellis.domain import (
     Finding,
     GraphChangeRequest,
+    GraphObject,
     ObjectUpsert,
     OperationOutcome,
     TypeDefinition,
@@ -116,9 +117,9 @@ class DraftInspectionEntry:
     category: DraftCategory
     key: str
     operation: DraftOperation
-    current: TypeDefinition | object | None
+    current: TypeDefinition | GraphObject | None
     staged: object
-    proposed: TypeDefinition | object | None
+    proposed: TypeDefinition | GraphObject | None
     has_effect: bool
 
 

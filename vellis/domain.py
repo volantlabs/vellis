@@ -254,6 +254,7 @@ class PropertyDefinition:
     minimum_length: int | None = None
     maximum_length: int | None = None
     pattern: str | None = None
+    _allowed_values_present: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not isinstance(self.description, str):
@@ -268,6 +269,14 @@ class PropertyDefinition:
         _require_optional_int(self.minimum_length, "minimum length")
         _require_optional_int(self.maximum_length, "maximum length")
         _require_optional_text(self.pattern, "property pattern")
+        if type(self._allowed_values_present) is not bool:
+            raise ValueError("allowed-values presence must be Boolean")
+        if self.allowed_values and not self._allowed_values_present:
+            object.__setattr__(self, "_allowed_values_present", True)
+
+    @property
+    def allowed_values_present(self) -> bool:
+        return self._allowed_values_present
 
 
 @dataclass(frozen=True, slots=True)

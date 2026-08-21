@@ -38,6 +38,7 @@ from vellis.graph_repository import (
     insert_graph_versions,
     load_graph_objects,
 )
+from vellis.public_wire import public_result
 from vellis.search_repository import close_search_versions, insert_search_versions
 from vellis.state_repository import StateNotFoundError, resolve_state
 from vellis.state_validation_repository import first_state_finding
@@ -137,7 +138,7 @@ def _finish(connection, result, selection, initiator, source):
         resulting_revision=result.resulting_revision,
         summary=result.summary,
         semantic_payload=semantic,
-        verbose_payload={"request": wire_value(selection), "response": wire_value(result)},
+        verbose_payload={"request": wire_value(selection), "response": public_result(result)},
     )
     connection.commit()
     return result

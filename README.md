@@ -1,94 +1,41 @@
 # Vellis
 
-Vellis is an individually owned personal AI system and an open demonstration of model-first software engineering with textual SysML v2.
+Vellis is one individually owned personal AI memory and an open demonstration of model-first
+software engineering with textual SysML v2. The accepted model under [`model/`](model/) is product
+and system authority. Markdown describes how to work with that authority without restating it as a
+second contract.
 
-The repository contains the Vellis system model, its development tooling, and an application being
-reworked to conform to that model; see [Implementation status](#implementation-status) for the
-currently runnable predecessor behavior. The accepted model defines scalar RTG facts, local
-cardinality, progressive discovery, one bounded identity-or-connected-pattern query, atomic field
-patches and removals, one durable draft, indexed current and historical state, separate canonical
-and activity ledgers, restore, audit, backup, streamed v1 initialization, and STDIO or protected HTTP
-access for one owner.
+The active v2 rebaseline deliberately removes prototype complexity. The successor is a scalar
+Reified Type Graph with local cardinality, progressive discovery, one bounded identity-or-pattern
+query, field-level graph patches, one durable draft, indexed current and historical state, separate
+canonical and activity ledgers, restore, audit, SQLite backup, streamed v1 initialization, and
+STDIO or bearer-protected HTTP for one owner.
 
-## What is here
+## Repository map
 
-- [`model/`](model/): the textual SysML packages forming the current system authority.
-- [`docs/vision.md`](docs/vision.md): the human/agent engineering vision.
-- [`docs/modeling-method.md`](docs/modeling-method.md): the use-case-first model-as-code method.
-- [`docs/implementation-method.md`](docs/implementation-method.md): the bidirectional path from
-  accepted model meaning to code and conformance evidence.
-- [`docs/mcp-realization.md`](docs/mcp-realization.md): non-normative guidance for the FastMCP realization.
-- [`model/config/`](model/config/): checksum pins for the specifications, model libraries, and validator. The searchable corpus is generated from them into an ignored cache, never committed.
-- [`.agents/skills/`](.agents/skills/): a portable SysML v2 MBSwE core plus Vellis-specific domain
-  and repository extensions.
-- [`implementation-campaign.yaml`](implementation-campaign.yaml): the completed historical build
-  campaign record; it is not the active rebaseline plan or product authority.
-- [`system-evolution.yaml`](system-evolution.yaml): the baseline-bound active post-build finding,
-  decision, work, and rebaseline index; it is not product authority.
-- [`tools/`](tools/): the pinned validator, reference search, skill checks, campaign validation, and
-  evolution-record validation.
+- [`model/README.md`](model/README.md) maps the authoritative textual SysML packages.
+- [`docs/vision.md`](docs/vision.md) gives the engineering vision.
+- [`docs/modeling-method.md`](docs/modeling-method.md) and
+  [`docs/implementation-method.md`](docs/implementation-method.md) describe the model-first method.
+- [`docs/mcp-realization.md`](docs/mcp-realization.md) describes the non-normative MCP realization.
+- [`docs/http-operation.md`](docs/http-operation.md) covers HTTP security and external deployment.
+- [`docs/v1-initialization.md`](docs/v1-initialization.md) covers v1 export, preview, import, and
+  remodeling review.
+- [`system-evolution.yaml`](system-evolution.yaml) is the active execution and evidence index, not
+  product authority.
+- [`implementation-campaign.yaml`](implementation-campaign.yaml) is the completed historical
+  campaign record and is intentionally stale during the rebaseline.
+- [`.agents/skills/`](.agents/skills/) contains the portable SysML workflow and Vellis-specific
+  extensions.
 
-`just model-setup` builds a searchable SysML v2 reference layer into an ignored cache: the pinned
-specifications, the normative model libraries, and 309 validated example models, all searched
-together with each result labelled by source. The `$sysml-reference` skill carries a map from
-ordinary engineering intent to SysML construct names, so an agent can name what it needs before
-searching.
-
-The SysML on a branch is that branch's system definition. A pull request proposes changes to behavior, requirements, system responsibility, and verification; review and merge are the acceptance mechanism. Markdown explains the work without duplicating the model as a parallel contract.
-
-## Agent-assisted engineering
-
-Begin with [`AGENTS.md`](AGENTS.md), then read the [model map](model/README.md), every current `model/*.sysml` file, and the current diff. Use `$sysml-modeling` for the engineering workflow, `$sysml-reference` for language decisions, `$rtg-schema-design` for RTG domain and governance meaning, and `$documentation-sync` after model or workflow changes.
-
-The reusable core is `$sysml-reference`, `$sysml-modeling`,
-`$sysml-implementation-planning`, `$sysml-implementation`, and
-`$sysml-implementation-campaign`, plus `$sysml-evolution` for changes to an already implemented
-system. Together they define a domain-neutral evidence, modeling, whole-model decomposition,
-bounded realization, conformance, resumable execution, evolution, and closure loop.
-They deliberately do not assume Vellis, RTG, this repository's paths or commands, Git, Python, MCP,
-persistence, networking, code generation, or a test framework.
-
-`AGENTS.md`, the model map, the pinned tooling, and the `just` commands bind that portable method
-to this repository. `$rtg-schema-design` adds Vellis's RTG semantics, while
-`$documentation-sync` maintains this repository's public and contributor guidance. Those are
-optional project and domain extensions, not dependencies of the portable core. No standalone plugin
-is packaged yet; the core skills are written so they can be moved or packaged later without carrying
-the Vellis binding into another project.
-
-For a complete-system build, `$sysml-implementation-planning` reads the complete accepted model and
-derives dependency-ordered, evidence-bearing semantic slices. The committed campaign record stays
-awaiting human approval until that complete plan is accepted. Vellis completed its seventeen
-original slices, then closure exposed an unimplemented selected realization decision. A reviewed
-candidate preserved that choice and added corrective slice S018. After renewed approval and S018,
-closure confirmed both matching registrations and completed bounded invocations through Codex and
-Claude Code. The implementation campaign is complete. A continuation harness may invoke
-`$sysml-implementation-campaign` through a thin manager. The manager reads one machine disposition,
-launches a fresh worker for exactly that slice, waits, and independently validates its checkpoint.
-The worker uses `$sysml-implementation`, runs both bounded review lenses, batches remediation, runs
-one final review pair, returns a compact result without reviewer transcripts, and stops. The manager
-then repeats through whole-system runnable closure. The complete campaign receives one human
-approval; reviewed routine slice checkpoints continue autonomously unless a model, plan, baseline,
-feasibility, or external-authority boundary requires renewed human direction. The committed campaign
-record, rather than any manager conversation, remains the resume authority.
-
-When an accepted semantic slice is ready for code, model work emits a compact handoff of qualified
-authority, in-scope obligations, authority coverage, remaining obligations, decisive examples,
-conformance-evidence intent, and deliberately open realization decisions. `$sysml-implementation`
-verifies or reconstructs that frame, selects the simplest evidence-backed realization, implements one
-end-to-end slice, and returns conformance evidence or precisely classified feedback. The handoff is a
-navigation aid, not another contract; the branch's SysML remains authoritative.
-
-A useful handoff answers the question, states the changed or reviewed meaning, gives decisive evidence
-and checks, and names only the remaining decision or follow-up work. Under the accepted v2 authority,
-an agent unfamiliar with an RTG begins with the complete current or historical anchor-type summary,
-then inspects only the focused anchor neighborhoods needed for its query or change. Known UUIDs use
-identity selection directly; connected questions use pattern selection. Definition work uses the one
-durable draft: inspect its raw deltas, query the effective draft state, validate current findings, then
-activate or discard it. The runnable predecessor remains explicitly identified above until reworked.
+Start agent-assisted work with [`AGENTS.md`](AGENTS.md). Use `$sysml-reference` for consequential
+SysML or KerML interpretation, `$sysml-modeling` for system meaning, `$sysml-implementation` for a
+bounded accepted slice, `$sysml-evolution` for the active rebaseline, `$rtg-schema-design` for RTG
+meaning, and `$documentation-sync` after public or workflow changes.
 
 ## Development setup
 
-Install [uv](https://docs.astral.sh/uv/) and [just](https://just.systems/). `git` is also required, since `model-setup` fetches the pinned upstream release as a sparse checkout. Then run:
+Install [uv](https://docs.astral.sh/uv/) and [just](https://just.systems/), then run:
 
 ```sh
 just setup
@@ -96,264 +43,84 @@ just model-setup
 just check
 ```
 
-Useful commands:
+Useful focused checks include:
 
-- `just model-check`: validate every authored SysML file with the pinned validator.
-- `just model-reference-find "<question>"`: search the specifications, model libraries, and example models; every hit is labelled with its source. Supply optional filters positionally, for example `just model-reference-find "<question>" sysml-2.1 8`.
-- `just model-reference-concepts`: list every SysML v2 construct name, for turning a question into a searchable term.
-- `just model-probe "<snippet>"`: check one SysML snippet against the pinned parser in about six seconds.
-- `just model-reference-check`: prove the generated search corpus still matches its pin.
-- `just skills-check`: validate the repo-local skills and their managed project links.
-- `just implementation-campaign-check`: validate the campaign schema, baseline, qualified model
-  references, dependency graph, approval, evidence, and closure invariants.
-- `just implementation-campaign-status`: show campaign freshness, approval, active or next slice,
-  blockers, closure status, and open realization-decision IDs with their owners.
-- `just implementation-campaign-dispatch`: emit the manager's machine-readable action, selected work
-  item, checkpoint, worktree condition, Git identity, reason codes, and state token without mutation.
-- `just implementation-campaign-review-frame <work-item> <lens>`: generate one fixed, finding-free
-  prompt for the `authority` or `engineering` review lens of the active slice, or of `closure`.
-- `just implementation-campaign-worker-result-check <path> <review-state-token> <checkpoint>`:
-  validate the candidate handoff against frozen pre-bookkeeping state. After commit, the manager uses
-  checkpoint validation because bookkeeping intentionally changes the token.
-- `just implementation-campaign-baseline`: print the currently observed model, language, and
-  validator digests without changing files.
-- `just implementation-campaign-checkpoint-check`: after a checkpoint commit, verify clean tracked
-  state, the committed campaign, approved plan projection, current checkpoint, and current evidence.
-- `just system-evolution-check`: validate the active post-build evolution record's schema,
-  ownership, dependencies, approval, lifecycle, and evidence references.
-- `just system-evolution-status`: show its lifecycle, approval, next work item, and open findings.
-- `just check`: run the complete repository gate.
+- `just model-check` and `just model-reference-check`
+- `just model-reference-find "<question>"`
+- `just skills-check`
+- `just system-evolution-check` and `just system-evolution-status`
+- `just test`, `just package-check`, `just lint`, and `just typecheck`
 
-## Implementation status
+`just check` still includes validation of the completed predecessor implementation campaign. Its two
+known stale-campaign failures remain tracked by F010/W008 until Phase 8 removes that completed
+campaign gate from the ordinary repository check.
 
-The accepted finite positive must-exist query language is implemented and independently reviewed.
-It supports every finite pattern topology, uses exclusive row or aggregate output,
-preserves the source identity of projected properties, and carries one tagged current, prospective,
-revision, or time selection. SQLite bounds distinct answer identities before hydration or arithmetic,
-and unreturned witnesses affect an answer only through existence. The prerelease request-schema break
-is intentional; the ten MCP tool names and persistence format are unchanged.
+## Runnable v2 boundary
 
-Definition summary, focused inspection, and proposal discovery now read one SQLite snapshot. Each
-relevant permitted-value index is prepared once per validation scope and reused across governed
-objects. Active and prospective mutation validation now share a reviewed implementation that
-derives exact rule/subject/end multiplicity work while keeping structural subjects and lookup-only
-identities separate. Assessment-page snapshot consistency and cleanup of completed
-assessment/restore work are implemented and independently reviewed. None requires a persistent
-migration. The semantic work-locality evolution is implemented and its evidence is synchronized
-with the public contract described here.
+The successor domain, SQLite persistence, discovery/query, active changes, draft governance,
+history/activity, restore/audit/backup, v1 initialization, and MCP/owner boundary are implemented.
+Predecessor production modules remain in the tree only until the Phase 8 subtraction checkpoint;
+the installed `vellis` command and selected MCP tools use the successor paths.
 
-All seventeen original campaign slices and corrective slice S018 are complete. S018 implements the
-selected setup-program/public-CLI behavior with fake-client evidence. Closure confirmed both
-matching user-scoped STDIO registrations, the exact no-op dry run, a full ten-tool Codex desktop
-owner scenario, and a bounded Claude Code definition-summary invocation. `A017`, integration, and
-the runnable boundary are conforming; closure decision D006 and the implementation campaign are
-complete. See [MCP realization](docs/mcp-realization.md#client-configuration) for the selected
-boundary and manual fallback.
-Use these words precisely:
+The owner command has seven subcommands:
 
-- **Implemented and verified.** Canonical graph, definition, and constraint meaning; canonical
-  semantic equality over JSON, graphs, definitions, and canonical state meaning; whole-string RE2
-  property patterns evaluated by RE2 itself; complete SQLite-backed assessment of graph conformance
-  with bounded finding retrieval; fresh initialization from a streamed initial definition set at
-  revision 0 with one initial-state
-  record, no transitions, and an empty activity ledger; a
-  schema-version-5 local SQLite store that owns normalized current, prospective, historical, and
-  ledger state, recovers identical memory across an ordinary restart, commits the canonical record
-  and its addressable graph, definition, and proposal projections as one effect, and refuses a
-  foreign or unsupported-version database. Complete assessments are published and retained as
-  observational state, separate from canonical replay authority. No production operation constructs a complete
-  resident graph, definition-set document, canonical-state document, or canonical-change document.
-  Explicit graph changes are committed atomically as contiguous canonical transitions after
-  validating their complete affected invariant closure; unaffected valid state is not revalidated.
-  Current graph and prospective-overlay semantic summaries are maintained in the same transaction
-  as their normalized rows, so sealing an ordinary transition does not rescan either population.
-  The typed graph-conformance report and current definition discovery provide the complete
-  shallow anchor vocabulary and the complete focused neighborhood of each selected anchor, each
-  carrying the revision it was evaluated at so a caller can tell that the ground moved;
-  governance of the one prospective definition set and graph overlay — stage bounded keyed
-  complete-definition replacements, stage complete-object graph upserts or tombstones, query the
-  prospective preview, unstage, assess, activate, and discard — where an edited type key replaces
-  its complete definition while untouched keys remain, a working proposal may temporarily carry
-  findings, and an exact non-stale clean assessment gates atomic activation; and the optional
-  Everyday Life starter vocabulary as an ordinary, owner-governable definition set; and bounded
-  semantic query over current, prospective, revision, or time state — named anchor and
-  associated-data selectors, required directed links, exact and ordered property comparisons, and
-  whole-string RE2 matching under one positive conjunction; exclusive row output preserves projected
-  object identity while exclusive aggregate output reduces one bounded associated-data population;
-  one relational selector-member mechanism handles UUID and type collections, hidden witnesses are
-  existential, distinct answer identities are bounded before hydration or arithmetic, and confirmed
-  SQLite structural excess is rejected whole with no partial result; and a separated
-  observational ledger — reads,
-  validation, and refused operations leave a bounded record carrying capability, outcome,
-  provenance, evaluated revision and scope but no result rows, over which the owner may read a
-  bounded interval of either ledger and forget activity without moving anything replay
-  reconstructs; and canonical snapshots with the reconstruction that rebuilds state from a base and
-  a later contiguous tail, where each record's identity is chained from the one before it and rooted
-  in the ledger's own, so a tail cannot be grafted onto a history it does not belong to; and
-  historical selection, where a revision or a time takes discovery and query back to a committed
-  state and answers with the meaning that state had; and the selected ten-tool MCP boundary —
-  exactly the modeled tool names, typed both ways, where a semantic refusal stays distinct from
-  malformed input and from an unexpected failure and every promised non-effect holds on the far
-  side; and restoration, which makes a past state current again as one new revision without
-  rewriting anything earlier, and refuses while a proposal is in flight rather than discarding it;
-  and beginning a new lineage from a snapshot and its tail, whose history starts at the revision
-  that state reached rather than at zero, because renumbering it would claim transitions this
-  ledger does not have. The confirmed first-use vocabulary choice — blank or the Everyday Life
-  starter, both named, the starter recommended and preselected, and neither established until the
-  owner confirms — is implemented and verified. Confirmed first use from a Vellis v1 snapshot —
-  live v1 content arriving exactly as it was stored, every simplification and omission named
-  before the owner agrees to it, and a new lineage at revision 0 that claims none of the v1
-  system's history — is implemented and verified. These capabilities are also verified as the
-  owner-governed workflows they compose into: nothing an agent uses to look at memory is capable
-  of retaining anything, and a proposal the owner declines never becomes a call, so canonical
-  memory afterwards is indistinguishable from memory that was never asked — Vellis does not decide
-  approval, and a submitted change is retained if it conforms, whoever asked for it. Approved
-  context outlives the session that wrote it, corrections and forgetting leave the state they
-  changed reachable in history, a
-  vocabulary proposal can be staged across other work and restarts and is gated at activation
-  rather than at staging, forgetting activity moves nothing replay reads, and an established
-  system reaches the Everyday Life vocabulary only through ordinary definition governance. Every
-  refusal and every execution failure in those workflows reaches the caller and leaves graph,
-  definitions, delta, revision, and canonical history where they were. The owner-only operations —
-  activity retention, snapshots, the recovery check, and restoration — are verified at the system
-  boundary that realizes them. Preserving a snapshot has the owner-facing
-  `vellis preserve --out FILE` command because that document is one of the inputs
-  setup takes; restoration has `vellis restore --revision REVISION` (or `--time`)
-  and confirms before committing the selected historical state forward. Support for incremental
-  owner-visible improvement analysis is verified the same way: an externally scheduled agent reads
-  explicit bounded intervals of both ledgers, discovers the vocabulary those states had, asks
-  bounded current and historical questions, and continues a later run from the interval it already
-  processed. Vellis supplies no scheduler, job registry, worker, or inference of its own — nothing
-  happens that the agent did not ask for, and where to continue from is the agent's own state
-  rather than anything Vellis stores. Before proposing either a definition delta or a graph
-  change, the agent rediscovers current definitions — bounded keyed edits produce one complete
-  proposed vocabulary meaning, and a graph change is written in concepts that may have been retired
-  since — and rechecks current facts,
-  because the owner may have fixed the thing already; and every finding is traceable to the
-  bounded observations and exact evaluated revisions it came from. Finally, that these compose
-  into one cohesive system an individual can run is itself verified end to end: each of the three
-  starting inputs the model names — blank or the confirmed Everyday Life starter, a canonical
-  snapshot with its later records, and a confirmed v1 snapshot — establishes its own system; a
-  client launching the server as an ordinary subprocess discovers exactly the ten tools, learns the
-  vocabulary cold, asks a bounded question and retains one approved change; and a later session in
-  a new process finds that memory at the state replay reconstructs. A failed start before
-  initialization, a second start over an established system, and a client that cannot connect each
-  name the stage that failed, truthfully report whether established memory changed, and give an
-  available next step. Pre-initialization and established-memory failures leave graph, definitions,
-  delta, revision, and canonical ledger identical either side; a client failure after successful
-  initialization leaves that newly established memory intact, and its client-only retry does not
-  change it.
-- **Characterized, not budgeted.** Existing evidence measures work in semantic
-  row visits, decoded values, affected neighborhoods, streamed buffer sizes, and query candidates.
-  Returned projections, definition-discovery details, and history entries legitimately require
-  output-sized memory; summary and focused inspection decode no graph and no unrelated definitions.
-  The accepted target requires ordinary mutation and prospective validation to scale with exact
-  changed invariant subjects rather than unrelated rules or far endpoints. Explicit full assessment
-  and broad definition cutover remain state-wide
-  work, but execute set-wise with bounded process memory and store each finding once for paged
-  retrieval. Reusable active-validation, assessment, and restoration temporary relations retain
-  their connection-local definitions but no population rows after successful or failed public
-  exits. The query implementation bounds source-preserving row identities or one aggregate
-  target population before hydration or arithmetic; hidden witnesses are existential and cannot
-  multiply an answer. Scalar aggregation
-  retains bounded match identities in an indexed SQLite temporary table and streams fixed-size
-  property batches through exact reducers, so resident Python memory follows batch size, reducer
-  count, and final scalar size rather than matched population; varied exponents and their
-  cancellation remain external SQLite terms until final scalar construction. Result-bearing
-  multi-group joins may be combinatorial; the caller's maximum bounds the returned answer, and
-  SQLite structural capacity is a typed whole-result refusal rather than truncation or a driver
-  failure. Snapshot, import, tail
-  replay, verification, v1 translation, and restoration are linear streaming or temporary-set work
-  without constructing whole-state values. Storage grows with normalized history and the
-  observational ledger. Forgetting activity removes those records but does not promise file-page
-  reclamation. No numerical latency, startup, throughput, or storage budget is claimed without
-  representative hardware and owner data.
-- **Runnable.** The installable `vellis setup` command prepares one local system. It previews the
-  destination and, unless it can already see that the destination will not do, offers both starting
-  vocabularies with the Everyday Life starter preselected. It asks for confirmation, and accepts
-  `--data-dir`, `--vocabulary`, `--yes`, and a no-effect `--dry-run` that still reports a
-  destination it can already see will not do. Repeating `--client codex` or `--client claude`
-  selects either or both supported clients; omitting it selects neither, and
-  `--replace-client CLIENT` is required before a differing entry can be replaced. `--from-v1`
-  begins from a Vellis v1 JSON system
-  snapshot instead, and `--from-snapshot` from a Vellis canonical snapshot document — a complete
-  capture with an optional later ledger tail, which
-  `vellis preserve --out FILE` writes from an established system, leaving its
-  canonical memory and revision where they were and recording the capture in its activity history.
-  Each carries its own vocabulary, so passing `--vocabulary` as well
-  is refused rather than ignored, and only one starting input may be given; each is read again at
-  confirmation, so one that changed after it was previewed is not the one that was agreed to. A
-  snapshot start says before it is confirmed which revision the new lineage will begin at, because
-  that is the revision the captured state reached rather than zero. Setup stores memory under
-  `VELLIS_DATA_DIR` when that is set and otherwise under the platform's user-data location, and
-  never writes to this repository's ignored `.data/`. Stores and exported snapshots are plaintext
-  at rest. On macOS and Linux, Vellis creates its data directory with mode `0700`, creates database,
-  WAL, SHM, import, and snapshot files with mode `0600`, and refuses an existing store that is not
-  owner-owned, regular, and private. It never changes an existing store's permissions; follow the
-  reported `chmod 0700` or `chmod 0600` guidance after verifying the path. On Windows, Vellis relies
-  on the user-profile location and the host's default ACLs; native ACL enforcement is not verified
-  for this prerelease.
-  `vellis serve` then serves that memory over local standard input and output; pointed at
-  a destination holding no established memory it refuses rather than creating one, and a client that
-  cannot start it is told which stage failed, whether established memory changed, and what to do
-  next, in the same shape setup uses. Both commands
-  resolve the same destination, so a system established at a configured location is the one the
-  server serves. An MCP client launching that command as a subprocess discovers exactly the
-  selected ten tools and reaches the memory setup established, across separate sessions and
-  processes — a real client library over the real transport. Setup inspects and configures selected
-  user-scoped Codex and Claude Code
-  entries only through their public CLIs. Matching entries are no-ops; differing entries require
-  explicit replacement; and an unavailable client identifies the inspection failure and tells the
-  owner how to repair the client before using the exact client-only retry, without undoing
-  initialized memory. `vellis-rtg-knowledge-graph` remains an executable alias,
-  `serve-mcp` remains a command alias for `serve`, and the existing `python -m vellis`,
-  `python -m vellis.setup`, and `python -m vellis.preserve` forms remain operational.
-
-### V1 upgrade and recovery
-
-A complete v1 JSON snapshot can be exported after installing Vellis 2.0.0. The old directory stays
-where it is and is never opened by v2. Run the tagged v1.0 code in a separate checkout and environment,
-point that process at the old directory, and use its public `rtg_export_system_snapshot` MCP tool:
-
-```sh
-git clone --branch v1.0 --single-branch https://github.com/volantlabs/vellis.git /tmp/vellis-v1
-uv --directory /tmp/vellis-v1 sync --locked
-uv --directory /tmp/vellis-v1 run vellis serve-mcp --data-dir /absolute/path/to/old-v1-data
+```text
+vellis setup
+vellis connect
+vellis serve
+vellis backup
+vellis restore
+vellis audit
+vellis configure
 ```
 
-From an MCP client connected to that process, call `rtg_export_system_snapshot` with
-`{"summary": false}` and save the returned `result` object—the object containing `graph`, `schema`,
-`constraints`, and `migration`—as one JSON file. Stop the v1 process, then preview and establish a
-separate v2 destination:
+Initialize a blank system or the recommended Everyday Life starter explicitly in noninteractive
+use:
 
 ```sh
-vellis setup --data-dir /absolute/path/to/new-v2-data \
-  --from-v1 /absolute/path/to/v1-system-snapshot.json --dry-run
-vellis setup --data-dir /absolute/path/to/new-v2-data \
-  --from-v1 /absolute/path/to/v1-system-snapshot.json
+vellis setup --blank --no-connect --data-dir /absolute/path/to/vellis-data
+vellis setup --starter --no-connect --data-dir /absolute/path/to/vellis-data
 ```
 
-Setup reports every preserved, simplified, omitted, or blocking translation before confirmation.
-Representable live graph content is preserved exactly; non-live content, v1 history, and rules v2
-cannot express are reported rather than silently approximated. The accepted snapshot creates one new
-v2 canonical lineage at revision 0. Raw v1 storage, same-directory replacement, v1 ledger-history
-import, and in-place conversion are intentionally unsupported. Keep the old directory and snapshot
-until the new system has been inspected and independently backed up.
-- **Runnable and live-closed.** Closure reran the exact authorized no-op dry run and reread both
-  matching entries. Codex desktop exercised all ten public tools in one owner scenario and restored
-  the starter vocabulary with an empty conforming graph and no staged proposal. Claude Code
-  completed the bounded `rtg_definition_summary` invocation at revision 8. These observations,
-  together with reproducible project boundary, setup, persistence, and inventory evidence, close
-  D006 and the campaign without changing client approval policy.
-  [MCP realization](docs/mcp-realization.md#client-configuration) carries public-CLI inspection,
-  repair, and registration guidance. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and
-  installed.
+V1 preview options apply only to `--from-v1 --preview`; confirmed imports require both displayed
+digests. Preview never connects a client or publishes a destination. Interactive setup always asks
+before publication; it has no `--yes` bypass.
 
-Vellis 2.0.0 is packaged as a wheel and source distribution with both released executable names.
-Deployment, remote hosting, authentication, and plugin packaging remain open. This release starts a
-fresh normalized schema-version-5 store and refuses unsupported prototype schema versions rather
-than migrating them; it never inspects or changes this repository's ignored `.data/` content during
-development. The
-initial contract assumes one trusted
-owner-configured client; its tools do not implement per-call authorization or decide owner approval.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
+Serve the exact initialized database over STDIO:
+
+```sh
+vellis serve --transport stdio --data-dir /absolute/path/to/vellis-data
+```
+
+Register the fixed `vellis` entry through a supported client's public CLI:
+
+```sh
+vellis connect --client codex --transport stdio --data-dir /absolute/path/to/vellis-data
+vellis connect --client claude --transport stdio --data-dir /absolute/path/to/vellis-data
+```
+
+Existing entries require `--replace`; Vellis probes the intended target before removing anything.
+It never reads or edits client configuration files. A failed add after removal is reported as an
+external client-state change with an exact recovery command, never as a rollback.
+
+For HTTP, guided setup creates an owner-private token without printing it. Vellis runs in the
+foreground at `/mcp` and performs no TLS termination or service management. See
+[`docs/http-operation.md`](docs/http-operation.md) before using a non-loopback address.
+
+The MCP boundary exposes:
+
+- `rtg_type_summary` and `rtg_type_inspect`
+- `rtg_query`
+- `rtg_change`
+- `rtg_draft_inspect`, `rtg_draft_change`, `rtg_validate`, `rtg_draft_activate`, and
+  `rtg_draft_discard`
+- `rtg_history`
+
+Begin cold with summary and focused inspection. Use identity selection directly for known UUIDs and
+pattern selection for connected graph questions. A draft is a bucket of deltas: inspect its raw
+entries, query the effective draft state, validate, then activate or discard. It has no public
+version, status, assessment identity, or activation token.
+
+Vellis data, backups, activity, and migration reports are plaintext at rest. On POSIX, Vellis uses
+owner-private directories and files. The ignored repository `.data/` directory may contain
+user-owned data and is never part of development or migration work without explicit owner direction.
