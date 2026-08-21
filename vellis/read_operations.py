@@ -5,25 +5,21 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
+from vellis.activity_repository import append_activity
 from vellis.database import connect_database, require_supported_database
 from vellis.definition_repository import load_definitions
-from vellis.discovery_repository import load_anchor_summary, load_neighborhoods
 from vellis.domain import (
-    AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
     Finding,
     FindingCode,
     LinkTypeDefinition,
     ObjectKind,
     OperationStatus,
-    StateSelection,
-    SystemEnvelope,
     TypeDefinition,
 )
 from vellis.draft_read_operations import (
     draft_effective_headers,
     draft_identity_headers,
-    draft_neighborhoods,
     query_draft_identity,
     query_draft_pattern_sql,
 )
@@ -31,8 +27,6 @@ from vellis.draft_repository import load_draft_definitions, load_draft_graph
 from vellis.draft_sql_overlay import install_draft_graph_overlay
 from vellis.graph_repository import load_graph_objects
 from vellis.query_domain import (
-    PUBLIC_ITEM_LIMIT,
-    DefinitionNeighborhood,
     GraphQuery,
     IdentityObjectSelection,
     IdentityQueryPayload,
@@ -41,8 +35,6 @@ from vellis.query_domain import (
     PatternSelection,
     PredicateOperator,
     QueryResult,
-    TypeInspectionResult,
-    TypeSummaryResult,
 )
 from vellis.query_repository import (
     HydrationRequest,
@@ -64,176 +56,52 @@ from vellis.state_repository import (
     interval_sql,
     resolve_state,
 )
+from vellis.wire import serialize_wire, wire_value
 
 
-def type_summary(
-    database_path: Path, state_selection: StateSelection | None = None
-) -> TypeSummaryResult:
-    connection = connect_database(database_path, read_only=True)
-    try:
-        require_supported_database(connection)
-        connection.execute("BEGIN")
-        try:
-            state = resolve_state(connection, state_selection)
-            over_limit = False
-            if state.includes_draft:
-                over_limit = _draft_anchor_type_count(connection) > PUBLIC_ITEM_LIMIT
-                if over_limit:
-                    values = ()
-                else:
-                    anchor_keys = _draft_anchor_type_keys(connection, PUBLIC_ITEM_LIMIT)
-                    definitions = load_draft_definitions(
-                        connection,
-                        load_definitions(connection, state, anchor_keys),
-                        anchor_keys,
-                    )
-                    values = tuple(
-                        _definition_without_legacy(value)
-                        for value in definitions
-                        if isinstance(value, AnchorTypeDefinition)
-                    )
-            else:
-                values = tuple(
-                    _definition_without_legacy(value)
-                    for value in load_anchor_summary(connection, state, PUBLIC_ITEM_LIMIT + 1)
-                )
-            if over_limit or len(values) > PUBLIC_ITEM_LIMIT:
-                finding = _finding(
-                    FindingCode.RESULT_LIMIT_EXCEEDED,
-                    "/anchorTypes",
-                    "complete anchor summary exceeds the public item limit",
-                )
-                result = TypeSummaryResult(
-                    OperationStatus.REJECTED,
-                    "anchor summary cannot be returned completely",
-                    (finding,),
-                    state.evaluated_revision,
-                    None,
-                )
-            else:
-                result = TypeSummaryResult(
-                    OperationStatus.ACCEPTED,
-                    "anchor types selected",
-                    (),
-                    state.evaluated_revision,
-                    values,
-                )
-        except StateNotFoundError as error:
-            result = TypeSummaryResult(
-                OperationStatus.REJECTED,
-                "state was not found",
-                (_finding(FindingCode.MISSING, "/state", str(error)),),
-                None,
-                None,
-            )
-        connection.commit()
-        return result
-    except BaseException:
-        connection.rollback()
-        raise
-    finally:
-        connection.close()
-
-
-def type_inspect(
+def query_graph(
     database_path: Path,
-    anchor_type_keys: tuple[str, ...],
+    query: GraphQuery,
     *,
-    state_selection: StateSelection | None = None,
-    include_legacy_system: bool = False,
-) -> TypeInspectionResult:
-    request_findings = _inspection_request_findings(anchor_type_keys, include_legacy_system)
-    if request_findings:
-        return TypeInspectionResult(
-            OperationStatus.REJECTED,
-            "definition inspection was rejected",
-            request_findings,
-            None,
-            None,
-        )
-    connection = connect_database(database_path, read_only=True)
+    initiator: str = "agent",
+    source: str | None = None,
+) -> QueryResult:
+    connection = connect_database(database_path)
     try:
         require_supported_database(connection)
-        connection.execute("BEGIN")
-        try:
-            state = resolve_state(connection, state_selection)
-            if state.includes_draft:
-                keys = _draft_neighborhood_type_keys(connection, anchor_type_keys)
-                definitions = load_draft_definitions(
-                    connection, load_definitions(connection, state, keys), keys
-                )
-            else:
-                definitions = load_definitions(connection, state, anchor_type_keys)
-            selected = tuple(value for value in definitions if value.type_key in anchor_type_keys)
-            unknown = _unknown_anchor_findings(anchor_type_keys, selected)
-            if unknown:
-                result = TypeInspectionResult(
-                    OperationStatus.REJECTED,
-                    "definition inspection was rejected",
-                    unknown,
-                    state.evaluated_revision,
-                    None,
-                )
-            else:
-                neighborhoods = (
-                    draft_neighborhoods(definitions, anchor_type_keys)
-                    if state.includes_draft
-                    else load_neighborhoods(connection, state, anchor_type_keys)
-                )
-                projected = tuple(
-                    _neighborhood_legacy(value, include_legacy_system) for value in neighborhoods
-                )
-                result = TypeInspectionResult(
-                    OperationStatus.ACCEPTED,
-                    "definition neighborhoods selected",
-                    (),
-                    state.evaluated_revision,
-                    projected,
-                )
-        except StateNotFoundError as error:
-            result = TypeInspectionResult(
-                OperationStatus.REJECTED,
-                "state was not found",
-                (_finding(FindingCode.MISSING, "/state", str(error)),),
-                None,
-                None,
-            )
-        connection.commit()
-        return result
-    except BaseException:
-        connection.rollback()
-        raise
-    finally:
-        connection.close()
-
-
-def query_graph(database_path: Path, query: GraphQuery) -> QueryResult:
-    connection = connect_database(database_path, read_only=True)
-    try:
-        require_supported_database(connection)
-        connection.execute("BEGIN")
+        connection.execute("BEGIN IMMEDIATE")
         try:
             state = resolve_state(connection, query.state)
             if state.includes_draft:
                 result = _draft_query(connection, state, query)
-                connection.commit()
-                return result
-            definitions = load_definitions(connection, state, _referenced_type_keys(query))
-            if isinstance(query.selection, PatternSelection):
-                result = _pattern_query(connection, state, query.selection, definitions)
             else:
-                findings = query_findings(query, definitions)
-                result = (
-                    _rejected_query(
-                        "query meaning was rejected", findings, state.evaluated_revision
+                definitions = load_definitions(connection, state, _referenced_type_keys(query))
+                if isinstance(query.selection, PatternSelection):
+                    result = _pattern_query(connection, state, query.selection, definitions)
+                else:
+                    findings = query_findings(query, definitions)
+                    result = (
+                        _rejected_query(
+                            "query meaning was rejected", findings, state.evaluated_revision
+                        )
+                        if findings
+                        else _identity_query(connection, state, query.selection, definitions)
                     )
-                    if findings
-                    else _identity_query(connection, state, query.selection, definitions)
-                )
         except StateNotFoundError as error:
             result = _rejected_query(
                 "state was not found", (_finding(FindingCode.MISSING, "/state", str(error)),), None
             )
+        serialize_wire(result)
+        shape = _query_activity_shape(result)
+        _append_read_activity(
+            connection,
+            "rtg_query",
+            result,
+            {"query": wire_value(query)},
+            shape,
+            initiator,
+            source,
+        )
         connection.commit()
         return result
     except BaseException:
@@ -472,79 +340,6 @@ def _identity_property_findings(
     return _ordered_findings(findings)
 
 
-def _inspection_request_findings(
-    anchor_type_keys: tuple[str, ...], include_legacy_system: bool
-) -> tuple[Finding, ...]:
-    findings: list[Finding] = []
-    if not isinstance(anchor_type_keys, tuple) or any(
-        not isinstance(value, str) for value in anchor_type_keys
-    ):
-        return (
-            _finding(
-                FindingCode.INVALID_VALUE,
-                "/anchorTypeKeys",
-                "anchorTypeKeys must be a tuple of text",
-            ),
-        )
-    if not 1 <= len(anchor_type_keys) <= PUBLIC_ITEM_LIMIT:
-        findings.append(
-            _finding(
-                FindingCode.INVALID_VALUE,
-                "/anchorTypeKeys",
-                "anchorTypeKeys must contain between 1 and 1000 keys",
-            )
-        )
-    seen: set[str] = set()
-    for index, key in enumerate(anchor_type_keys):
-        if key in seen:
-            findings.append(
-                _finding(
-                    FindingCode.DUPLICATE,
-                    f"/anchorTypeKeys/{index}",
-                    "duplicate anchor type key",
-                    type_keys=(key,),
-                )
-            )
-        seen.add(key)
-    if type(include_legacy_system) is not bool:
-        findings.append(
-            _finding(
-                FindingCode.INVALID_VALUE,
-                "/includeLegacySystem",
-                "includeLegacySystem must be Boolean",
-            )
-        )
-    return _ordered_findings(findings)
-
-
-def _unknown_anchor_findings(
-    requested: tuple[str, ...], selected: tuple[TypeDefinition, ...]
-) -> tuple[Finding, ...]:
-    by_key = {value.type_key: value for value in selected}
-    findings = []
-    for index, key in enumerate(requested):
-        value = by_key.get(key)
-        if value is None:
-            findings.append(
-                _finding(
-                    FindingCode.UNKNOWN,
-                    f"/anchorTypeKeys/{index}",
-                    "unknown anchor type key",
-                    type_keys=(key,),
-                )
-            )
-        elif not isinstance(value, AnchorTypeDefinition):
-            findings.append(
-                _finding(
-                    FindingCode.KIND_MISMATCH,
-                    f"/anchorTypeKeys/{index}",
-                    "type key is not an anchor type",
-                    type_keys=(key,),
-                )
-            )
-    return _ordered_findings(findings)
-
-
 def _referenced_type_keys(query: GraphQuery) -> tuple[str, ...] | None:
     if isinstance(query.selection, IdentitySelection):
         return ()
@@ -698,87 +493,6 @@ def _identity_type_keys(uuids, selected, headers) -> tuple[str, ...]:
     return tuple(sorted(actual))
 
 
-def _definition_without_legacy(value: TypeDefinition) -> TypeDefinition:
-    if value.system is None or value.system.legacy_v1 is None:
-        return value
-    return replace(
-        value,
-        system=SystemEnvelope(value.system.created_revision, value.system.last_changed_revision),
-    )
-
-
-def _draft_anchor_type_keys(connection, maximum):
-    rows = connection.execute(
-        """SELECT type_key FROM definition_version
-           WHERE valid_to_revision IS NULL AND kind = 'anchor'
-             AND NOT EXISTS (
-               SELECT 1 FROM draft_definition_entry AS d
-               WHERE d.type_key = definition_version.type_key
-             )
-           UNION
-           SELECT type_key FROM draft_definition_entry
-           WHERE operation = 'replace' AND kind = 'anchor'
-           ORDER BY type_key LIMIT ?""",
-        (maximum,),
-    )
-    return tuple(str(row[0]) for row in rows)
-
-
-def _draft_anchor_type_count(connection):
-    return int(
-        connection.execute(
-            """SELECT count(*) FROM (
-               SELECT v.type_key FROM definition_version AS v
-               WHERE v.valid_to_revision IS NULL AND v.kind = 'anchor'
-                 AND NOT EXISTS (
-                   SELECT 1 FROM draft_definition_entry AS d
-                   WHERE d.type_key = v.type_key
-                 )
-               UNION
-               SELECT d.type_key FROM draft_definition_entry AS d
-               WHERE d.operation = 'replace' AND d.kind = 'anchor')"""
-        ).fetchone()[0]
-    )
-
-
-def _draft_neighborhood_type_keys(connection, anchor_type_keys):
-    encoded = tuple(anchor_type_keys)
-    placeholders = ",".join("?" for _ in encoded)
-    data_rows = connection.execute(
-        f"""SELECT DISTINCT p.type_key FROM definition_permitted_type AS p
-            WHERE p.valid_to_revision IS NULL AND p.role = 'anchor'
-              AND p.permitted_type_key IN ({placeholders})
-              AND NOT EXISTS (
-                SELECT 1 FROM draft_definition_entry AS d WHERE d.type_key = p.type_key)
-            UNION
-            SELECT DISTINCT p.type_key FROM draft_definition_permitted_type AS p
-            JOIN draft_definition_entry AS d USING (type_key)
-            WHERE d.operation = 'replace' AND d.kind = 'associatedData'
-              AND p.role = 'anchor' AND p.permitted_type_key IN ({placeholders})""",
-        (*encoded, *encoded),
-    ).fetchall()
-    data_keys = tuple(str(row[0]) for row in data_rows)
-    participating = tuple(dict.fromkeys((*anchor_type_keys, *data_keys)))
-    participant_placeholders = ",".join("?" for _ in participating)
-    link_rows = connection.execute(
-        f"""SELECT DISTINCT p.type_key FROM definition_permitted_type AS p
-            WHERE p.valid_to_revision IS NULL AND p.role IN ('source', 'target')
-              AND p.permitted_type_key IN ({participant_placeholders})
-              AND NOT EXISTS (
-                SELECT 1 FROM draft_definition_entry AS d WHERE d.type_key = p.type_key)
-            UNION
-            SELECT DISTINCT p.type_key FROM draft_definition_permitted_type AS p
-            JOIN draft_definition_entry AS d USING (type_key)
-            WHERE d.operation = 'replace' AND d.kind = 'link'
-              AND p.role IN ('source', 'target')
-              AND p.permitted_type_key IN ({participant_placeholders})""",
-        (*participating, *participating),
-    ).fetchall()
-    return tuple(
-        dict.fromkeys((*anchor_type_keys, *data_keys, *(str(row[0]) for row in link_rows)))
-    )
-
-
 def _draft_pattern_definition_keys(query, headers):
     selection = query.selection
     keys = {value.type_key for value in headers.values()}
@@ -803,18 +517,6 @@ def _full_text_scopes(selection):
         for node in selection.nodes
         for predicate in node.predicates
         if predicate.operator in operators
-    )
-
-
-def _neighborhood_legacy(
-    value: DefinitionNeighborhood, include_legacy_system: bool
-) -> DefinitionNeighborhood:
-    if include_legacy_system:
-        return value
-    return DefinitionNeighborhood(
-        _definition_without_legacy(value.anchor_type),
-        tuple(_definition_without_legacy(item) for item in value.associated_data_types),
-        tuple(_definition_without_legacy(item) for item in value.link_types),
     )
 
 
@@ -848,3 +550,49 @@ def _ordered_findings(findings: list[Finding]) -> tuple[Finding, ...]:
             ),
         )
     )
+
+
+def _append_read_activity(
+    connection,
+    capability,
+    result,
+    request_payload,
+    result_shape,
+    initiator,
+    source,
+):
+    append_activity(
+        connection,
+        capability=capability,
+        outcome=result.status.value,
+        initiator=initiator,
+        source=source,
+        evaluated_revision=result.evaluated_revision,
+        resulting_revision=None,
+        summary=result.summary,
+        semantic_payload={
+            "request": request_payload,
+            "resultShape": result_shape,
+            "findings": wire_value(result.findings),
+        },
+        verbose_payload={"request": request_payload, "response": wire_value(result)},
+    )
+
+
+def _query_activity_shape(result):
+    payload = result.payload
+    if payload is None:
+        return {"bindingCount": 0, "objectCount": 0, "bindings": []}
+    if isinstance(payload, IdentityQueryPayload):
+        bindings = [{"uuid": value} for value in payload.found_uuids[:100]]
+        return {
+            "bindingCount": len(payload.found_uuids),
+            "missingCount": len(payload.missing_uuids),
+            "objectCount": len(payload.objects),
+            "bindings": bindings,
+        }
+    return {
+        "bindingCount": len(payload.matches),
+        "objectCount": len(payload.objects),
+        "bindings": [wire_value(value.bindings) for value in payload.matches[:100]],
+    }

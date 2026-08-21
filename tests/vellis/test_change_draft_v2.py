@@ -25,6 +25,7 @@ from vellis.change_domain import (
     ValidationScope,
 )
 from vellis.change_operations import apply_graph_change
+from vellis.discovery_operations import type_inspect, type_summary
 from vellis.domain import (
     Anchor,
     AnchorTypeDefinition,
@@ -67,7 +68,7 @@ from vellis.query_domain import (
     PropertyField,
     PropertySelection,
 )
-from vellis.read_operations import query_graph, type_inspect, type_summary
+from vellis.read_operations import query_graph
 
 PERSON = "11111111-1111-4111-8111-111111111111"
 PERSON_2 = "22222222-2222-4222-8222-222222222222"

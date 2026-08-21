@@ -8,7 +8,7 @@ from dataclasses import fields, is_dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
-from vellis.activity_repository import append_activity
+from vellis.activity_repository import append_activity, canonical_activity_effect
 from vellis.canonical_encoding import CanonicalHeader, canonical_record_hash
 from vellis.database import connect_database, require_supported_database
 from vellis.definition_repository import load_definitions
@@ -101,6 +101,7 @@ def apply_graph_change(
                 resulting_revision=None,
                 summary=result.summary,
                 semantic_payload={"request": _wire(request), "findings": _wire(result.findings)},
+                verbose_payload={"request": _wire(request), "response": _wire(result)},
             )
             connection.commit()
             return result
@@ -122,7 +123,8 @@ def apply_graph_change(
                 evaluated_revision=state.evaluated_revision,
                 resulting_revision=None,
                 summary=result.summary,
-                semantic_payload={"affectedUuids": []},
+                semantic_payload=canonical_activity_effect(connection, None),
+                verbose_payload={"request": _wire(request), "response": _wire(result)},
             )
             connection.commit()
             return result
@@ -154,7 +156,8 @@ def apply_graph_change(
             evaluated_revision=state.evaluated_revision,
             resulting_revision=revision,
             summary=result.summary,
-            semantic_payload={"affectedUuids": sorted((*removed, *(v.uuid for v in changed)))},
+            semantic_payload=canonical_activity_effect(connection, revision),
+            verbose_payload={"request": _wire(request), "response": _wire(result)},
         )
         connection.commit()
         return result
@@ -685,7 +688,9 @@ def _wire(value):
         return [_wire(item) for item in value]
     if is_dataclass(value):
         return {
-            field.name: _wire(getattr(value, field.name)) for field in fields(value) if field.init
+            field.name: _wire(getattr(value, field.name))
+            for field in fields(value)
+            if not field.name.startswith("_")
         }
     if hasattr(value, "value") and isinstance(value.value, str):
         return value.value

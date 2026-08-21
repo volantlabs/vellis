@@ -72,8 +72,17 @@ def inspect_draft(
             resulting_revision=None,
             summary=result.outcome.summary,
             semantic_payload={
-                "returnedCount": None if result.payload is None else result.payload.returned_count
+                "request": _wire(request),
+                "returnedCount": None if result.payload is None else result.payload.returned_count,
+                "rawEntryCount": (
+                    None if result.payload is None else result.payload.counts.raw_entry_count
+                ),
+                "effectiveChangeCount": (
+                    None if result.payload is None else result.payload.counts.effective_change_count
+                ),
+                "findings": _wire(result.outcome.findings),
             },
+            verbose_payload={"request": _wire(request), "response": _wire(result)},
         )
         connection.commit()
         return result

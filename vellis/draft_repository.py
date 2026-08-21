@@ -48,10 +48,12 @@ def ensure_draft(connection: sqlite3.Connection) -> None:
 
 def remove_draft_if_empty(connection: sqlite3.Connection) -> None:
     if raw_entry_count(connection) == 0:
+        connection.execute("DELETE FROM validation_run WHERE scope = 'draft'")
         connection.execute("DELETE FROM draft_metadata WHERE singleton = 1")
 
 
 def clear_draft(connection: sqlite3.Connection) -> None:
+    connection.execute("DELETE FROM validation_run WHERE scope = 'draft'")
     for relation in (
         "draft_definition_permitted_type",
         "draft_property_definition_allowed_value",
@@ -209,6 +211,13 @@ def load_draft_graph(
 
 
 def draft_fingerprint(connection: sqlite3.Connection) -> bytes:
+    digest = computed_draft_fingerprint(connection)
+    connection.execute("UPDATE draft_metadata SET fingerprint = ? WHERE singleton = 1", (digest,))
+    return digest
+
+
+def computed_draft_fingerprint(connection: sqlite3.Connection) -> bytes:
+    """Compute the normalized draft digest without mutating metadata."""
     relations = (
         ("draft_definition_entry", "type_key"),
         ("draft_definition_permitted_type", "type_key, role, permitted_type_key"),
@@ -233,9 +242,7 @@ def draft_fingerprint(connection: sqlite3.Connection) -> bytes:
                 )
                 yield Record(fields)
 
-    digest = ordered_values_hash(rows)
-    connection.execute("UPDATE draft_metadata SET fingerprint = ? WHERE singleton = 1", (digest,))
-    return digest
+    return ordered_values_hash(rows)
 
 
 def _merge_structural_patch(connection, upsert) -> None:

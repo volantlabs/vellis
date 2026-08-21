@@ -117,9 +117,9 @@ findings:
     classification: implementation defect
     consequence: Recovery and historical reads carry several state authorities for a local SQLite product.
     authority_refs: [owner-plan:sections-4.10-and-4.11]
-    evidence_refs: []
+    evidence_refs: [path:docs/v2-simplification-phase5-evidence.md#predecessor-reachability-and-subtraction, path:docs/v2-simplification-phase5-evidence.md#evidence-status]
     disposition: implementation-work
-    owner_work_item_id: W005
+    owner_work_item_id: W008
     implementation_status: conflicting
     nearest_wrong_system: Version tables are added while replay remains authoritative or public.
     compatibility_effect: SQLite history, restore, audit, and backup replace snapshot and replay.
@@ -238,8 +238,8 @@ decisions:
     reversible: false
     owner_work_item_id: W005
     evidence_intent: [Reads do not replay., Audit detects corruption., Backup works while serving and excludes sidecars.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_history_recovery_v2.py#test_history_is_complete_bounded_ordered_and_excludes_its_own_activity, path:tests/vellis/test_history_recovery_v2.py#test_restore_revision_preserves_lineage_metadata_and_intervening_history, path:tests/vellis/test_history_recovery_v2.py#test_read_only_audit_detects_independent_relation_corruption, path:tests/vellis/test_history_recovery_v2.py#test_online_backup_and_initialization_preserve_complete_database_only, path:docs/v2-simplification-phase5-evidence.md#evidence-status]
   - id: D007
     summary: Stream v1 JSON through staging SQLite and report every disposition before publication.
     authority_refs: [owner-plan:section-4.12]
@@ -402,16 +402,16 @@ work_items:
     kind: implementation
     dependencies: [W004]
     planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: [F006]
+    finding_ids: []
     decision_ids: [D006]
     authority: [{refs: [owner-plan:phase-5], coverage: full, remaining_work_item_ids: []}]
     approval: {status: not-required, reason: The approved plan selects indexed history and SQLite recovery., checkpoint: null}
     nearest_wrong_system: Version tables coexist with replay, snapshot APIs, or duplicated mutation payloads.
-    compatibility_effect: Replay artifacts and preserve commands are removed.
+    compatibility_effect: The Phase 5 successor uses indexed history and SQLite recovery; predecessor replay, snapshot, tail, and preserve reachability remains W008 subtraction work.
     non_effects: [No activity hash chain., No pruning., No checkpoint framework.]
     lifecycle: active
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:docs/v2-simplification-phase5-evidence.md#implemented-distinction, path:docs/v2-simplification-phase5-evidence.md#evidence-status, command:uv run pytest -q tests/vellis/test_domain_v2.py tests/vellis/test_canonical_encoding_v2.py tests/vellis/test_storage_v2.py tests/vellis/test_query_v2_successor.py tests/vellis/test_change_draft_v2.py tests/vellis/test_history_recovery_v2.py, command:just lint, command:just typecheck, command:just model-check, command:just model-reference-check, command:just system-evolution-check]
     blocker: null
     checkpoint: null
   - id: W006
@@ -456,7 +456,7 @@ work_items:
     kind: closure
     dependencies: [W007]
     planned_baseline: {dimension: model, identity: "sha256:8af0ac5250d5186b8baa693bc8ebcc2b5e69f0e130754fbc676cb2302bfa8794"}
-    finding_ids: [F002, F003, F004, F010]
+    finding_ids: [F002, F003, F004, F006, F010]
     decision_ids: [D009]
     authority: [{refs: [owner-plan:phase-8], coverage: full, remaining_work_item_ids: []}]
     approval: {status: not-required, reason: Closure removes superseded paths and aligns claims., checkpoint: null}

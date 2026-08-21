@@ -9,7 +9,7 @@ import secrets
 from dataclasses import fields, is_dataclass
 from pathlib import Path
 
-from vellis.activity_repository import append_activity
+from vellis.activity_repository import append_activity, canonical_activity_effect
 from vellis.change_domain import (
     DraftChangeRequest,
     DraftChangeResult,
@@ -94,9 +94,19 @@ def change_draft(
             resulting_revision=None,
             summary=result.outcome.summary,
             semantic_payload={
+                "request": (
+                    _wire(request) if result.outcome.status is OperationStatus.REJECTED else None
+                ),
                 "keys": _draft_request_keys(request),
+                "rawEntryCount": (
+                    None if result.payload is None else result.payload.raw_entry_count
+                ),
+                "effectiveChangeCount": (
+                    None if result.payload is None else result.payload.effective_change_count
+                ),
                 "findings": _wire(result.outcome.findings),
             },
+            verbose_payload={"request": _wire(request), "response": _wire(result)},
         )
         connection.commit()
         return result
@@ -134,9 +144,11 @@ def validate_state(
             resulting_revision=None,
             summary=result.outcome.summary,
             semantic_payload={
-                "scope": request.scope.value,
+                "request": _wire(request),
                 "totalFindings": None if result.payload is None else result.payload.total_findings,
+                "findings": _validation_activity_findings(connection, request.scope.value, result),
             },
+            verbose_payload={"request": _wire(request), "response": _wire(result)},
         )
         connection.commit()
         return result
@@ -175,6 +187,7 @@ def discard_draft(
             resulting_revision=None,
             summary=result.summary,
             semantic_payload={"draftWasPresent": was_present},
+            verbose_payload={"request": {}, "response": _wire(result)},
         )
         connection.commit()
         return result
@@ -372,7 +385,8 @@ def _continue_validation(connection, request, revision):
         )
     else:
         connection.execute(
-            "UPDATE validation_run SET cursor_hash = NULL, next_offset = NULL WHERE scope = ?",
+            """UPDATE validation_run SET cursor_hash = NULL, next_offset = NULL,
+               page_limit = NULL WHERE scope = ?""",
             (request.scope.value,),
         )
     payload = ValidationPayload(
@@ -551,6 +565,11 @@ def _draft_request_findings(connection, request):
 
 def _append_activation(connection, result, initiator, source):
     _serialize(result)
+    semantic: dict[str, object] = {
+        "findings": _validation_activity_findings(connection, "draft", result)
+    }
+    if result.outcome.status is OperationStatus.ACCEPTED:
+        semantic.update(canonical_activity_effect(connection, result.outcome.resulting_revision))
     append_activity(
         connection,
         capability="rtg_draft_activate",
@@ -560,7 +579,8 @@ def _append_activation(connection, result, initiator, source):
         evaluated_revision=result.outcome.evaluated_revision,
         resulting_revision=result.outcome.resulting_revision,
         summary=result.outcome.summary,
-        semantic_payload={"findings": _wire(result.outcome.findings)},
+        semantic_payload=semantic,
+        verbose_payload={"request": {}, "response": _wire(result)},
     )
 
 
@@ -619,13 +639,26 @@ def _wire(value):
         return [_wire(item) for item in value]
     if is_dataclass(value):
         return {
-            field.name: _wire(getattr(value, field.name)) for field in fields(value) if field.init
+            field.name: _wire(getattr(value, field.name))
+            for field in fields(value)
+            if not field.name.startswith("_")
         }
     if hasattr(value, "wire_value"):
         return value.wire_value()
     if hasattr(value, "value") and isinstance(value.value, str):
         return value.value
     return value
+
+
+def _validation_activity_findings(connection, scope, result):
+    if result.payload is None:
+        return _wire(result.outcome.findings)
+    return [
+        json.loads(str(row[0]))
+        for row in connection.execute(
+            "SELECT finding FROM validation_finding WHERE scope = ? ORDER BY ordinal", (scope,)
+        )
+    ]
 
 
 def _serialize(value):

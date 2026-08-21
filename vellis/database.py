@@ -747,14 +747,14 @@ CREATE TABLE activity_header (
     source TEXT,
     evaluated_revision INTEGER,
     resulting_revision INTEGER,
-    summary TEXT NOT NULL,
-    semantic_payload TEXT NOT NULL
+    summary TEXT NOT NULL
 ) STRICT;
 CREATE INDEX activity_time_idx
     ON activity_header(recorded_epoch_seconds, recorded_nanosecond, sequence);
 CREATE TABLE activity_payload (
     sequence INTEGER PRIMARY KEY REFERENCES activity_header(sequence) ON DELETE CASCADE,
-    verbose_payload TEXT NOT NULL
+    semantic_payload TEXT NOT NULL,
+    verbose_payload TEXT
 ) STRICT;
 
 CREATE TABLE search_document (

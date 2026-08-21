@@ -2,30 +2,29 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+from vellis.audit_governance import check_governance
+from vellis.audit_observability import check_observability
 from vellis.canonical_encoding import (
     CanonicalHeader,
     Record,
     RowDescriptor,
-    canonical_record_hash,
-    encode,
+    canonical_record_hash_members,
+    descriptor_member,
 )
 from vellis.database import connect_database, require_supported_database
 from vellis.definition_repository import definition_descriptors, load_definitions
 from vellis.domain import (
-    GraphObject,
     RevisionState,
-    TypeDefinition,
     canonical_uuid,
     parse_timestamp,
 )
-from vellis.domain_validation import definition_set_findings, graph_findings
-from vellis.graph_repository import graph_descriptors, load_graph
+from vellis.graph_repository import graph_descriptors, load_graph_objects
 from vellis.state_repository import resolve_state
+from vellis.state_validation_repository import first_state_finding
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +34,14 @@ class AuditReport:
     @property
     def clean(self) -> bool:
         return not self.findings
+
+
+class _FindingCategories(list[str]):
+    """Retain each fixed audit category once while state-wide scans continue."""
+
+    def append(self, finding: str) -> None:
+        if finding not in self:
+            super().append(finding)
 
 
 def audit_database(path: Path) -> AuditReport:
@@ -57,25 +64,23 @@ def audit_connection(connection: sqlite3.Connection) -> AuditReport:
 
 
 def _audit_snapshot(connection: sqlite3.Connection) -> AuditReport:
-    findings: list[str] = []
+    findings: list[str] = _FindingCategories()
     try:
         require_supported_database(connection)
         _check_lineage_identity(connection, findings)
         _check_sqlite_integrity(connection, findings)
-        records = connection.execute("SELECT * FROM canonical_record ORDER BY revision").fetchall()
-        _check_record_sequence(records, findings)
-        _check_head(connection, records, findings)
         _check_intervals(connection, findings)
         _check_child_boundaries(connection, findings)
         _check_reservations(connection, findings)
         _check_closed_storage_shapes(connection, findings)
         _check_version_metadata(connection, findings)
         _check_timestamp_representations(connection, findings)
-        _check_revisions(connection, records, findings)
-        _check_search_projection(connection, findings)
+        _check_revisions(connection, findings)
+        check_observability(connection, findings)
+        check_governance(connection, findings)
     except (sqlite3.DatabaseError, ValueError, TypeError, KeyError, OverflowError) as error:
         findings.append(f"integrity inspection could not decode stored content: {error}")
-    return AuditReport(tuple(sorted(set(findings))))
+    return AuditReport(tuple(sorted(findings)))
 
 
 def _check_lineage_identity(connection: sqlite3.Connection, findings: list[str]) -> None:
@@ -112,8 +117,7 @@ def _check_closed_storage_shapes(connection: sqlite3.Connection, findings: list[
         ("property_definition_allowed_value", _allowed_value_shape),
     )
     for relation, valid in checks:
-        rows = connection.execute(f"SELECT * FROM {relation}").fetchall()
-        invalid = sum(not valid(row) for row in rows)
+        invalid = sum(not valid(row) for row in connection.execute(f"SELECT * FROM {relation}"))
         if invalid:
             findings.append(f"{relation} contains {invalid} rows with incompatible stored fields")
 
@@ -254,47 +258,13 @@ def _expected_typed_columns(prefix: str, kind: str) -> set[str] | None:
 
 
 def _check_sqlite_integrity(connection: sqlite3.Connection, findings: list[str]) -> None:
-    rows = connection.execute("PRAGMA integrity_check").fetchall()
-    messages = [str(row[0]) for row in rows]
-    if messages != ["ok"]:
-        findings.extend(f"SQLite integrity: {message}" for message in messages)
-    foreign_key_rows = connection.execute("PRAGMA foreign_key_check").fetchall()
-    if foreign_key_rows:
-        findings.append(f"SQLite reports {len(foreign_key_rows)} foreign-key violations")
-
-
-def _check_record_sequence(records: list[sqlite3.Row], findings: list[str]) -> None:
-    if not records:
-        findings.append("canonical history is empty")
-        return
-    expected = list(range(len(records)))
-    actual = [int(row["revision"]) for row in records]
-    if actual != expected:
-        findings.append("canonical revisions are not contiguous from zero")
-    times = [
-        (int(row["recorded_epoch_seconds"]), int(row["recorded_nanosecond"])) for row in records
-    ]
-    if times != sorted(times):
-        findings.append("canonical recorded times decrease")
-    for row in records:
-        if not _timestamp_matches(
-            row["recorded_at"], row["recorded_epoch_seconds"], row["recorded_nanosecond"]
-        ):
-            findings.append(f"revision {int(row['revision'])}: recorded time fields differ")
-
-
-def _check_head(
-    connection: sqlite3.Connection, records: list[sqlite3.Row], findings: list[str]
-) -> None:
-    if not records:
-        return
-    head = int(
-        connection.execute(
-            "SELECT head_revision FROM metadata_setting WHERE singleton = 1"
-        ).fetchone()[0]
-    )
-    if head != int(records[-1]["revision"]):
-        findings.append("metadata head does not identify the greatest canonical revision")
+    integrity_ok = True
+    for row in connection.execute("PRAGMA integrity_check"):
+        integrity_ok = integrity_ok and str(row[0]) == "ok"
+    if not integrity_ok:
+        findings.append("SQLite integrity check reported corruption")
+    if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
+        findings.append("SQLite reports foreign-key violations")
 
 
 def _check_intervals(connection: sqlite3.Connection, findings: list[str]) -> None:
@@ -469,47 +439,57 @@ def _check_timestamp_representations(connection: sqlite3.Connection, findings: l
     for relation, where, text_column, seconds_column, nanos_column in checks:
         rows = connection.execute(
             f"SELECT {text_column}, {seconds_column}, {nanos_column} FROM {relation} WHERE {where}"
-        ).fetchall()
+        )
         if any(not _timestamp_matches(*row) for row in rows):
             findings.append(f"{relation} contains inconsistent timestamp representations")
 
 
-def _check_revisions(
-    connection: sqlite3.Connection,
-    records: list[sqlite3.Row],
-    findings: list[str],
-) -> None:
+def _check_revisions(connection: sqlite3.Connection, findings: list[str]) -> None:
+    _prepare_audit_descriptors(connection, findings)
     previous_hash = bytes(32)
+    previous_time: tuple[int, int] | None = None
+    expected_revision = 0
+    semantic_invalid = False
     lineage_uuid = str(
         connection.execute(
             "SELECT lineage_uuid FROM metadata_setting WHERE singleton = 1"
         ).fetchone()[0]
     )
+    records = connection.execute("SELECT * FROM canonical_record ORDER BY revision")
     for row in records:
         revision = int(row["revision"])
+        if revision != expected_revision:
+            findings.append("canonical revisions are not contiguous from zero")
+        expected_revision = revision + 1
+        timestamp = (int(row["recorded_epoch_seconds"]), int(row["recorded_nanosecond"]))
+        if previous_time is not None and timestamp < previous_time:
+            findings.append("canonical recorded times decrease")
+        previous_time = timestamp
+        if not _timestamp_matches(
+            row["recorded_at"], row["recorded_epoch_seconds"], row["recorded_nanosecond"]
+        ):
+            findings.append("canonical recorded time fields differ")
         state = resolve_state(connection, RevisionState(revision))
-        definitions = load_definitions(connection, state)
-        graph = load_graph(connection, state)
-        findings.extend(
-            f"revision {revision}: {finding.summary}"
-            for finding in definition_set_findings(definitions, require_system=True)
-        )
-        findings.extend(
-            f"revision {revision}: {finding.summary}"
-            for finding in graph_findings(graph, definitions, require_system=True)
-        )
-        expected = _expected_introduced(connection, definitions, graph, revision)
+        semantic_invalid = semantic_invalid or first_state_finding(connection, state) is not None
         _check_affected_keys(connection, row, revision, findings)
-        actual = _stored_descriptors(connection, revision, introduced=True)
-        _compare_descriptors(expected, actual, revision, findings)
-        retired = _stored_descriptors(connection, revision, introduced=False)
         header = _header_from_row(row, lineage_uuid)
-        computed_hash = canonical_record_hash(previous_hash, header, expected, retired)
+        computed_hash = _audit_record_hash(connection, previous_hash, header, revision)
         if bytes(row["previous_hash"]) != previous_hash:
-            findings.append(f"revision {revision}: previous canonical hash differs")
+            findings.append("previous canonical hashes differ")
         if bytes(row["record_hash"]) != computed_hash:
-            findings.append(f"revision {revision}: canonical record hash differs")
+            findings.append("canonical record hashes differ")
         previous_hash = bytes(row["record_hash"])
+    if expected_revision == 0:
+        findings.append("canonical history is empty")
+    head = int(
+        connection.execute(
+            "SELECT head_revision FROM metadata_setting WHERE singleton = 1"
+        ).fetchone()[0]
+    )
+    if head != expected_revision - 1:
+        findings.append("metadata head does not identify the greatest canonical revision")
+    if semantic_invalid:
+        findings.append("a canonical revision is not graph-conforming")
 
 
 def _check_affected_keys(
@@ -518,64 +498,102 @@ def _check_affected_keys(
     revision: int,
     findings: list[str],
 ) -> None:
-    expected_types = _changed_keys(connection, "definition_version", "type_key", revision)
-    expected_uuids = _changed_keys(connection, "graph_object_version", "uuid", revision)
-    expected_type_text = json.dumps(expected_types, separators=(",", ":"))
-    expected_uuid_text = json.dumps(expected_uuids, separators=(",", ":"))
-    if record["affected_type_keys"] != expected_type_text:
-        findings.append(f"revision {revision}: affected type keys differ from version changes")
-    if record["affected_uuids"] != expected_uuid_text:
-        findings.append(f"revision {revision}: affected UUIDs differ from version changes")
+    checks = (
+        ("definition_version", "type_key", "affected_type_keys"),
+        ("graph_object_version", "uuid", "affected_uuids"),
+    )
+    for relation, key, column in checks:
+        if _affected_keys_differ(connection, relation, key, revision, record[column]):
+            findings.append(f"canonical {column} differ from version changes")
 
 
-def _changed_keys(
-    connection: sqlite3.Connection, relation: str, key: str, revision: int
-) -> list[str]:
-    return [
-        str(row[0])
-        for row in connection.execute(
-            f"""
-            SELECT DISTINCT {key}
-            FROM {relation}
-            WHERE valid_from_revision = ? OR valid_to_revision = ?
-            ORDER BY {key}
-            """,
-            (revision, revision),
+def _affected_keys_differ(connection, relation, key, revision, stored):
+    if not isinstance(stored, str):
+        return True
+    valid = connection.execute("SELECT json_valid(?)", (stored,)).fetchone()
+    if not bool(valid[0]):
+        return True
+    row = connection.execute(
+        f"""WITH expected(value) AS (
+               SELECT DISTINCT {key} FROM {relation}
+               WHERE valid_from_revision = ? OR valid_to_revision = ?),
+             supplied(value) AS (SELECT value FROM json_each(?))
+             SELECT EXISTS(SELECT value FROM expected EXCEPT SELECT value FROM supplied)
+                 OR EXISTS(SELECT value FROM supplied EXCEPT SELECT value FROM expected)
+                 OR (SELECT count(*) FROM supplied) <> (SELECT count(*) FROM expected)
+                 OR ? <> (SELECT json_group_array(value)
+                           FROM (SELECT value FROM expected ORDER BY value))""",
+        (revision, revision, stored, stored),
+    ).fetchone()
+    return bool(row[0])
+
+
+def _prepare_audit_descriptors(connection, findings):
+    connection.execute("DROP TABLE IF EXISTS temp.audit_descriptor")
+    connection.execute(
+        """CREATE TEMP TABLE audit_descriptor(
+           relation_name TEXT NOT NULL, identity BLOB NOT NULL,
+           valid_from_revision INTEGER NOT NULL, valid_to_revision INTEGER,
+           expected_digest BLOB, expected_member BLOB,
+           actual_digest BLOB, actual_member BLOB,
+           PRIMARY KEY(relation_name, identity)) WITHOUT ROWID"""
+    )
+    _store_expected_descriptors(connection)
+    _store_actual_descriptors(connection)
+    missing = connection.execute(
+        """SELECT 1 FROM audit_descriptor
+           WHERE expected_digest IS NULL OR actual_digest IS NULL LIMIT 1"""
+    ).fetchone()
+    mismatch = connection.execute(
+        """SELECT 1 FROM audit_descriptor
+           WHERE expected_digest <> actual_digest LIMIT 1"""
+    ).fetchone()
+    if missing is not None:
+        findings.append("introduced version identities differ from decoded state")
+    if mismatch is not None:
+        findings.append("introduced version row digests differ from decoded state")
+
+
+def _store_expected_descriptors(connection):
+    definition_rows = connection.execute(
+        """SELECT type_key, valid_from_revision FROM definition_version
+           ORDER BY type_key, valid_from_revision"""
+    )
+    for row in definition_rows:
+        revision = int(row["valid_from_revision"])
+        state = resolve_state(connection, RevisionState(revision))
+        values = load_definitions(connection, state, (str(row["type_key"]),))
+        for descriptor in definition_descriptors(values, revision):
+            _put_expected_descriptor(connection, descriptor, revision)
+    graph_rows = connection.execute(
+        """SELECT uuid, valid_from_revision FROM graph_object_version
+           ORDER BY uuid, valid_from_revision"""
+    )
+    for row in graph_rows:
+        revision = int(row["valid_from_revision"])
+        state = resolve_state(connection, RevisionState(revision))
+        values = load_graph_objects(connection, state, (str(row["uuid"]),))
+        definitions = (
+            () if not values else load_definitions(connection, state, (values[0].type_key,))
         )
-    ]
+        for descriptor in graph_descriptors(values, definitions, revision):
+            _put_expected_descriptor(connection, descriptor, revision)
 
 
-def _expected_introduced(
-    connection: sqlite3.Connection,
-    definitions: tuple[TypeDefinition, ...],
-    graph: tuple[GraphObject, ...],
-    revision: int,
-) -> tuple[RowDescriptor, ...]:
-    type_keys = {
-        str(row[0])
-        for row in connection.execute(
-            "SELECT type_key FROM definition_version WHERE valid_from_revision = ?", (revision,)
-        )
-    }
-    uuids = {
-        str(row[0])
-        for row in connection.execute(
-            "SELECT uuid FROM graph_object_version WHERE valid_from_revision = ?", (revision,)
-        )
-    }
-    changed_definitions = tuple(value for value in definitions if value.type_key in type_keys)
-    changed_graph = tuple(value for value in graph if value.uuid in uuids)
-    return (
-        *definition_descriptors(changed_definitions, revision),
-        *graph_descriptors(changed_graph, definitions, revision),
+def _put_expected_descriptor(connection, descriptor, revision):
+    identity, member = descriptor_member(descriptor)
+    connection.execute(
+        """INSERT INTO audit_descriptor(
+             relation_name, identity, valid_from_revision, expected_digest, expected_member)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(relation_name, identity) DO UPDATE SET
+             expected_digest = excluded.expected_digest,
+             expected_member = excluded.expected_member""",
+        (descriptor.relation_name, identity, revision, descriptor.row_digest, member),
     )
 
 
-def _stored_descriptors(
-    connection: sqlite3.Connection, revision: int, *, introduced: bool
-) -> tuple[RowDescriptor, ...]:
-    column = "valid_from_revision" if introduced else "valid_to_revision"
-    descriptors: list[RowDescriptor] = []
+def _store_actual_descriptors(connection):
     specs = (
         ("definition_version", ("type_key",)),
         ("definition_permitted_type", ("type_key", "role", "permitted_type_key")),
@@ -589,33 +607,59 @@ def _stored_descriptors(
         ("property_version", ("object_uuid", "property_name")),
     )
     for relation, keys in specs:
-        rows = connection.execute(
-            f"SELECT * FROM {relation} WHERE {column} = ?", (revision,)
-        ).fetchall()
-        for row in rows:
+        for row in connection.execute(f"SELECT * FROM {relation}"):
             fields = tuple((_camel(key), row[key]) for key in keys)
             identity = Record((*fields, ("validFromRevision", int(row["valid_from_revision"]))))
-            descriptors.append(RowDescriptor(relation, identity, bytes(row["row_digest"])))
-    return tuple(descriptors)
+            descriptor = RowDescriptor(relation, identity, bytes(row["row_digest"]))
+            encoded_identity, member = descriptor_member(descriptor)
+            connection.execute(
+                """INSERT INTO audit_descriptor(
+                     relation_name, identity, valid_from_revision, valid_to_revision,
+                     actual_digest, actual_member)
+                   VALUES (?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(relation_name, identity) DO UPDATE SET
+                     valid_to_revision = excluded.valid_to_revision,
+                     actual_digest = excluded.actual_digest,
+                     actual_member = excluded.actual_member""",
+                (
+                    relation,
+                    encoded_identity,
+                    int(row["valid_from_revision"]),
+                    None if row["valid_to_revision"] is None else int(row["valid_to_revision"]),
+                    descriptor.row_digest,
+                    member,
+                ),
+            )
 
 
-def _compare_descriptors(
-    expected: tuple[RowDescriptor, ...],
-    actual: tuple[RowDescriptor, ...],
-    revision: int,
-    findings: list[str],
-) -> None:
-    expected_map = {_descriptor_key(value): value.row_digest for value in expected}
-    actual_map = {_descriptor_key(value): value.row_digest for value in actual}
-    if expected_map.keys() != actual_map.keys():
-        findings.append(f"revision {revision}: introduced version identities differ")
-        return
-    if expected_map != actual_map:
-        findings.append(f"revision {revision}: introduced version row digest differs")
+def _audit_record_hash(connection, previous_hash, header, revision):
+    def members(column, boundary):
+        return (
+            bytes(row[0])
+            for row in connection.execute(
+                f"""SELECT {column} FROM audit_descriptor WHERE {boundary} = ?
+                    ORDER BY relation_name, identity""",
+                (revision,),
+            )
+        )
 
+    def length(column, boundary):
+        return int(
+            connection.execute(
+                f"""SELECT coalesce(sum(8 + length({column})), 0)
+                FROM audit_descriptor WHERE {boundary} = ?""",
+                (revision,),
+            ).fetchone()[0]
+        )
 
-def _descriptor_key(value: RowDescriptor) -> tuple[str, bytes]:
-    return value.relation_name, encode(value.identity)
+    return canonical_record_hash_members(
+        previous_hash,
+        header,
+        length("expected_member", "valid_from_revision"),
+        members("expected_member", "valid_from_revision"),
+        length("actual_member", "valid_to_revision"),
+        members("actual_member", "valid_to_revision"),
+    )
 
 
 def _header_from_row(row: sqlite3.Row, lineage_uuid: str) -> CanonicalHeader:
@@ -630,13 +674,6 @@ def _header_from_row(row: sqlite3.Row, lineage_uuid: str) -> CanonicalHeader:
         summary=str(row["summary"]),
         v1_report_digest=None if digest is None else bytes(digest),
     )
-
-
-def _check_search_projection(connection: sqlite3.Connection, findings: list[str]) -> None:
-    documents = int(connection.execute("SELECT count(*) FROM search_document").fetchone()[0])
-    indexed = int(connection.execute("SELECT count(*) FROM search_fts").fetchone()[0])
-    if documents != indexed:
-        findings.append("search document and FTS row counts differ")
 
 
 def _camel(value: str) -> str:

@@ -13,6 +13,7 @@ import vellis.read_operations as read_operations
 from tests.vellis.v2_query_fixture import initialized_query_database
 from tests.vellis.v2_query_oracle import evaluate_pattern
 from vellis.database import connect_database
+from vellis.discovery_operations import type_inspect, type_summary
 from vellis.domain import (
     Anchor,
     AnchorTypeDefinition,
@@ -47,7 +48,7 @@ from vellis.query_domain import (
     PropertyField,
     PropertySelection,
 )
-from vellis.read_operations import query_graph, type_inspect, type_summary
+from vellis.read_operations import query_graph
 
 A = "10000000-0000-4000-8000-000000000001"
 B = "10000000-0000-4000-8000-000000000002"

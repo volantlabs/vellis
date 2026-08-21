@@ -74,6 +74,25 @@ def definition_set_findings(
     return _ordered(findings)
 
 
+def type_definition_findings(
+    definition: TypeDefinition,
+    referenced_definitions: Iterable[TypeDefinition],
+    *,
+    require_system: bool,
+) -> tuple[Finding, ...]:
+    """Validate one definition without materializing the complete definition set."""
+    path = f"/definitions/{definition.type_key}"
+    findings: list[Finding] = []
+    _require_nonempty(definition.type_key, f"{path}/typeKey", "type key", findings)
+    _require_nonempty(definition.description, f"{path}/description", "description", findings)
+    _validate_system(definition.system, path, require_system, findings)
+    _validate_definition_content(definition, path, findings)
+    references = {value.type_key: value for value in referenced_definitions}
+    references[definition.type_key] = definition
+    _validate_definition_references(definition, references, path, findings)
+    return _ordered(findings)
+
+
 def graph_findings(
     objects: Iterable[GraphObject],
     definitions: Iterable[TypeDefinition],
