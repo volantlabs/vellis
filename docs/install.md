@@ -50,6 +50,7 @@ uv tool uninstall vellis
 | `vellis` is not found after `uv tool install` | The tool bin directory is not on `PATH`. | Run `uv tool update-shell`, or add `uv tool dir --bin` to `PATH` yourself, then open a new shell. |
 | `vellis setup` exits with `noninteractive setup requires an explicit initialization mode` | Fresh `setup` run without a mode flag from a script or agent (no interactive terminal to confirm a preselected choice in). | Pass `--starter` for the recommended Everyday Life vocabulary, `--blank` for an empty graph, `--from-v1 <path>` to import a v1 snapshot, or `--from-backup <path>` to restore a backup. |
 | Install fails with a Python version conflict and no download occurred | Python downloads are disabled in your environment (`UV_PYTHON_DOWNLOADS=never` or `--no-python-downloads`) and no Python 3.14+ is present. | Install Python 3.14+ yourself, or re-enable downloads and retry. |
+| Reinstalling from a local checkout appears to succeed in well under a second, but the installed `vellis` still behaves like the old code | `uv tool install --force <path>` reuses a cached build when the version string is unchanged, so edits to a working tree are not picked up. | Use `uv tool install --force --reinstall --no-cache <path>`. Verify with `vellis --help` or by probing the running server, not by the install output alone. |
 
 See the [README](../README.md#install) for the canonical commands and
 [AGENTS.md](../AGENTS.md#running-vellis) for the agent-facing setup path.

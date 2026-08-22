@@ -106,7 +106,12 @@ class _ConditionalTool(Tool):
 
 
 def _one_of_schema(*models: type[BaseModel]) -> dict[str, object]:
-    return {"oneOf": [model.model_json_schema(by_alias=True) for model in models]}
+    # MCP requires every inputSchema to declare type "object"; a bare oneOf is
+    # rejected by strict clients even though each branch is itself an object.
+    return {
+        "type": "object",
+        "oneOf": [model.model_json_schema(by_alias=True) for model in models],
+    }
 
 
 def _draft_inspect_conditional_tool(database_path: Path, description: str) -> Tool:

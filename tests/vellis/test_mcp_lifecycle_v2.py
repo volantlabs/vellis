@@ -940,6 +940,10 @@ async def test_public_server_lists_strict_selected_tools_and_calls_successor(
         value.inputSchema.get("additionalProperties") is False or "oneOf" in value.inputSchema
         for value in tools
     )
+    # MCP requires every inputSchema to declare type "object". A bare oneOf parses
+    # locally but strict clients reject the whole tools/list response, which takes
+    # the entire server down, not just the offending tool.
+    assert {value.name for value in tools if value.inputSchema.get("type") != "object"} == set()
     expected_properties = {
         "rtg_type_summary": {"state"},
         "rtg_type_inspect": {"anchorTypeKeys", "state", "includeLegacySystem"},
