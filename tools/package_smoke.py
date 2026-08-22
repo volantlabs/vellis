@@ -75,6 +75,29 @@ def _documented_install_commands(root: Path) -> tuple[list[str], list[str], str]
     return install_argv, trial_argv, clone_source
 
 
+def _run_isolated_tool(
+    *arguments: str, cwd: Path, environment: dict[str, str], temporary: Path
+) -> subprocess.CompletedProcess[str]:
+    """Run a ``uv tool``/``uvx`` command, re-verifying isolation on every call.
+
+    The isolation check lives here, not beside where ``environment`` is built, so
+    there is exactly one function in this module capable of running a tool-install
+    command against real ``uv`` state -- a future call site cannot silently skip
+    the check by threading a different or unvalidated environment into a bare
+    ``_run(...)``, and forgetting ``env=`` here is a hard error, not a fallback to
+    the real ``os.environ``.
+    """
+    resolved_temporary = temporary.resolve()
+    for variable in ("UV_TOOL_DIR", "UV_TOOL_BIN_DIR"):
+        resolved = Path(environment[variable]).resolve()
+        if resolved != resolved_temporary and resolved_temporary not in resolved.parents:
+            raise AssertionError(
+                f"refusing to run an isolated tool command with {variable}="
+                f"{environment[variable]!r} outside its isolated temp root {temporary}"
+            )
+    return _run(*arguments, cwd=cwd, env=environment)
+
+
 def _verify_documented_install(
     root: Path, temporary: Path, cache_environment: dict[str, str]
 ) -> None:
@@ -83,11 +106,10 @@ def _verify_documented_install(
     ``git+file://{root}`` (and the plain local ``git clone {root}``) exercise a real
     clone's failure mode -- installing from a working-tree directory would pass even
     if a file needed by ``git+https`` were untracked -- so this validates HEAD, not
-    the working tree. Every side effect stays inside ``temporary``; the environment-
-    value check below inspects what will actually be passed to the subprocess, not
-    just the pre-computed path objects, so a refactor that silently drops the
-    isolation override is caught here instead of overwriting the operator's real
-    installed ``vellis``.
+    the working tree. Every ``uv tool``/``uvx`` invocation routes through
+    ``_run_isolated_tool``, which re-verifies isolation itself rather than trusting a
+    check performed elsewhere, so a refactor cannot silently overwrite the operator's
+    real installed ``vellis``.
     """
     install_argv, trial_argv, clone_source = _documented_install_commands(root)
 
@@ -98,16 +120,14 @@ def _verify_documented_install(
     environment["UV_TOOL_DIR"] = str(tool_dir)
     environment["UV_TOOL_BIN_DIR"] = str(tool_bin)
 
-    resolved_temporary = temporary.resolve()
-    for variable in ("UV_TOOL_DIR", "UV_TOOL_BIN_DIR"):
-        resolved = Path(environment[variable]).resolve()
-        if resolved != resolved_temporary and resolved_temporary not in resolved.parents:
-            raise AssertionError(
-                f"refusing to run the documented install check with {variable}="
-                f"{environment[variable]!r} outside its isolated temp root {temporary}"
-            )
-
-    _run(install_argv[0], "--no-config", *install_argv[1:], cwd=temporary, env=environment)
+    _run_isolated_tool(
+        install_argv[0],
+        "--no-config",
+        *install_argv[1:],
+        cwd=temporary,
+        environment=environment,
+        temporary=temporary,
+    )
 
     shim = tool_bin / "vellis"
     if not shim.is_file() or not os.access(shim, os.X_OK):
@@ -169,7 +189,14 @@ def _verify_documented_install(
             f"documented install imported version {reported_version!r}, expected {VERSION!r}"
         )
 
-    _run(trial_argv[0], "--no-config", *trial_argv[1:], cwd=temporary, env=environment)
+    _run_isolated_tool(
+        trial_argv[0],
+        "--no-config",
+        *trial_argv[1:],
+        cwd=temporary,
+        environment=environment,
+        temporary=temporary,
+    )
 
     clone_root = temporary / "vellis"
     _run("git", "clone", clone_source, str(clone_root), cwd=temporary)
