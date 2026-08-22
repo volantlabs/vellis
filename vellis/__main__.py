@@ -43,6 +43,16 @@ EXIT_FAILED = 1
 DEFAULT_HTTP_URL = "http://127.0.0.1:8000/mcp"
 DEFAULT_TOKEN_ENVIRONMENT = "VELLIS_HTTP_TOKEN"
 
+# Remedy text is derived from these so a new mode or client cannot be added
+# without the noninteractive guidance naming it too.
+SETUP_MODE_REMEDIES = (
+    ("--starter", "the recommended Everyday Life vocabulary"),
+    ("--blank", "an empty graph"),
+    ("--from-v1 <path>", "an exact v1 snapshot import"),
+    ("--from-backup <path>", "a restored backup"),
+)
+SETUP_CONNECT_CHOICES = ("codex", "claude", "both")
+
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vellis")
@@ -69,7 +79,7 @@ def _setup_parser(commands) -> None:
     parser.add_argument("--report-out", type=Path)
     parser.add_argument("--confirm-source-digest")
     parser.add_argument("--confirm-report-digest")
-    parser.add_argument("--connect", choices=("codex", "claude", "both"))
+    parser.add_argument("--connect", choices=SETUP_CONNECT_CHOICES)
     parser.add_argument("--transport", choices=tuple(TransportKind))
     parser.add_argument("--no-connect", action="store_true")
 
@@ -170,11 +180,11 @@ def _setup(arguments) -> int:
     selected = _setup_mode(arguments)
     if selected is None:
         if not interactive:
+            remedies = ", ".join(
+                f"{flag} for {description}" for flag, description in SETUP_MODE_REMEDIES
+            )
             raise ValueError(
-                "noninteractive setup requires an explicit initialization mode: "
-                "--starter for the recommended Everyday Life vocabulary, "
-                "--blank for an empty graph, --from-v1 <path> to import a v1 "
-                "snapshot, or --from-backup <path> to restore a backup"
+                f"noninteractive setup requires an explicit initialization mode: {remedies}"
             )
         selected = _interactive_setup_mode(arguments)
     if selected == "cancelled":
@@ -212,7 +222,8 @@ def _validate_setup_connection(arguments, interactive: bool) -> None:
         raise ValueError("--no-connect cannot be combined with --connect")
     if not interactive and arguments.connect is None and not arguments.no_connect:
         raise ValueError(
-            "noninteractive setup requires --connect <codex|claude|both> or --no-connect"
+            f"noninteractive setup requires --connect <{'|'.join(SETUP_CONNECT_CHOICES)}> "
+            "or --no-connect"
         )
     if not interactive and arguments.connect is not None and arguments.transport is None:
         raise ValueError("noninteractive connection requires an explicit --transport <stdio|http>")

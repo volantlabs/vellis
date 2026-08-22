@@ -44,8 +44,9 @@ uv run vellis serve --transport stdio --data-dir <that same directory>
 - Never point a throwaway `--data-dir` at `.data/` or any existing owner destination.
 - Pass `--no-connect` in unattended use; `vellis connect` mutates external client configuration and
   is covered by the `## Safety` restriction above.
-- `--starter` (the recommended Everyday Life vocabulary) or `--blank` must be given explicitly on a
-  noninteractive `setup` — there is no default when no terminal is present to confirm one.
+- One initialization mode must be given explicitly on a noninteractive `setup` — `--starter` (the
+  recommended Everyday Life vocabulary), `--blank`, `--from-v1`, or `--from-backup`. There is no
+  default when no terminal is present to confirm one.
 
 ## Skill routing
 

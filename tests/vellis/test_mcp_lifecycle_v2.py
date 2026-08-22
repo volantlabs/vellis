@@ -1989,13 +1989,26 @@ def test_setup_noninteractive_is_explicit_and_connection_failure_does_not_rollba
     assert (directory / "vellis.sqlite3").exists()
 
 
+def _setup_mode_flags() -> set[str]:
+    subparsers = next(
+        action
+        for action in main_module._parser()._subparsers._group_actions  # type: ignore[union-attr]
+        if hasattr(action, "choices")
+    )
+    setup = subparsers.choices["setup"]  # type: ignore[index]
+    modes = setup._mutually_exclusive_groups[0]
+    return {option for action in modes._group_actions for option in action.option_strings}
+
+
 def test_noninteractive_setup_mode_error_names_every_valid_flag(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert main(["setup", "--data-dir", str(tmp_path / "missing")]) == EXIT_FAILED
 
     error = capsys.readouterr().err
-    for flag in ("--starter", "--blank", "--from-v1", "--from-backup"):
+    flags = _setup_mode_flags()
+    assert flags == {"--blank", "--starter", "--from-v1", "--from-backup"}
+    for flag in flags:
         assert flag in error
 
 
@@ -2005,7 +2018,7 @@ def test_noninteractive_connect_error_names_every_valid_client(
     assert main(["setup", "--data-dir", str(tmp_path / "memory"), "--blank"]) == EXIT_FAILED
 
     error = capsys.readouterr().err
-    for client in ("codex", "claude", "both"):
+    for client in main_module.SETUP_CONNECT_CHOICES:
         assert client in error
 
 
