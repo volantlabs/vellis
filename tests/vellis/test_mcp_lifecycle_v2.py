@@ -1989,6 +1989,26 @@ def test_setup_noninteractive_is_explicit_and_connection_failure_does_not_rollba
     assert (directory / "vellis.sqlite3").exists()
 
 
+def test_noninteractive_setup_mode_error_names_every_valid_flag(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["setup", "--data-dir", str(tmp_path / "missing")]) == EXIT_FAILED
+
+    error = capsys.readouterr().err
+    for flag in ("--starter", "--blank", "--from-v1", "--from-backup"):
+        assert flag in error
+
+
+def test_noninteractive_connect_error_names_every_valid_client(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["setup", "--data-dir", str(tmp_path / "memory"), "--blank"]) == EXIT_FAILED
+
+    error = capsys.readouterr().err
+    for client in ("codex", "claude", "both"):
+        assert client in error
+
+
 def test_setup_from_backup_reports_the_preserved_head_revision(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

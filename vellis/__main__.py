@@ -171,9 +171,10 @@ def _setup(arguments) -> int:
     if selected is None:
         if not interactive:
             raise ValueError(
-                "noninteractive setup requires an explicit initialization mode; "
-                "pass --starter for the recommended Everyday Life vocabulary "
-                "or --blank for an empty graph"
+                "noninteractive setup requires an explicit initialization mode: "
+                "--starter for the recommended Everyday Life vocabulary, "
+                "--blank for an empty graph, --from-v1 <path> to import a v1 "
+                "snapshot, or --from-backup <path> to restore a backup"
             )
         selected = _interactive_setup_mode(arguments)
     if selected == "cancelled":
