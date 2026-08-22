@@ -1,9 +1,57 @@
 # Vellis
 
-Vellis is one individually owned personal AI memory and an open demonstration of model-first
-software engineering with textual SysML v2. The accepted model under [`model/`](model/) is product
-and system authority. Markdown describes how to work with that authority without restating it as a
-second contract.
+Vellis is one individually owned personal AI memory, run as a local MCP server for coding
+agents and other MCP clients.
+
+## Install
+
+```sh
+uv tool install git+https://github.com/volantlabs/vellis
+vellis --help
+```
+
+Try it without installing:
+
+```sh
+uvx --from git+https://github.com/volantlabs/vellis vellis --help
+```
+
+Working from a clone (contributors):
+
+```sh
+git clone https://github.com/volantlabs/vellis && cd vellis
+uv sync
+uv run vellis --help
+```
+
+- Requires Python 3.14 or newer; `uv` fetches it automatically if it is not already installed.
+- The `vellis` shim lands in `uv tool dir --bin` (usually `~/.local/bin`), and that directory must
+  be on `PATH` — `vellis connect` resolves the command with `shutil.which("vellis")` and records
+  the resulting absolute path into the client entry it registers.
+- Every invocation needs a subcommand. Bare `vellis` or `python -m vellis` exits with a usage
+  error, not a running server.
+
+See [`docs/install.md`](docs/install.md) for troubleshooting, pinning a version, and upgrading.
+
+## Quick start
+
+```sh
+vellis setup --starter --no-connect --data-dir ~/vellis-data
+vellis serve --transport stdio --data-dir ~/vellis-data
+```
+
+In another terminal, register the server with a supported client:
+
+```sh
+vellis connect --client claude --transport stdio --data-dir ~/vellis-data
+```
+
+An agent working unattended should use a throwaway directory and skip `connect`; see
+[`AGENTS.md`](AGENTS.md#running-vellis).
+
+Vellis is an open demonstration of model-first software engineering with textual SysML v2. The
+accepted model under [`model/`](model/) is product and system authority. Markdown describes how to
+work with that authority without restating it as a second contract.
 
 Vellis v2 deliberately removes prototype complexity. It is a scalar
 Reified Type Graph with local cardinality, progressive discovery, one bounded identity-or-pattern
@@ -13,6 +61,7 @@ STDIO or bearer-protected HTTP for one owner.
 
 ## Repository map
 
+- [`docs/install.md`](docs/install.md) covers installation, upgrading, pinning, and troubleshooting.
 - [`model/README.md`](model/README.md) maps the authoritative textual SysML packages.
 - [`docs/vision.md`](docs/vision.md) gives the engineering vision.
 - [`docs/modeling-method.md`](docs/modeling-method.md) and
@@ -62,14 +111,6 @@ The inactive campaign engine has separate explicit recipes and is not an ordinar
 The scalar domain, SQLite persistence, discovery/query, active changes, draft governance,
 history/activity, restore/audit/backup, v1 initialization, and MCP/owner boundary are implemented.
 The unreleased prototype modules and compatibility paths are absent.
-
-Vellis v2 requires Python 3.14 or newer. To install a built wheel as an isolated owner command with
-`uv`, select that runtime explicitly:
-
-```sh
-uv tool install /absolute/path/to/vellis-2.0.0-py3-none-any.whl --python 3.14
-vellis --help
-```
 
 The owner command has seven subcommands:
 

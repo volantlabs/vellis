@@ -170,7 +170,11 @@ def _setup(arguments) -> int:
     selected = _setup_mode(arguments)
     if selected is None:
         if not interactive:
-            raise ValueError("noninteractive setup requires an explicit initialization mode")
+            raise ValueError(
+                "noninteractive setup requires an explicit initialization mode; "
+                "pass --starter for the recommended Everyday Life vocabulary "
+                "or --blank for an empty graph"
+            )
         selected = _interactive_setup_mode(arguments)
     if selected == "cancelled":
         print("Setup cancelled; no destination was published.")
@@ -206,9 +210,9 @@ def _validate_setup_connection(arguments, interactive: bool) -> None:
     if arguments.no_connect and arguments.connect is not None:
         raise ValueError("--no-connect cannot be combined with --connect")
     if not interactive and arguments.connect is None and not arguments.no_connect:
-        raise ValueError("noninteractive setup requires --connect or --no-connect")
+        raise ValueError("noninteractive setup requires --connect <codex|claude> or --no-connect")
     if not interactive and arguments.connect is not None and arguments.transport is None:
-        raise ValueError("noninteractive connection requires an explicit --transport")
+        raise ValueError("noninteractive connection requires an explicit --transport <stdio|http>")
 
 
 def _validate_setup_mode_flags(arguments, selected: str) -> None:

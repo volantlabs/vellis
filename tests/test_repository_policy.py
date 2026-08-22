@@ -173,3 +173,19 @@ def test_version_is_consistent_across_metadata_runtime_and_lock() -> None:
 
     assert project["version"] == vellis.__version__ == "2.0.0"  # type: ignore[index]
     assert 'name = "vellis"\nversion = "2.0.0"\nsource = { editable = "." }' in lock
+
+
+def test_documented_subcommands_match_the_owner_command() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    block = re.search(r"```text\n(.*?)```", readme, re.DOTALL)
+    assert block is not None, "README.md has no fenced subcommand block to verify"
+
+    documented = {
+        line.removeprefix("vellis ").strip() for line in block.group(1).splitlines() if line
+    }
+    subparsers = next(
+        action
+        for action in owner_command._parser()._subparsers._group_actions  # type: ignore[union-attr]
+        if hasattr(action, "choices")
+    )
+    assert documented == set(subparsers.choices)  # type: ignore[arg-type]

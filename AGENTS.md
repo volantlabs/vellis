@@ -23,6 +23,30 @@ historical comparison or recovery task. Do not mutate external client configurat
 explicitly authorized closure step; use public client CLIs and stop on conflicting or unparseable
 state.
 
+## Running Vellis
+
+Check for an existing install before assuming one is needed: `command -v vellis`. If absent, install
+with `uv tool install git+https://github.com/volantlabs/vellis`; see
+[`docs/install.md`](docs/install.md) for the full command set and troubleshooting.
+
+For a throwaway test instance that touches no global state — the recommended shape for unattended
+work — use a scratch data directory and skip client registration:
+
+```sh
+uv run vellis setup --starter --no-connect --data-dir "$(mktemp -d)/vellis-data"
+uv run vellis serve --transport stdio --data-dir <that same directory>
+```
+
+`uv run` works from a clone without a separate install step. Rules that apply at this scope:
+
+- Every invocation needs a subcommand; bare `vellis` or `python -m vellis` is a usage error, not a
+  server.
+- Never point a throwaway `--data-dir` at `.data/` or any existing owner destination.
+- Pass `--no-connect` in unattended use; `vellis connect` mutates external client configuration and
+  is covered by the `## Safety` restriction above.
+- `--starter` (the recommended Everyday Life vocabulary) or `--blank` must be given explicitly on a
+  noninteractive `setup` — there is no default when no terminal is present to confirm one.
+
 ## Skill routing
 
 The portable MBSwE core is `$sysml-reference`, `$sysml-modeling`,

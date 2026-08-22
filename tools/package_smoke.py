@@ -8,10 +8,12 @@ import re
 import shlex
 import subprocess
 import tempfile
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "2.0.0"
+with (ROOT / "pyproject.toml").open("rb") as _pyproject:
+    VERSION: str = tomllib.load(_pyproject)["project"]["version"]
 
 
 def _run(
@@ -25,6 +27,146 @@ def _run(
         capture_output=True,
         text=True,
     )
+
+
+def _documented_install_commands(root: Path) -> tuple[list[str], list[str]]:
+    """Extract the install and no-install-trial command lines from README.md.
+
+    Parsed rather than duplicated, so a README that stops matching a working
+    install fails this check instead of silently going stale.
+    """
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    section_match = re.search(r"^## Install\n(.*?)(?=^## |\Z)", readme, re.MULTILINE | re.DOTALL)
+    if section_match is None:
+        raise AssertionError("README.md has no '## Install' section to verify")
+    fenced_blocks = re.findall(r"```sh\n(.*?)```", section_match.group(1), re.DOTALL)
+    install_lines = [
+        line
+        for block in fenced_blocks
+        for line in block.splitlines()
+        if line.startswith("uv tool install")
+    ]
+    trial_lines = [
+        line
+        for block in fenced_blocks
+        for line in block.splitlines()
+        if line.startswith("uvx --from")
+    ]
+    canonical_url = "git+https://github.com/volantlabs/vellis"
+    if len(install_lines) != 1 or canonical_url not in install_lines[0]:
+        raise AssertionError(
+            "README.md '## Install' section must contain exactly one "
+            f"'uv tool install {canonical_url}' line; found {install_lines!r}"
+        )
+    if len(trial_lines) != 1 or canonical_url not in trial_lines[0]:
+        raise AssertionError(
+            "README.md '## Install' section must contain exactly one "
+            f"'uvx --from {canonical_url} ...' line; found {trial_lines!r}"
+        )
+    source_url = f"git+file://{root}"
+    install_argv = shlex.split(install_lines[0].replace(canonical_url, source_url))
+    trial_argv = shlex.split(trial_lines[0].replace(canonical_url, source_url))
+    return install_argv, trial_argv
+
+
+def _verify_documented_install(
+    root: Path, temporary: Path, cache_environment: dict[str, str]
+) -> None:
+    """Run the exact commands documented in README.md against this checkout's committed HEAD.
+
+    ``git+file://{root}`` exercises a real clone's failure mode -- a plain directory
+    install would pass even if a file needed by ``git+https`` were untracked -- so
+    this validates HEAD, not the working tree. Isolation keeps every side effect
+    inside ``temporary``; the tool-dir/bin-dir precondition below exists because one
+    refactor slip here would otherwise overwrite the operator's real installed
+    ``vellis``.
+    """
+    install_argv, trial_argv = _documented_install_commands(root)
+
+    tool_dir = temporary / "documented-install-tool-dir"
+    tool_bin = temporary / "documented-install-tool-bin"
+    if temporary not in tool_dir.parents or temporary not in tool_bin.parents:
+        raise AssertionError("refusing to run an install check outside its isolated temp root")
+
+    environment = dict(cache_environment)
+    environment["UV_TOOL_DIR"] = str(tool_dir)
+    environment["UV_TOOL_BIN_DIR"] = str(tool_bin)
+
+    _run(install_argv[0], "--no-config", *install_argv[1:], cwd=temporary, env=environment)
+
+    shim = tool_bin / "vellis"
+    if not shim.is_file() or not os.access(shim, os.X_OK):
+        raise AssertionError(f"documented install did not produce an executable shim at {shim}")
+
+    which_probe = os.environ.copy()
+    which_probe["PATH"] = f"{tool_bin}{os.pathsep}{which_probe['PATH']}"
+    resolved = _run(
+        "python3",
+        "-c",
+        "import shutil; print(shutil.which('vellis'))",
+        cwd=temporary,
+        env=which_probe,
+    ).stdout.strip()
+    if resolved == "" or Path(resolved).resolve() != shim.resolve():
+        raise AssertionError(f"shutil.which('vellis') resolved to {resolved!r}, not {shim}")
+
+    help_result = _run(str(shim), "--help", cwd=temporary)
+    for subcommand in ("setup", "connect", "serve", "backup", "restore", "audit", "configure"):
+        if subcommand not in help_result.stdout:
+            raise AssertionError(f"documented install help omits subcommand {subcommand!r}")
+
+    bare = subprocess.run([str(shim)], cwd=temporary, check=False, capture_output=True, text=True)
+    if bare.returncode == 0 or "usage:" not in bare.stderr or "Traceback" in bare.stderr:
+        raise AssertionError(f"bare 'vellis' did not exit as a clean usage error: {bare!r}")
+
+    tool_python = tool_dir / "vellis" / "bin" / "python"
+    bare_module = subprocess.run(
+        [str(tool_python), "-m", "vellis"],
+        cwd=temporary,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if (
+        bare_module.returncode == 0
+        or "usage:" not in bare_module.stderr
+        or "Traceback" in bare_module.stderr
+    ):
+        raise AssertionError(
+            f"bare 'python -m vellis' did not exit as a clean usage error: {bare_module!r}"
+        )
+
+    version_check = _run(
+        str(tool_python),
+        "-c",
+        "import sys, vellis\n"
+        "print(f'{sys.version_info.major}.{sys.version_info.minor}')\n"
+        "print(vellis.__version__)",
+        cwd=temporary,
+    )
+    reported_python, reported_version = version_check.stdout.splitlines()
+    if tuple(int(part) for part in reported_python.split(".")) < (3, 14):
+        raise AssertionError(
+            f"documented install resolved Python {reported_python}, expected >= 3.14"
+        )
+    if reported_version != VERSION:
+        raise AssertionError(
+            f"documented install imported version {reported_version!r}, expected {VERSION!r}"
+        )
+
+    _run(trial_argv[0], "--no-config", *trial_argv[1:], cwd=temporary, env=environment)
+
+    data_directory = temporary / "documented-install-data"
+    _run(
+        str(shim),
+        "setup",
+        "--blank",
+        "--no-connect",
+        "--data-dir",
+        str(data_directory),
+        cwd=temporary,
+    )
+    _run(str(shim), "audit", "--data-dir", str(data_directory), cwd=temporary)
 
 
 def _smoke(artifact: Path, root: Path, label: str) -> None:
@@ -562,6 +704,9 @@ def main() -> int:
         distribution = temporary / "dist"
         environment = os.environ.copy()
         environment["UV_CACHE_DIR"] = str(temporary / "uv-cache")
+        documented_install_root = temporary / "documented-install"
+        documented_install_root.mkdir()
+        _verify_documented_install(ROOT, documented_install_root, environment)
         _run(
             "uv",
             "build",
@@ -572,8 +717,8 @@ def main() -> int:
             cwd=ROOT,
             env=environment,
         )
-        wheel = next(distribution.glob("*.whl"))
-        source = next(distribution.glob("*.tar.gz"))
+        wheel = next(distribution.glob(f"vellis-{VERSION}-py3-none-any.whl"))
+        source = next(distribution.glob(f"vellis-{VERSION}.tar.gz"))
         _smoke(wheel, temporary, "wheel")
         _smoke(source, temporary, "sdist")
     return 0

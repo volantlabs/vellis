@@ -40,3 +40,24 @@ jobs:
 
       - name: Run checks
         run: just check
+
+  install:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install exactly as documented
+        run: |
+          uv tool install git+https://github.com/volantlabs/vellis@${{ github.sha }}
+          uv tool dir --bin >> "$GITHUB_PATH"
+
+      - name: Confirm the owner command runs
+        run: vellis --help
+
+      - name: Initialize and audit a blank system
+        run: |
+          vellis setup --blank --no-connect --data-dir "$RUNNER_TEMP/vellis-data"
+          vellis audit --data-dir "$RUNNER_TEMP/vellis-data"

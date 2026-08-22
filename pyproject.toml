@@ -11,12 +11,26 @@ requires-python = ">=3.14"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Vellis contributors" }]
+keywords = [
+    "sysml",
+    "sysml-v2",
+    "mcp",
+    "model-context-protocol",
+    "knowledge-graph",
+    "personal-memory",
+    "local-first",
+    "sqlite",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.14",
     "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [
     "fastmcp==3.4.5",
@@ -30,6 +44,8 @@ dependencies = [
 vellis = "vellis.__main__:main"
 
 [project.urls]
+Homepage = "https://github.com/volantlabs/vellis"
+Documentation = "https://github.com/volantlabs/vellis/blob/main/README.md"
 Repository = "https://github.com/volantlabs/vellis"
 Issues = "https://github.com/volantlabs/vellis/issues"
 

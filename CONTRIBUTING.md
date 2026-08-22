@@ -14,6 +14,21 @@ just package-check
 just check
 ```
 
+`just build` produces the wheel and source distribution into `dist/` for local inspection; it is
+independent of `just package-check`, which builds and smoke-tests its own disposable copies and
+also proves the documented `uv tool install git+...` path against this checkout's committed HEAD
+(see [`docs/install.md`](docs/install.md)).
+
+### Version bump
+
+The version is a static literal in four places, cross-checked by
+`tests/test_repository_policy.py::test_version_is_consistent_across_metadata_runtime_and_lock`:
+
+1. `pyproject.toml` (`project.version`)
+2. `vellis/__init__.py` (`__version__`)
+3. `tests/test_repository_policy.py` (the literal comparison)
+4. Run `uv lock` to regenerate the matching `uv.lock` entry.
+
 ## Skill portability
 
 `$sysml-reference`, `$sysml-modeling`, `$sysml-implementation-planning`,

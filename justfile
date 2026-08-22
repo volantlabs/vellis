@@ -39,6 +39,10 @@ implementation-campaign-check:
 system-evolution-check:
     @uv run python tools/system_evolution.py check
 
+# Build the distributable wheel and source distribution into dist/.
+build:
+    @uv build --wheel --sdist --out-dir dist
+
 # Build and smoke-test the installable wheel and source distribution.
 package-check:
     @uv run python tools/package_smoke.py
