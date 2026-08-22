@@ -217,8 +217,9 @@ def _pattern_query(connection, state, selection: PatternSelection, definitions) 
     if matches is None:
         finding = _finding(
             FindingCode.RESULT_LIMIT_EXCEEDED,
-            "/selection/maximumMatches",
-            "pattern has more matches than maximumMatches",
+            "/selection/maxMatches",
+            "pattern has more matches than maxMatches; narrow it with predicates or"
+            " select known UUIDs by identity",
         )
         return _rejected_query(
             "pattern result limit was exceeded", (finding,), state.evaluated_revision

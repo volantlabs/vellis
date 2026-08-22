@@ -3245,3 +3245,97 @@ async def test_union_tool_schemas_expose_callable_top_level_properties(
     assert fresh_validation.structured_content["clean"] is True
     assert fresh_inspection.structured_content is not None
     assert fresh_inspection.structured_content["status"] == "accepted"
+
+
+def _resolve_request_pointer(document: object, pointer: str) -> object:
+    """Resolve an RFC 6901 pointer against the request that produced the finding."""
+    if pointer == "":
+        return document
+    assert pointer.startswith("/"), pointer
+    current = document
+    for raw_token in pointer[1:].split("/"):
+        token = raw_token.replace("~1", "/").replace("~0", "~")
+        if isinstance(current, list):
+            index = int(token)
+            assert 0 <= index < len(current), pointer
+            current = current[index]
+        else:
+            assert isinstance(current, dict), pointer
+            assert token in current, pointer
+            current = current[token]
+    return current
+
+
+@pytest.mark.anyio
+async def test_query_finding_paths_resolve_against_the_request(starter_database: Path) -> None:
+    """A finding path must name a member the request actually carries.
+
+    Naming the domain field instead of the accepted wire member leaves an agent
+    holding a pointer that resolves nowhere in its own document, so it cannot tell
+    which member to correct.
+    """
+    over_limit = {
+        "kind": "pattern",
+        "maxMatches": 1,
+        "nodes": [{"name": "a", "kind": "anchor"}],
+    }
+    bad_regex = {
+        "kind": "pattern",
+        "maxMatches": 10,
+        "nodes": [
+            {
+                "name": "a",
+                "kind": "associatedData",
+                "predicates": [
+                    {
+                        "field": {"kind": "displayName"},
+                        "operator": "regex",
+                        "value": "(unclosed",
+                    }
+                ],
+            }
+        ],
+    }
+    empty_name = {
+        "kind": "pattern",
+        "maxMatches": 10,
+        "nodes": [{"name": "", "kind": "anchor"}],
+    }
+
+    async with Client(build_server(starter_database)) as client:
+        await client.call_tool(
+            "rtg_change",
+            {
+                "expectedRevision": 0,
+                "upserts": [
+                    {"kind": "anchor", "uuid": UUID, "typeKey": "life.person", "displayName": "A"},
+                    {
+                        "kind": "anchor",
+                        "uuid": "00000000-0000-4000-8000-000000000002",
+                        "typeKey": "life.person",
+                        "displayName": "B",
+                    },
+                ],
+            },
+        )
+        results = [
+            (selection, await client.call_tool("rtg_query", {"selection": selection}))
+            for selection in (over_limit, bad_regex, empty_name)
+        ]
+
+    for selection, result in results:
+        content = result.structured_content
+        assert content is not None
+        assert content["status"] == "rejected", selection
+        findings = content["findings"]
+        assert findings, selection
+        for finding in findings:
+            path = finding.get("path")
+            assert path is not None, finding
+            _resolve_request_pointer({"selection": selection}, path)
+
+    limit_content = results[0][1].structured_content
+    assert limit_content is not None
+    limit_finding = limit_content["findings"][0]
+    assert limit_finding["path"] == "/selection/maxMatches"
+    assert "narrow it with predicates" in limit_finding["summary"]

@@ -154,8 +154,9 @@ def query_draft_pattern_sql(connection, state, selection):
     if matches is None:
         finding = _finding(
             FindingCode.RESULT_LIMIT_EXCEEDED,
-            "/selection/maximumMatches",
-            "pattern has more matches than maximumMatches",
+            "/selection/maxMatches",
+            "pattern has more matches than maxMatches; narrow it with predicates or"
+            " select known UUIDs by identity",
         )
         return _rejected("pattern result limit was exceeded", (finding,), state.evaluated_revision)
     objects = load_hydrated_objects(

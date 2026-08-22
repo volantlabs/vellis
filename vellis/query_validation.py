@@ -126,8 +126,8 @@ def _pattern_findings(
         findings.append(
             _finding(
                 FindingCode.INVALID_VALUE,
-                "/selection/maximumMatches",
-                f"maximumMatches must be between 1 and {PUBLIC_ITEM_LIMIT}",
+                "/selection/maxMatches",
+                f"maxMatches must be between 1 and {PUBLIC_ITEM_LIMIT}",
             )
         )
     total = len(selection.nodes) + len(selection.direct_associations) + len(selection.links)
@@ -151,11 +151,7 @@ def _pattern_findings(
     )
     _duplicates(names, "/selection", findings)
     _duplicate_values(selection.direct_associations, "/selection/directAssociations", findings)
-    for index, name in enumerate(names):
-        if name == "":
-            findings.append(
-                _finding(FindingCode.MISSING, f"/selection/names/{index}", "query name is empty")
-            )
+    findings.extend(_empty_selector_name_findings(selection))
     definition_map = {definition.type_key: definition for definition in definitions}
     nodes = {node.name: node for node in selection.nodes}
     for index, node in enumerate(selection.nodes):
@@ -463,10 +459,30 @@ def _text_payload_findings(
             findings.append(
                 _finding(
                     FindingCode.INVALID_VALUE,
-                    f"{path}/text",
+                    f"{path}/value",
                     "regex is not a valid RE2 expression",
                 )
             )
+
+
+def _empty_selector_name_findings(selection: PatternSelection) -> tuple[Finding, ...]:
+    """Point at the array the name actually lives in.
+
+    Node and link names occupy separate request arrays, so an index into their
+    concatenation identifies no member of the request.
+    """
+    findings: list[Finding] = []
+    for collection, values in (("nodes", selection.nodes), ("links", selection.links)):
+        for index, value in enumerate(values):
+            if value.name == "":
+                findings.append(
+                    _finding(
+                        FindingCode.MISSING,
+                        f"/selection/{collection}/{index}/name",
+                        "query name is empty",
+                    )
+                )
+    return tuple(findings)
 
 
 def _term_payload_findings(

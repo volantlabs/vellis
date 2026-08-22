@@ -311,7 +311,9 @@ _TOOL_FACTORIES = (
     ),
     (
         "rtg_query",
-        "Select known UUIDs or bounded connected patterns and hydrate requested properties.",
+        "Select known UUIDs or bounded connected patterns and hydrate requested properties."
+        " A pattern answers only within maxMatches; a wider match set is refused rather than"
+        " paged, so narrow it with node predicates or select the known UUIDs by identity.",
         _query_tool,
     ),
     (
