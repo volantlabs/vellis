@@ -210,7 +210,9 @@ def _validate_setup_connection(arguments, interactive: bool) -> None:
     if arguments.no_connect and arguments.connect is not None:
         raise ValueError("--no-connect cannot be combined with --connect")
     if not interactive and arguments.connect is None and not arguments.no_connect:
-        raise ValueError("noninteractive setup requires --connect <codex|claude> or --no-connect")
+        raise ValueError(
+            "noninteractive setup requires --connect <codex|claude|both> or --no-connect"
+        )
     if not interactive and arguments.connect is not None and arguments.transport is None:
         raise ValueError("noninteractive connection requires an explicit --transport <stdio|http>")
 

@@ -29,8 +29,8 @@ def _run(
     )
 
 
-def _documented_install_commands(root: Path) -> tuple[list[str], list[str]]:
-    """Extract the install and no-install-trial command lines from README.md.
+def _documented_install_commands(root: Path) -> tuple[list[str], list[str], str]:
+    """Extract the install, no-install-trial, and clone command lines from README.md.
 
     Parsed rather than duplicated, so a README that stops matching a working
     install fails this check instead of silently going stale.
@@ -40,18 +40,14 @@ def _documented_install_commands(root: Path) -> tuple[list[str], list[str]]:
     if section_match is None:
         raise AssertionError("README.md has no '## Install' section to verify")
     fenced_blocks = re.findall(r"```sh\n(.*?)```", section_match.group(1), re.DOTALL)
+    lines_by_block = [block.splitlines() for block in fenced_blocks]
     install_lines = [
-        line
-        for block in fenced_blocks
-        for line in block.splitlines()
-        if line.startswith("uv tool install")
+        line for lines in lines_by_block for line in lines if line.startswith("uv tool install")
     ]
     trial_lines = [
-        line
-        for block in fenced_blocks
-        for line in block.splitlines()
-        if line.startswith("uvx --from")
+        line for lines in lines_by_block for line in lines if line.startswith("uvx --from")
     ]
+    clone_blocks = [lines for lines in lines_by_block if lines and lines[0].startswith("git clone")]
     canonical_url = "git+https://github.com/volantlabs/vellis"
     if len(install_lines) != 1 or canonical_url not in install_lines[0]:
         raise AssertionError(
@@ -63,10 +59,20 @@ def _documented_install_commands(root: Path) -> tuple[list[str], list[str]]:
             "README.md '## Install' section must contain exactly one "
             f"'uvx --from {canonical_url} ...' line; found {trial_lines!r}"
         )
+    if len(clone_blocks) != 1 or clone_blocks[0] != [
+        "git clone https://github.com/volantlabs/vellis && cd vellis",
+        "uv sync",
+        "uv run vellis --help",
+    ]:
+        raise AssertionError(
+            "README.md '## Install' section must contain exactly one clone block: "
+            f"found {clone_blocks!r}"
+        )
     source_url = f"git+file://{root}"
     install_argv = shlex.split(install_lines[0].replace(canonical_url, source_url))
     trial_argv = shlex.split(trial_lines[0].replace(canonical_url, source_url))
-    return install_argv, trial_argv
+    clone_source = str(root)
+    return install_argv, trial_argv, clone_source
 
 
 def _verify_documented_install(
@@ -74,23 +80,32 @@ def _verify_documented_install(
 ) -> None:
     """Run the exact commands documented in README.md against this checkout's committed HEAD.
 
-    ``git+file://{root}`` exercises a real clone's failure mode -- a plain directory
-    install would pass even if a file needed by ``git+https`` were untracked -- so
-    this validates HEAD, not the working tree. Isolation keeps every side effect
-    inside ``temporary``; the tool-dir/bin-dir precondition below exists because one
-    refactor slip here would otherwise overwrite the operator's real installed
-    ``vellis``.
+    ``git+file://{root}`` (and the plain local ``git clone {root}``) exercise a real
+    clone's failure mode -- installing from a working-tree directory would pass even
+    if a file needed by ``git+https`` were untracked -- so this validates HEAD, not
+    the working tree. Every side effect stays inside ``temporary``; the environment-
+    value check below inspects what will actually be passed to the subprocess, not
+    just the pre-computed path objects, so a refactor that silently drops the
+    isolation override is caught here instead of overwriting the operator's real
+    installed ``vellis``.
     """
-    install_argv, trial_argv = _documented_install_commands(root)
+    install_argv, trial_argv, clone_source = _documented_install_commands(root)
 
     tool_dir = temporary / "documented-install-tool-dir"
     tool_bin = temporary / "documented-install-tool-bin"
-    if temporary not in tool_dir.parents or temporary not in tool_bin.parents:
-        raise AssertionError("refusing to run an install check outside its isolated temp root")
 
     environment = dict(cache_environment)
     environment["UV_TOOL_DIR"] = str(tool_dir)
     environment["UV_TOOL_BIN_DIR"] = str(tool_bin)
+
+    resolved_temporary = temporary.resolve()
+    for variable in ("UV_TOOL_DIR", "UV_TOOL_BIN_DIR"):
+        resolved = Path(environment[variable]).resolve()
+        if resolved != resolved_temporary and resolved_temporary not in resolved.parents:
+            raise AssertionError(
+                f"refusing to run the documented install check with {variable}="
+                f"{environment[variable]!r} outside its isolated temp root {temporary}"
+            )
 
     _run(install_argv[0], "--no-config", *install_argv[1:], cwd=temporary, env=environment)
 
@@ -155,6 +170,14 @@ def _verify_documented_install(
         )
 
     _run(trial_argv[0], "--no-config", *trial_argv[1:], cwd=temporary, env=environment)
+
+    clone_root = temporary / "vellis"
+    _run("git", "clone", clone_source, str(clone_root), cwd=temporary)
+    _run("uv", "sync", cwd=clone_root, env=cache_environment)
+    clone_help = _run("uv", "run", "vellis", "--help", cwd=clone_root, env=cache_environment)
+    for subcommand in ("setup", "connect", "serve", "backup", "restore", "audit", "configure"):
+        if subcommand not in clone_help.stdout:
+            raise AssertionError(f"documented clone help omits subcommand {subcommand!r}")
 
     data_directory = temporary / "documented-install-data"
     _run(
