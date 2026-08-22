@@ -39,6 +39,7 @@ from vellis.mcp_models import (
     OmissibleArgument,
     QuerySelectionInput,
     StateInput,
+    Utf8Text,
     ValidateContinuationInput,
     ValidateFreshInput,
     ValidateInput,
@@ -165,7 +166,9 @@ def _type_summary_tool(database_path: Path) -> Callable[..., dict[str, object]]:
 
 def _type_inspect_tool(database_path: Path) -> Callable[..., dict[str, object]]:
     def tool(
-        anchorTypeKeys: Annotated[list[str], Field(min_length=1, max_length=PUBLIC_ITEM_LIMIT)],
+        anchorTypeKeys: Annotated[
+            list[Utf8Text], Field(min_length=1, max_length=PUBLIC_ITEM_LIMIT)
+        ],
         state: OmissibleArgument[StateInput] = _OMITTED_ARGUMENT,
         includeLegacySystem: bool = False,
     ) -> dict[str, object]:
@@ -213,8 +216,12 @@ def _draft_change_tool(database_path: Path) -> Callable[..., dict[str, object]]:
         definitionUpserts: Annotated[
             tuple[DefinitionInput, ...], Field(max_length=PUBLIC_ITEM_LIMIT)
         ] = (),
-        definitionRemovals: Annotated[tuple[str, ...], Field(max_length=PUBLIC_ITEM_LIMIT)] = (),
-        unstageDefinitionKeys: Annotated[tuple[str, ...], Field(max_length=PUBLIC_ITEM_LIMIT)] = (),
+        definitionRemovals: Annotated[
+            tuple[Utf8Text, ...], Field(max_length=PUBLIC_ITEM_LIMIT)
+        ] = (),
+        unstageDefinitionKeys: Annotated[
+            tuple[Utf8Text, ...], Field(max_length=PUBLIC_ITEM_LIMIT)
+        ] = (),
         objectUpserts: Annotated[
             tuple[ObjectUpsertInput, ...], Field(max_length=PUBLIC_ITEM_LIMIT)
         ] = (),

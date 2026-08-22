@@ -1412,6 +1412,38 @@ async def test_non_utf8_unicode_surrogate_is_invalid_arguments_without_activity(
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("tool_name", "arguments", "operation_name"),
+    (
+        ("rtg_type_inspect", {"anchorTypeKeys": ["\ud800"]}, "type_inspect"),
+        ("rtg_draft_change", {"definitionRemovals": ["\ud800"]}, "change_draft"),
+        ("rtg_draft_change", {"unstageDefinitionKeys": ["\ud800"]}, "change_draft"),
+    ),
+)
+async def test_top_level_text_surrogates_reject_before_domain_operation(
+    database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tool_name: str,
+    arguments: dict[str, object],
+    operation_name: str,
+) -> None:
+    operation_called = False
+
+    def fail_if_called(*_args, **_kwargs):
+        nonlocal operation_called
+        operation_called = True
+        raise AssertionError("malformed wire text reached the domain operation")
+
+    monkeypatch.setattr(f"vellis.mcp.{operation_name}", fail_if_called)
+    before = _activity_count(database)
+    async with Client(build_server(database)) as client:
+        with pytest.raises(ToolError, match="Unicode scalar values"):
+            await client.call_tool(tool_name, arguments)
+    assert not operation_called
+    assert _activity_count(database) == before
+
+
+@pytest.mark.anyio
 async def test_every_selected_tool_reaches_one_successor_operation(database: Path) -> None:
     calls = {
         "rtg_type_summary": {},

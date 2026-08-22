@@ -50,7 +50,16 @@ def _camel(name: str) -> str:
     return head + "".join(value.capitalize() for value in tail)
 
 
-NonemptyText = Annotated[str, Field(min_length=1)]
+def _utf8_text(value: str) -> str:
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as error:
+        raise ValueError("text must contain only Unicode scalar values") from error
+    return value
+
+
+Utf8Text = Annotated[str, AfterValidator(_utf8_text)]
+NonemptyText = Annotated[Utf8Text, Field(min_length=1)]
 BoundedStrings = Annotated[list[NonemptyText], Field(max_length=PUBLIC_ITEM_LIMIT)]
 NonemptyStrings = Annotated[list[NonemptyText], Field(min_length=1, max_length=PUBLIC_ITEM_LIMIT)]
 CanonicalUuid = Annotated[str, AfterValidator(canonical_uuid)]
@@ -81,10 +90,7 @@ def _reject_explicit_null(value):
 
 def _require_utf8_strings(value) -> None:
     if isinstance(value, str):
-        try:
-            value.encode("utf-8")
-        except UnicodeEncodeError as error:
-            raise ValueError("text must contain only Unicode scalar values") from error
+        _utf8_text(value)
         return
     if isinstance(value, dict):
         for key, item in value.items():

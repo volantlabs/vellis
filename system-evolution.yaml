@@ -9,7 +9,7 @@ evolution:
     reason: Current accepted authority already decides all five defects and the owner authorized pre-release remediation.
     checkpoint: null
   blocker: null
-  checkpoint: git:4b484f399368807cf1b4be3bfa4353d0dfc95069
+  checkpoint: git:b07599e3543f2d6fe8be4d8311ff491b6a376da6
 baselines:
   status: current
   source: &source
@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:6da7985aae97a01c13468d1ec4a4f77bc6c7d5bc
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:4b484f399368807cf1b4be3bfa4353d0dfc95069
+    implementation: git:b07599e3543f2d6fe8be4d8311ff491b6a376da6
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:4b484f399368807cf1b4be3bfa4353d0dfc95069
+    checkpoint: git:b07599e3543f2d6fe8be4d8311ff491b6a376da6
   observed: *target
 scope:
   authority_scope:
@@ -41,6 +41,7 @@ scope:
     - system-evolution.yaml
     - vellis/pattern_repository.py
     - vellis/query_repository.py
+    - vellis/mcp.py
     - vellis/onboarding.py
     - vellis/mcp_models.py
     - vellis/audit.py
@@ -80,11 +81,11 @@ findings:
     classification: implementation defect
     consequence: Malformed public text becomes an unexpected execution failure rather than an invalid-arguments rejection with no state effect.
     authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_non_utf8_unicode_surrogate_is_invalid_arguments_without_activity]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_non_utf8_unicode_surrogate_is_invalid_arguments_without_activity, path:tests/vellis/test_mcp_lifecycle_v2.py#test_top_level_text_surrogates_reject_before_domain_operation]
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
-    nearest_wrong_system: A text scalar containing a lone surrogate constructs successfully and raises UnicodeEncodeError during publication.
+    nearest_wrong_system: A lone surrogate in a nested object or top-level type-key collection reaches a domain operation and raises UnicodeEncodeError during publication or SQLite lookup.
     compatibility_effect: Unicode scalar text remains accepted; only strings that cannot be encoded as UTF-8 are rejected at the wire boundary.
   - id: F004
     summary: Audit rejects inverted version intervals but not overlapping intervals for one version-family identity.
@@ -177,7 +178,7 @@ work_items:
     label: Verify, independently review, and close the PR correction
     kind: closure
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: "git:4b484f399368807cf1b4be3bfa4353d0dfc95069"}
+    planned_baseline: {dimension: implementation, identity: "git:b07599e3543f2d6fe8be4d8311ff491b6a376da6"}
     finding_ids: [F006]
     decision_ids: []
     authority:
@@ -207,4 +208,4 @@ closure:
     - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
     - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
   evidence_refs: [path:docs/v2-pre-release-evidence.md#pull-request-review-follow-up, path:docs/v2-pre-release-evidence.md#verification, command:just check, command:just package-check]
-  checkpoint: git:4b484f399368807cf1b4be3bfa4353d0dfc95069
+  checkpoint: git:b07599e3543f2d6fe8be4d8311ff491b6a376da6
