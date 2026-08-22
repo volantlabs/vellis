@@ -9,7 +9,7 @@ evolution:
     reason: Current accepted authority already decides all five defects and the owner authorized pre-release remediation.
     checkpoint: null
   blocker: null
-  checkpoint: git:6da7985aae97a01c13468d1ec4a4f77bc6c7d5bc
+  checkpoint: git:6c64eb1667513b8bf1a845ebc8a995919b3462f2
 baselines:
   status: current
   source: &source
@@ -18,8 +18,13 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
     checkpoint: git:6da7985aae97a01c13468d1ec4a4f77bc6c7d5bc
-  target: null
-  observed: *source
+  target: &target
+    model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
+    implementation: git:6c64eb1667513b8bf1a845ebc8a995919b3462f2
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
+    checkpoint: git:6c64eb1667513b8bf1a845ebc8a995919b3462f2
+  observed: *target
 scope:
   authority_scope:
     - VellisRequirements::querySafety
@@ -50,9 +55,9 @@ findings:
     consequence: A bounded public query can consume temporary storage and work proportional to every partial binding before the final maximum-plus-one limit is observed.
     authority_refs: [VellisRequirements::querySafety, VellisRequirements::locality]
     evidence_refs: [path:tests/vellis/test_query_v2_successor.py#test_dense_pattern_stops_stream_after_maximum_plus_one_complete_bindings]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: A two-node pattern with maximumMatches one materializes every matching node pair before detecting the second complete tuple.
     compatibility_effect: Accepted and rejected query results remain unchanged; only evaluation resource shape changes.
   - id: F002
@@ -61,9 +66,9 @@ findings:
     consequence: Malformed or unreadable external client configuration can be followed by an attempted add instead of a safe stop on uncertain state.
     authority_refs: [VellisRequirements::mcpBoundary]
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_client_enumeration_distinguishes_absence_from_uncertain_failure]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: A failed configuration parse and a documented missing-entry result both return false from entry enumeration.
     compatibility_effect: Documented missing entries still register; other enumeration failures now stop before mutation.
   - id: F003
@@ -72,9 +77,9 @@ findings:
     consequence: Malformed public text becomes an unexpected execution failure rather than an invalid-arguments rejection with no state effect.
     authority_refs: [VellisRequirements::mcpBoundary]
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_non_utf8_unicode_surrogate_is_invalid_arguments_without_activity]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: A text scalar containing a lone surrogate constructs successfully and raises UnicodeEncodeError during publication.
     compatibility_effect: Unicode scalar text remains accepted; only strings that cannot be encoded as UTF-8 are rejected at the wire boundary.
   - id: F004
@@ -83,9 +88,9 @@ findings:
     consequence: A self-consistent but ambiguous historical lineage can pass audit, backup, and restore validation.
     authority_refs: [VellisRequirements::lifecycle]
     evidence_refs: [path:tests/vellis/test_history_recovery_v2.py#test_audit_detects_overlapping_versions_with_individually_valid_intervals]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Two individually valid versions of one identity overlap at a revision and audit reports no interval finding.
     compatibility_effect: Valid databases remain unchanged; semantically ambiguous version histories are newly rejected by audit.
   - id: F005
@@ -94,9 +99,9 @@ findings:
     consequence: Search index corruption that changes phrase results can pass audit and backup validation.
     authority_refs: [VellisRequirements::lifecycle, VellisRequirements::queryPredicates]
     evidence_refs: [path:tests/vellis/test_history_recovery_v2.py#test_audit_detects_phrase_changing_fts_token_position_corruption]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Reversing two indexed tokens preserves aggregate counts while reversing which phrase query matches.
     compatibility_effect: Search behavior and schema remain unchanged; audit becomes sensitive to per-document token positions.
 decisions:
@@ -107,7 +112,7 @@ decisions:
     reversible: true
     owner_work_item_id: W001
     evidence_intent: [A dense pattern stops after maximum plus one complete tuples., Patterns above the SQLite flat-join limit remain supported., Public query meaning remains identical to the independent topology oracle.]
-    implementation_status: not evaluated
+    implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_query_v2_successor.py#test_dense_pattern_stops_stream_after_maximum_plus_one_complete_bindings, path:tests/vellis/test_query_v2_successor.py#test_streamed_pattern_above_sqlites_flat_join_limit_is_a_domain_result]
   - id: D002
     summary: Recognize only each supported public client's positive missing-entry diagnostic as absence.
@@ -116,7 +121,7 @@ decisions:
     reversible: true
     owner_work_item_id: W001
     evidence_intent: [Codex and Claude documented absence diagnostics return false., Other nonzero results raise before remove or add.]
-    implementation_status: not evaluated
+    implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_client_enumeration_distinguishes_absence_from_uncertain_failure]
   - id: D003
     summary: Compare expected and actual FTS vocabularies at instance granularity including document column and offset.
@@ -125,7 +130,7 @@ decisions:
     reversible: true
     owner_work_item_id: W001
     evidence_intent: [Phrase-changing token-order corruption is detected., A valid independently rebuilt index remains equivalent.]
-    implementation_status: not evaluated
+    implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_history_recovery_v2.py#test_audit_detects_phrase_changing_fts_token_position_corruption]
 work_items:
   - id: W001
@@ -147,17 +152,17 @@ work_items:
     nearest_wrong_system: Nominal tests pass while bounded queries materialize all prefixes, malformed input crashes, uncertain client state mutates, or semantic corruption passes audit.
     compatibility_effect: Results, tools, commands, schemas, and database format remain stable; rejection and audit precision improve.
     non_effects: [Do not inspect .data., Do not add public surface or numerical performance promises., Do not mutate external client configuration during tests.]
-    lifecycle: active
-    implementation_status: conflicting
+    lifecycle: complete
+    implementation_status: conforming
     evidence_refs: [path:docs/v2-pre-release-evidence.md#pull-request-review-follow-up]
     blocker: null
-    checkpoint: null
+    checkpoint: git:6c64eb1667513b8bf1a845ebc8a995919b3462f2
   - id: W002
     order: 2
     label: Verify, independently review, and close the PR correction
     kind: closure
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: "git:6da7985aae97a01c13468d1ec4a4f77bc6c7d5bc"}
+    planned_baseline: {dimension: implementation, identity: "git:6c64eb1667513b8bf1a845ebc8a995919b3462f2"}
     finding_ids: []
     decision_ids: []
     authority:
@@ -171,15 +176,15 @@ work_items:
     nearest_wrong_system: Focused fixes pass while an integration regression or unsupported public-boundary consequence remains.
     compatibility_effect: No additional compatibility effect beyond W001.
     non_effects: [Do not resolve or reply to GitHub review threads without explicit owner authorization.]
-    lifecycle: pending
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: active
+    implementation_status: partial
+    evidence_refs: [path:docs/v2-pre-release-evidence.md#verification, command:just package-check]
     blocker: null
     checkpoint: null
 closure:
   finding_disposition: open
   model_status: accepted
-  implementation_status: conflicting
+  implementation_status: partial
   integration_status: not evaluated
   external_status: not evaluated
   compatibility: Evaluation is in progress; no public schema or database-format change is planned.
