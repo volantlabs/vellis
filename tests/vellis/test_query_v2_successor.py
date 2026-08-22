@@ -737,17 +737,82 @@ def test_streamed_pattern_above_sqlites_flat_join_limit_is_a_domain_result(
     assert result.payload.matches == ()
 
 
-def test_maximum_width_parallel_links_avoid_sqlite_expression_limit(tmp_path: Path) -> None:
-    database = _database(tmp_path)
-    nodes = (
-        PatternNode("source", PatternNodeKind.ANCHOR),
-        PatternNode("target", PatternNodeKind.ANCHOR),
+def test_maximum_width_parallel_links_match_and_overflow_without_sqlite_limits(
+    tmp_path: Path,
+) -> None:
+    link_uuids = tuple(f"30000000-0000-4000-8000-{index:012d}" for index in range(1, 999))
+    graph = (
+        Anchor(A, "test.person", "Source"),
+        Anchor(B, "test.person", "Target"),
+        *(Link(uuid, "test.relates", A, B) for uuid in link_uuids),
     )
-    links = tuple(PatternLink(f"link{index}", "source", "target") for index in range(998))
-    result = query_graph(database, GraphQuery(PatternSelection(1, nodes, links=links)))
+    database = initialized_query_database(
+        tmp_path / "maximum-width" / "vellis.db",
+        _definitions(),
+        graph,
+    )
+    nodes = (
+        PatternNode("source", PatternNodeKind.ANCHOR, uuids=(A,)),
+        PatternNode("target", PatternNodeKind.ANCHOR, uuids=(B,)),
+    )
+    exact_links = tuple(
+        PatternLink(f"link{index}", "source", "target", uuids=(uuid,))
+        for index, uuid in enumerate(link_uuids)
+    )
+    exact = query_graph(database, GraphQuery(PatternSelection(1, nodes, links=exact_links)))
+    assert exact.status is OperationStatus.ACCEPTED
+    assert isinstance(exact.payload, PatternQueryPayload)
+    assert len(exact.payload.matches) == 1
+    assert exact.payload.matches[0].bindings == (
+        ("source", A),
+        ("target", B),
+        *((f"link{index}", uuid) for index, uuid in enumerate(link_uuids)),
+    )
+
+    unfiltered_links = tuple(
+        PatternLink(f"link{index}", "source", "target") for index in range(998)
+    )
+    overflow = query_graph(
+        database,
+        GraphQuery(PatternSelection(1, nodes, links=unfiltered_links)),
+    )
+    assert overflow.status is OperationStatus.REJECTED
+    assert overflow.payload is None
+    assert {finding.code.value for finding in overflow.findings} == {"resultLimitExceeded"}
+
+
+def test_streamed_pattern_checks_bound_relationship_before_opening_later_node(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database = _database(tmp_path)
+    selection = PatternSelection(
+        1,
+        (
+            PatternNode("source", PatternNodeKind.ANCHOR, uuids=(A,)),
+            PatternNode("detail", PatternNodeKind.ASSOCIATED_DATA, uuids=(D1,)),
+            PatternNode("project", PatternNodeKind.ANCHOR, uuids=(P,)),
+        ),
+        links=(
+            PatternLink("detailLink", "source", "detail", uuids=(L1,)),
+            PatternLink("projectLink", "source", "project", uuids=(L5,)),
+        ),
+    )
+    original = pattern_repository._candidate_cursor
+    opened: list[tuple[str, int]] = []
+
+    def recording_candidate(*args):
+        steps = args[4]
+        depth = args[-1]
+        opened.append(steps[depth])
+        return original(*args)
+
+    monkeypatch.setattr(pattern_repository, "_candidate_cursor", recording_candidate)
+    result = query_graph(database, GraphQuery(selection))
     assert result.status is OperationStatus.ACCEPTED
     assert isinstance(result.payload, PatternQueryPayload)
-    assert result.payload.matches == ()
+    assert len(result.payload.matches) == 1
+    assert opened.index(("link", 0)) < opened.index(("node", 2))
 
 
 def test_dense_pattern_stops_stream_after_maximum_plus_one_complete_bindings(

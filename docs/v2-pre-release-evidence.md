@@ -53,13 +53,13 @@ database-version change was required.
 
 | Review finding | Correction and discriminating evidence |
 |---|---|
-| Intermediate query bindings were materialized without the public result bound. | Pattern evaluation now streams candidates through an iterative depth-first traversal and retains only `maximumMatches + 1` complete tuples. Relationship constraints are evaluated as bounded traversal steps rather than one expression per relationship. A dense synthetic stream proves early termination; the public topology/oracle matrix, a 65-node pattern, and a maximum-width 998-parallel-link request preserve query meaning without SQLite's flat-join or expression-depth limits. |
+| Intermediate query bindings were materialized without the public result bound. | Pattern evaluation now streams candidates through an iterative depth-first traversal and retains only `maximumMatches + 1` complete tuples. Relationship constraints are evaluated as bounded traversal steps as soon as their endpoints are bound rather than as one expression per relationship. A dense synthetic stream proves early termination; the public topology/oracle matrix and a 65-node pattern preserve query meaning, while a real maximum-width population returns one exact 1,000-binding match and rejects an unfiltered second match without SQLite's flat-join or expression-depth limits. |
 | Client enumeration treated every nonzero result as absence. | Codex and Claude each require their own complete missing-entry diagnostic. Mixed, cross-client, and other nonzero diagnostics raise on uncertain external state before remove or add. |
-| A lone Unicode surrogate reached canonical UTF-8 encoding. | The strict wire-model boundary recursively rejects strings that are not UTF-8 encodable. A real MCP request carrying an escaped surrogate is an invalid-arguments error and appends no activity. |
+| A lone Unicode surrogate reached canonical UTF-8 encoding. | The strict wire-model boundary recursively rejects strings that are not UTF-8 encodable. A real MCP request carrying an escaped surrogate produces the Unicode-scalar validation error before the domain change operation is invoked and appends no activity. |
 | Version interval audit omitted overlap detection. | Every version relation is checked by its family identity for intersecting intervals. The focused counterexample has individually valid bounds but two active versions at revision 2 and now produces an overlap finding. |
 | FTS audit compared only aggregate token counts. | Independent rebuilt and live vocabularies are compared by term, document, column, and offset. Reversing indexed token order while retaining source content changes phrase results and now fails audit. |
 
-The affected query, MCP lifecycle, history, audit, backup, and recovery suites passed 203 tests after
+The affected query, MCP lifecycle, history, audit, backup, and recovery suites passed 204 tests after
 the correction. The final gate and review results below are refreshed at the frozen closure token.
 
 ## Installed owner narratives
@@ -148,7 +148,7 @@ the Phase 0 rules; line counts are diagnostic, not design targets.
 |---|---:|---:|---:|
 | Authored SysML lines | 4,750 | 2,483 | -2,267 |
 | Product Python lines under `vellis/` | 23,854 | 20,791 | -3,063 |
-| Test Python lines | 28,692 | 16,665 | -12,027 |
+| Test Python lines | 28,692 | 16,740 | -11,952 |
 | Product C901 findings above 10 | 37 | 0 | -37 |
 | `vellis/ + tools/` C901 findings above 10 | 53 | 11 | -42 |
 | Persistent application relations | 39 | 25 | -14 |
@@ -180,7 +180,7 @@ and the historical deletion-sequencing lesson. None is a material pre-release pr
 
 The earlier affected domain, starter/storage, change/draft, query, MCP lifecycle, v1 import,
 history/recovery, and repository-policy selection passed 561 tests. The pull-request follow-up's
-focused selection passed 203 tests. The complete candidate passed 805 tests through ordinary
+focused selection passed 204 tests. The complete candidate passed 806 tests through ordinary
 `just check`.
 
 | Gate | Candidate result |
@@ -192,7 +192,7 @@ focused selection passed 203 tests. The complete candidate passed 805 tests thro
 | `just model-reference-check` | passed; pinned corpus current |
 | `just system-evolution-check` | passed for this active correction record |
 | `just package-check` | passed for wheel and source-distribution installed-command paths |
-| `just check` | passed; 805 tests |
+| `just check` | passed; 806 tests |
 | `git diff --check` | passed |
 
 The regenerated SQLite schema text is byte-identical to baseline and retains database version 1.

@@ -1380,10 +1380,19 @@ async def test_unknown_wire_member_is_invalid_arguments_not_domain_result(databa
 @pytest.mark.anyio
 async def test_non_utf8_unicode_surrogate_is_invalid_arguments_without_activity(
     database: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    operation_called = False
+
+    def fail_if_called(*_args, **_kwargs):
+        nonlocal operation_called
+        operation_called = True
+        raise AssertionError("malformed wire text reached the domain operation")
+
+    monkeypatch.setattr("vellis.mcp.apply_graph_change", fail_if_called)
     before = _activity_count(database)
     async with Client(build_server(database)) as client:
-        with pytest.raises(ToolError):
+        with pytest.raises(ToolError, match="Unicode scalar values"):
             await client.call_tool(
                 "rtg_change",
                 {
@@ -1398,6 +1407,7 @@ async def test_non_utf8_unicode_surrogate_is_invalid_arguments_without_activity(
                     ],
                 },
             )
+    assert not operation_called
     assert _activity_count(database) == before
 
 
