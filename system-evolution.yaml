@@ -9,7 +9,7 @@ evolution:
     reason: model/50-verification.sysml already requires proving the MCP boundary from installed wheel and source distribution; this closes an evidence and realization gap under that existing acceptance, and the owner selected the git+ distribution channel directly.
     checkpoint: null
   blocker: null
-  checkpoint: git:5ef0fab487ff433c935095e4c9226d6db0996076
+  checkpoint: git:6dbe5b0841f099686c7dbb37b5e83eb0a488c074
 baselines:
   status: current
   source: &source
@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:7b32a6f7661048a57d0a91fea2580b4facbefd92
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:5ef0fab487ff433c935095e4c9226d6db0996076
+    implementation: git:6dbe5b0841f099686c7dbb37b5e83eb0a488c074
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:5ef0fab487ff433c935095e4c9226d6db0996076
+    checkpoint: git:6dbe5b0841f099686c7dbb37b5e83eb0a488c074
   observed: *target
 scope:
   authority_scope:
@@ -37,6 +37,7 @@ scope:
     - justfile
     - pyproject.toml
     - tools/package_smoke.py
+    - tests/test_package_smoke.py
     - tests/test_repository_policy.py
     - vellis/__main__.py
     - docs/install.md
@@ -76,7 +77,7 @@ findings:
     classification: implementation defect
     consequence: An agent following the named remedy would believe only codex or claude were valid --connect values, when both is also accepted.
     authority_refs: [VellisRequirements::simpleOperation]
-    evidence_refs: [command:just check]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_noninteractive_connect_error_names_every_valid_client]
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
@@ -87,7 +88,7 @@ findings:
     classification: implementation defect
     consequence: A future refactor that dropped the UV_TOOL_DIR/UV_TOOL_BIN_DIR override could silently install into the operator's real ~/.local/share/uv/tools and ~/.local/bin while the guard still reported clean.
     authority_refs: [VellisVerification::mcpLifecycle]
-    evidence_refs: [command:just package-check]
+    evidence_refs: [path:tests/test_package_smoke.py#test_run_isolated_tool_rejects_environment_outside_temp_root, path:tests/test_package_smoke.py#test_run_isolated_tool_rejects_missing_overrides]
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
@@ -105,16 +106,16 @@ findings:
     nearest_wrong_system: Two of three documented install paths are exercised while the third silently rots.
     compatibility_effect: No product effect; the check now clones, syncs, and runs against committed HEAD.
   - id: F006
-    summary: The noninteractive setup mode-selection error restated the rule without naming its remedy.
+    summary: The noninteractive setup mode-selection error restated the rule without naming its remedy, and its first fix repeated F003's own defect by naming only two of the four valid flags.
     classification: implementation defect
-    consequence: An unattended agent hitting the required-explicit-mode rule had no indication which flag to pass next.
+    consequence: An unattended agent intending --from-v1 or --from-backup, having omitted the flag, was told only about --starter/--blank, an equally incomplete remedy to the one F003 fixed for --connect.
     authority_refs: [VellisRequirements::initialization, VellisRequirements::starter]
-    evidence_refs: [command:just check]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_noninteractive_setup_mode_error_names_every_valid_flag]
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
-    nearest_wrong_system: The message correctly enforces VellisRequirements::initialization's explicit-choice obligation but gives no path to satisfy it, leaving an agent to guess at --starter or --blank.
-    compatibility_effect: No behavior change; only the error message text, which now also names the starter by its accepted description.
+    nearest_wrong_system: The message correctly enforces VellisRequirements::initialization's explicit-choice obligation but names only some of the flags that satisfy it, leaving an agent using an unnamed one to guess.
+    compatibility_effect: No behavior change; only the error message text, which now names all four modes.
 decisions:
   - id: D001
     summary: Derive the tested install command from README.md's own Install section rather than duplicating it in package_smoke.py.
@@ -158,13 +159,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [command:just package-check, command:just check, path:tests/test_repository_policy.py#test_documented_subcommands_match_the_owner_command]
     blocker: null
-    checkpoint: git:5ef0fab487ff433c935095e4c9226d6db0996076
+    checkpoint: git:6dbe5b0841f099686c7dbb37b5e83eb0a488c074
   - id: W002
     order: 2
     label: Verify, independently review, and close the install-path fix
     kind: closure
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: "git:5ef0fab487ff433c935095e4c9226d6db0996076"}
+    planned_baseline: {dimension: implementation, identity: "git:6dbe5b0841f099686c7dbb37b5e83eb0a488c074"}
     finding_ids: []
     decision_ids: []
     authority:
