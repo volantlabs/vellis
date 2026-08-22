@@ -9,7 +9,7 @@ evolution:
     reason: model/50-verification.sysml already requires proving the MCP boundary from installed wheel and source distribution; this closes an evidence and realization gap under that existing acceptance, and the owner selected the git+ distribution channel directly.
     checkpoint: null
   blocker: null
-  checkpoint: git:1e5f11230e8423c1631f8628cbc068cce03a19a2
+  checkpoint: git:5ef0fab487ff433c935095e4c9226d6db0996076
 baselines:
   status: current
   source: &source
@@ -20,14 +20,16 @@ baselines:
     checkpoint: git:7b32a6f7661048a57d0a91fea2580b4facbefd92
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:1e5f11230e8423c1631f8628cbc068cce03a19a2
+    implementation: git:5ef0fab487ff433c935095e4c9226d6db0996076
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:1e5f11230e8423c1631f8628cbc068cce03a19a2
+    checkpoint: git:5ef0fab487ff433c935095e4c9226d6db0996076
   observed: *target
 scope:
   authority_scope:
     - VellisRequirements::simpleOperation
+    - VellisRequirements::initialization
+    - VellisRequirements::starter
     - VellisVerification::mcpLifecycle
   implementation_scope:
     - system-evolution.yaml
@@ -45,7 +47,7 @@ scope:
   non_goals:
     - No model authority, public MCP tool, wire shape, database schema, or database version change.
     - No PyPI publish or GitHub Release artifact channel; the owner selected git+ install only.
-    - No change to VEL001/VEL002's initialization-mode requirement; only its CLI error text improved. The --connect/--transport noninteractive messages instead realize VellisRequirements::simpleOperation, not VEL001/VEL002.
+    - No change to any accepted model requirement; only CLI error text improved to name remedies already implied by existing requirements (see F003-F006 for exact authority).
 findings:
   - id: F001
     summary: The only documented install command referenced a wheel that no repository command produced, and no check ever ran it.
@@ -69,6 +71,50 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: A wheel built at a new version still passes package_smoke's installed-import assertion because its expected VERSION literal was never bumped alongside it.
     compatibility_effect: No product effect; only the smoke test's own version comparison source changes.
+  - id: F003
+    summary: The noninteractive --connect error omitted the valid 'both' choice.
+    classification: implementation defect
+    consequence: An agent following the named remedy would believe only codex or claude were valid --connect values, when both is also accepted.
+    authority_refs: [VellisRequirements::simpleOperation]
+    evidence_refs: [command:just check]
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: An error message names a remedy that is itself incomplete, leading an unattended agent to retry with an incomplete command.
+    compatibility_effect: No behavior change; only the error message text.
+  - id: F004
+    summary: The install-check's isolation precondition was tautologically true by construction and never inspected the environment values reaching the subprocess.
+    classification: implementation defect
+    consequence: A future refactor that dropped the UV_TOOL_DIR/UV_TOOL_BIN_DIR override could silently install into the operator's real ~/.local/share/uv/tools and ~/.local/bin while the guard still reported clean.
+    authority_refs: [VellisVerification::mcpLifecycle]
+    evidence_refs: [command:just package-check]
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: The guard compares two Path objects that are nested by construction one line above it, so it can never fail regardless of what is actually passed as the subprocess environment.
+    compatibility_effect: No product effect; the isolation check now lives inside the one function capable of running a tool-install command, and re-verifies on every call.
+  - id: F005
+    summary: README's clone-and-run contributor path was never parsed or executed by the install check.
+    classification: implementation defect
+    consequence: A broken contributor path, such as a typo in uv sync, would leave just package-check green.
+    authority_refs: [VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
+    evidence_refs: [command:just package-check]
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: Two of three documented install paths are exercised while the third silently rots.
+    compatibility_effect: No product effect; the check now clones, syncs, and runs against committed HEAD.
+  - id: F006
+    summary: The noninteractive setup mode-selection error restated the rule without naming its remedy.
+    classification: implementation defect
+    consequence: An unattended agent hitting the required-explicit-mode rule had no indication which flag to pass next.
+    authority_refs: [VellisRequirements::initialization, VellisRequirements::starter]
+    evidence_refs: [command:just check]
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: The message correctly enforces VellisRequirements::initialization's explicit-choice obligation but gives no path to satisfy it, leaving an agent to guess at --starter or --blank.
+    compatibility_effect: No behavior change; only the error message text, which now also names the starter by its accepted description.
 decisions:
   - id: D001
     summary: Derive the tested install command from README.md's own Install section rather than duplicating it in package_smoke.py.
@@ -95,10 +141,10 @@ work_items:
     kind: implementation
     dependencies: []
     planned_baseline: {dimension: implementation, identity: "git:7b32a6f7661048a57d0a91fea2580b4facbefd92"}
-    finding_ids: [F001, F002]
+    finding_ids: [F001, F002, F003, F004, F005, F006]
     decision_ids: [D001, D002]
     authority:
-      - refs: [VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
+      - refs: [VellisRequirements::simpleOperation, VellisRequirements::initialization, VellisRequirements::starter, VellisVerification::mcpLifecycle]
         coverage: partial
         remaining_work_item_ids: [W002]
     approval:
@@ -112,17 +158,17 @@ work_items:
     implementation_status: conforming
     evidence_refs: [command:just package-check, command:just check, path:tests/test_repository_policy.py#test_documented_subcommands_match_the_owner_command]
     blocker: null
-    checkpoint: git:1e5f11230e8423c1631f8628cbc068cce03a19a2
+    checkpoint: git:5ef0fab487ff433c935095e4c9226d6db0996076
   - id: W002
     order: 2
     label: Verify, independently review, and close the install-path fix
     kind: closure
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: "git:1e5f11230e8423c1631f8628cbc068cce03a19a2"}
+    planned_baseline: {dimension: implementation, identity: "git:5ef0fab487ff433c935095e4c9226d6db0996076"}
     finding_ids: []
     decision_ids: []
     authority:
-      - refs: [VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
+      - refs: [VellisRequirements::simpleOperation, VellisRequirements::initialization, VellisRequirements::starter, VellisVerification::mcpLifecycle]
         coverage: full
         remaining_work_item_ids: []
     approval:
