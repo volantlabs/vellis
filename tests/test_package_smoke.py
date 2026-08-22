@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tools.package_smoke import ROOT, _run_isolated_tool
+from tools.package_smoke import ROOT, _assert_installed_matches_source, _run_isolated_tool
 
 
 def test_run_isolated_tool_rejects_environment_outside_temp_root(tmp_path: Path) -> None:
@@ -71,3 +71,42 @@ def test_only_the_isolated_helper_can_run_a_tool_install() -> None:
         f"uv tool/uvx invoked outside _run_isolated_tool at {offenders}; "
         "route it through the isolated helper instead"
     )
+
+
+def _mirror_source(destination: Path) -> Path:
+    package = destination / "vellis"
+    package.mkdir(parents=True)
+    for path in (ROOT / "vellis").rglob("*.py"):
+        target = package / path.relative_to(ROOT / "vellis")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(path.read_bytes())
+    return package
+
+
+def test_installed_match_accepts_a_faithful_copy_of_the_source_tree(tmp_path: Path) -> None:
+    _assert_installed_matches_source(_mirror_source(tmp_path), "wheel")
+
+
+def test_installed_match_rejects_a_module_deleted_from_source(tmp_path: Path) -> None:
+    """A rebuilt distribution keeps its name and version, so only content differs."""
+    package = _mirror_source(tmp_path)
+    (package / "graph.py").write_text("# a module deleted from source but left in build/lib\n")
+
+    with pytest.raises(AssertionError, match="unexpected=..graph.py"):
+        _assert_installed_matches_source(package, "wheel")
+
+
+def test_installed_match_rejects_a_module_that_drifted_from_source(tmp_path: Path) -> None:
+    package = _mirror_source(tmp_path)
+    (package / "mcp.py").write_text("# stale copy\n")
+
+    with pytest.raises(AssertionError, match="altered=..mcp.py"):
+        _assert_installed_matches_source(package, "wheel")
+
+
+def test_installed_match_rejects_a_missing_module(tmp_path: Path) -> None:
+    package = _mirror_source(tmp_path)
+    (package / "mcp.py").unlink()
+
+    with pytest.raises(AssertionError, match="missing=..mcp.py"):
+        _assert_installed_matches_source(package, "wheel")

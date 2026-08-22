@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import tempfile
 import tomllib
@@ -316,6 +318,32 @@ def _assert_installed_import(python: Path, environment: Path, root: Path, label:
     version, source = imported.stdout.splitlines()
     if version != VERSION or not Path(source).resolve().is_relative_to(environment.resolve()):
         raise AssertionError(f"{label} imported an unexpected Vellis: {imported.stdout!r}")
+    _assert_installed_matches_source(Path(source).resolve().parent, label)
+
+
+def _module_digests(package: Path) -> dict[str, str]:
+    return {
+        str(path.relative_to(package)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(package.rglob("*.py"))
+    }
+
+
+def _assert_installed_matches_source(installed: Path, label: str) -> None:
+    """Compare installed module content against the source tree.
+
+    A version string cannot distinguish a fresh artifact from a stale one, because
+    a rebuilt distribution keeps the same name and version. Content can.
+    """
+    expected = _module_digests(ROOT / "vellis")
+    actual = _module_digests(installed)
+    missing = sorted(set(expected) - set(actual))
+    extra = sorted(set(actual) - set(expected))
+    altered = sorted(name for name in set(expected) & set(actual) if expected[name] != actual[name])
+    if missing or extra or altered:
+        raise AssertionError(
+            f"{label} does not match the source tree: "
+            f"missing={missing} unexpected={extra} altered={altered}"
+        )
 
 
 def _setup(
@@ -750,6 +778,10 @@ def main() -> int:
         documented_install_root = temporary / "documented-install"
         documented_install_root.mkdir()
         _verify_documented_install(ROOT, documented_install_root, environment)
+        # The setuptools backend copies into build/ and never purges files that
+        # no longer exist in source, so an uncleaned tree ships modules deleted
+        # from the working tree and modules never committed to it.
+        shutil.rmtree(ROOT / "build", ignore_errors=True)
         _run(
             "uv",
             "build",
