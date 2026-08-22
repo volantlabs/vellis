@@ -10,6 +10,7 @@ from pathlib import Path
 
 from vellis.activity_repository import append_activity, canonical_activity_effect
 from vellis.canonical_encoding import CanonicalHeader, canonical_record_hash
+from vellis.cardinality_validation import CardinalitySubjects
 from vellis.database import connect_database, require_supported_database
 from vellis.definition_repository import load_definitions
 from vellis.domain import (
@@ -71,9 +72,13 @@ def apply_graph_change(
             proposed_commands, compose_findings = compose_graph_change(
                 connection, current, request.upserts, request.remove_uuids
             )
-            closure, definitions, cardinality_definitions, cardinality_uuids = _validation_closure(
-                connection, state, commanded_uuids, current, proposed_commands
-            )
+            (
+                closure,
+                definitions,
+                cardinality_definitions,
+                cardinality_uuids,
+                cardinality_scope,
+            ) = _validation_closure(connection, state, commanded_uuids, current, proposed_commands)
             proposed = _replace_commands(closure, proposed_commands, commanded_uuids)
             cardinality_graph = tuple(
                 value for value in proposed if value.uuid in cardinality_uuids
@@ -81,7 +86,9 @@ def apply_graph_change(
             findings = (
                 *compose_findings,
                 *graph_structure_findings(proposed, definitions, require_system=False),
-                *graph_cardinality_findings(cardinality_graph, cardinality_definitions),
+                *graph_cardinality_findings(
+                    cardinality_graph, cardinality_definitions, cardinality_scope
+                ),
             )
         else:
             proposed_commands = current
@@ -395,7 +402,7 @@ def _validation_closure(connection, state, commanded_uuids, current, proposed):
     cardinality_definitions = tuple(
         value for value in definitions if value.type_key in cardinality_keys
     )
-    cardinality_uuids = _cardinality_closure_uuids(
+    cardinality_uuids, cardinality_scope = _cardinality_closure_uuids(
         connection, cardinality_definitions, cardinality_impacts
     )
     closure_uuids = dependent_uuids | cardinality_uuids | set(commanded_uuids)
@@ -406,7 +413,7 @@ def _validation_closure(connection, state, commanded_uuids, current, proposed):
     if header_keys:
         extra = load_definitions(connection, state, header_keys)
         definitions = tuple({value.type_key: value for value in (*definitions, *extra)}.values())
-    return graph, definitions, cardinality_definitions, cardinality_uuids
+    return graph, definitions, cardinality_definitions, cardinality_uuids, cardinality_scope
 
 
 def _load_structural_closure(connection, state, initial_uuids):
@@ -504,7 +511,14 @@ def _dependent_referents(connection, dependent_uuids):
 
 
 def _cardinality_closure_uuids(connection, definitions, changed_objects):
+    """Select the subjects of each definition whose count this change can alter.
+
+    The subject sets stay separated by definition and by role. A flat uuid set
+    would make every closure member a subject of every definition in scope, which
+    counts an endpoint under a definition whose population was never loaded.
+    """
     uuids = set()
+    scope: dict[str, CardinalitySubjects] = {}
     for definition in definitions:
         if isinstance(definition, AssociatedDataTypeDefinition):
             uuids.update(
@@ -526,6 +540,7 @@ def _cardinality_closure_uuids(connection, definitions, changed_objects):
             )
             uuids.update(subjects)
             uuids.update(_data_count_peers(connection, definition.type_key, subjects))
+            scope[definition.type_key] = CardinalitySubjects(data_anchors=frozenset(subjects))
         elif isinstance(definition, LinkTypeDefinition):
             uuids.update(
                 value.uuid
@@ -535,7 +550,10 @@ def _cardinality_closure_uuids(connection, definitions, changed_objects):
             sources, targets = _link_count_subjects(definition, changed_objects)
             uuids.update((*sources, *targets))
             uuids.update(_link_count_peers(connection, definition.type_key, sources, targets))
-    return uuids
+            scope[definition.type_key] = CardinalitySubjects(
+                link_sources=frozenset(sources), link_targets=frozenset(targets)
+            )
+    return uuids, scope
 
 
 def _data_count_peers(connection, type_key, subjects):
@@ -579,22 +597,19 @@ def _link_count_subjects(definition, changed_objects):
 
 
 def _link_count_peers(connection, type_key, sources, targets):
-    # An endpoint enters the closure through either role, and complete-state
-    # cardinality then checks both of its counts. Selecting peers by the matching
-    # role alone hides the endpoint's links in its other role, which reports a
-    # committed parent at source count zero the moment a child is attached to it.
-    # The endpoint set stays bounded by the changed neighbourhood, so this remains
-    # independent of unrelated members of the same type.
-    endpoints = set(sources) | set(targets)
-    if not endpoints:
+    # Each endpoint is counted only in the role that admitted it, so only that
+    # role's population has to be loaded. Loading both roles would materialize an
+    # endpoint's whole degree to satisfy a bound the change cannot affect.
+    if not sources and not targets:
         return set()
-    encoded = json.dumps(sorted(endpoints), separators=(",", ":"))
+    source_json = json.dumps(sorted(sources), separators=(",", ":"))
+    target_json = json.dumps(sorted(targets), separators=(",", ":"))
     rows = connection.execute(
         """SELECT uuid FROM graph_object_version
            WHERE valid_to_revision IS NULL AND type_key = ?
              AND (source_uuid IN (SELECT value FROM json_each(?))
                   OR target_uuid IN (SELECT value FROM json_each(?)))""",
-        (type_key, encoded, encoded),
+        (type_key, source_json, target_json),
     ).fetchall()
     return {str(row[0]) for row in rows}
 

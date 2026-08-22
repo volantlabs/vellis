@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 
 from vellis.domain import (
     Anchor,
@@ -20,12 +21,35 @@ from vellis.domain import (
 from vellis.json_pointer import append_pointer
 
 
+@dataclass(frozen=True, slots=True)
+class CardinalitySubjects:
+    """The subjects of one definition whose count a change can actually alter.
+
+    Local cardinality is per type and per role, so an endpoint admitted to a
+    partial closure by one definition is not thereby a subject of another, and an
+    endpoint admitted in one role is not thereby a subject in the opposite role.
+    A caller validating a complete state supplies no scope and every permitted
+    participant is a subject.
+    """
+
+    link_sources: frozenset[str] = frozenset()
+    link_targets: frozenset[str] = frozenset()
+    data_anchors: frozenset[str] = frozenset()
+
+
+CardinalityScope = Mapping[str, CardinalitySubjects]
+
+_NO_SUBJECTS = CardinalitySubjects()
+
+
 def graph_cardinality_findings(
-    objects: Iterable[GraphObject], definitions: Iterable[TypeDefinition]
+    objects: Iterable[GraphObject],
+    definitions: Iterable[TypeDefinition],
+    scope: CardinalityScope | None = None,
 ) -> tuple[Finding, ...]:
     findings: list[Finding] = []
     _validate_complete_cardinality(
-        tuple(objects), {value.type_key: value for value in definitions}, findings
+        tuple(objects), {value.type_key: value for value in definitions}, scope, findings
     )
     return tuple(
         sorted(
@@ -44,6 +68,7 @@ def graph_cardinality_findings(
 def _validate_complete_cardinality(
     objects: tuple[GraphObject, ...],
     definitions: Mapping[str, TypeDefinition],
+    scope: CardinalityScope | None,
     findings: list[Finding],
 ) -> None:
     anchors = tuple(value for value in objects if isinstance(value, Anchor))
@@ -51,16 +76,18 @@ def _validate_complete_cardinality(
     data = tuple(value for value in objects if isinstance(value, AssociatedData))
     links = tuple(value for value in objects if isinstance(value, Link))
     for definition in definitions.values():
+        subjects = None if scope is None else scope.get(definition.type_key, _NO_SUBJECTS)
         if isinstance(definition, AssociatedDataTypeDefinition):
-            _validate_data_counts(definition, anchors, data, findings)
+            _validate_data_counts(definition, anchors, data, subjects, findings)
         elif isinstance(definition, LinkTypeDefinition):
-            _validate_link_counts(definition, endpoints, links, findings)
+            _validate_link_counts(definition, endpoints, links, subjects, findings)
 
 
 def _validate_data_counts(
     definition: AssociatedDataTypeDefinition,
     anchors: tuple[Anchor, ...],
     objects: tuple[AssociatedData, ...],
+    subjects: CardinalitySubjects | None,
     findings: list[Finding],
 ) -> None:
     typed = tuple(value for value in objects if value.type_key == definition.type_key)
@@ -75,6 +102,8 @@ def _validate_data_counts(
         )
     counts = Counter(anchor for value in typed for anchor in value.anchor_uuids)
     for anchor in anchors:
+        if subjects is not None and anchor.uuid not in subjects.data_anchors:
+            continue
         if anchor.type_key in definition.permitted_anchor_type_keys:
             _check_count(
                 counts[anchor.uuid],
@@ -90,13 +119,16 @@ def _validate_link_counts(
     definition: LinkTypeDefinition,
     endpoints: tuple[Anchor | AssociatedData, ...],
     links: tuple[Link, ...],
+    subjects: CardinalitySubjects | None,
     findings: list[Finding],
 ) -> None:
     typed = tuple(value for value in links if value.type_key == definition.type_key)
     source_counts = Counter(value.source_uuid for value in typed)
     target_counts = Counter(value.target_uuid for value in typed)
     for endpoint in endpoints:
-        if endpoint.type_key in definition.permitted_source_type_keys:
+        source_subject = subjects is None or endpoint.uuid in subjects.link_sources
+        target_subject = subjects is None or endpoint.uuid in subjects.link_targets
+        if source_subject and endpoint.type_key in definition.permitted_source_type_keys:
             _check_count(
                 source_counts[endpoint.uuid],
                 definition.links_per_source,
@@ -105,7 +137,7 @@ def _validate_link_counts(
                 endpoint.uuid,
                 findings,
             )
-        if endpoint.type_key in definition.permitted_target_type_keys:
+        if target_subject and endpoint.type_key in definition.permitted_target_type_keys:
             _check_count(
                 target_counts[endpoint.uuid],
                 definition.links_per_target,

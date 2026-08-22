@@ -2310,3 +2310,245 @@ def test_attaching_children_still_rejects_a_child_left_outside_its_bound(
     assert rejected.resulting_revision is None
     assert [value.code for value in rejected.findings] == [FindingCode.CARDINALITY_VIOLATION]
     assert rejected.findings[0].uuids == (LEAF_2,)
+
+
+ROOT_A = "cccccccc-0000-4000-8000-000000000001"
+ROOT_B = "cccccccc-0000-4000-8000-000000000002"
+DUAL_MID = "cccccccc-0000-4000-8000-000000000003"
+DUAL_LEAF = "cccccccc-0000-4000-8000-000000000004"
+HELD_BY_MID = "dddddddd-0000-4000-8000-000000000001"
+TAGGED_MID = "dddddddd-0000-4000-8000-000000000002"
+HELD_BY_LEAF = "dddddddd-0000-4000-8000-000000000003"
+TAGGED_LEAF = "dddddddd-0000-4000-8000-000000000004"
+
+
+def _dual_bound_definitions():
+    """Two minimum-one link types sharing a permitted source type."""
+    return (
+        AnchorTypeDefinition("test.top", "Top"),
+        AnchorTypeDefinition("test.mid", "Mid"),
+        AnchorTypeDefinition("test.leaf", "Leaf"),
+        LinkTypeDefinition(
+            "test.held_by",
+            "Exactly one containing parent",
+            ("test.mid", "test.leaf"),
+            ("test.top", "test.mid"),
+            Cardinality(1, 1),
+            Cardinality(0),
+        ),
+        LinkTypeDefinition(
+            "test.tagged",
+            "Exactly one owning tag",
+            ("test.mid", "test.leaf"),
+            ("test.top",),
+            Cardinality(1, 1),
+            Cardinality(0),
+        ),
+    )
+
+
+def _dual_bound_database(tmp_path: Path) -> Path:
+    path = tmp_path / "dual" / "vellis.db"
+    initialize_with_definitions(path, _dual_bound_definitions(), recorded_at="2026-08-20T00:00:00Z")
+    seeded = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            0,
+            (
+                AnchorUpsert(ROOT_A, "test.top", "Root A"),
+                AnchorUpsert(ROOT_B, "test.top", "Root B"),
+                AnchorUpsert(DUAL_MID, "test.mid", "Mid"),
+                LinkUpsert(HELD_BY_MID, "test.held_by", DUAL_MID, ROOT_A),
+                LinkUpsert(TAGGED_MID, "test.tagged", DUAL_MID, ROOT_A),
+            ),
+        ),
+    )
+    assert seeded.resulting_revision == 1
+    return path
+
+
+def test_attaching_children_does_not_count_a_parent_under_another_definition(
+    tmp_path: Path,
+) -> None:
+    """A subject of one link definition is not thereby a subject of another.
+
+    The parent enters the closure through test.held_by, where it is the target of
+    the attached child. Counting it under test.tagged as well reports it at source
+    count zero, because that definition's population was never loaded for it, and
+    rejects a batch whose every bound is satisfied.
+    """
+    path = _dual_bound_database(tmp_path)
+
+    attached = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            1,
+            (
+                AnchorUpsert(DUAL_LEAF, "test.leaf", "Leaf"),
+                LinkUpsert(HELD_BY_LEAF, "test.held_by", DUAL_LEAF, DUAL_MID),
+                LinkUpsert(TAGGED_LEAF, "test.tagged", DUAL_LEAF, ROOT_B),
+            ),
+        ),
+    )
+
+    assert attached.status is OperationStatus.ACCEPTED
+    assert attached.findings == ()
+    assert attached.resulting_revision == 2
+    objects = _objects(path)
+    tag = objects[TAGGED_MID]
+    assert isinstance(tag, Link)
+    assert tag.source_uuid == DUAL_MID
+    assert tag.target_uuid == ROOT_A
+
+
+def test_repointing_one_link_does_not_load_an_untouched_endpoint_degree(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Peers load per role, so an endpoint's opposite-role degree stays out.
+
+    Re-pointing the hub's single outgoing link cannot change how many children
+    point at the hub, and that bound is unbounded regardless. Loading the hub's
+    incoming population to satisfy it makes ordinary change cost proportional to
+    total degree.
+    """
+    path = tmp_path / "degree" / "vellis.db"
+    initialize_with_definitions(
+        path,
+        (
+            AnchorTypeDefinition("test.top", "Top"),
+            AnchorTypeDefinition("test.mid", "Mid"),
+            AnchorTypeDefinition("test.leaf", "Leaf"),
+            LinkTypeDefinition(
+                "test.held_by",
+                "Exactly one containing parent",
+                ("test.mid", "test.leaf"),
+                ("test.top", "test.mid"),
+                Cardinality(1, 1),
+                Cardinality(0),
+            ),
+        ),
+        recorded_at="2026-08-20T00:00:00Z",
+    )
+    children = tuple(f"eeeeeeee-0000-4000-8000-{index:012d}" for index in range(1, 41))
+    child_links = tuple(f"ffffffff-0000-4000-8000-{index:012d}" for index in range(1, 41))
+    seeded = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            0,
+            (
+                AnchorUpsert(ROOT_A, "test.top", "Root A"),
+                AnchorUpsert(ROOT_B, "test.top", "Root B"),
+                AnchorUpsert(DUAL_MID, "test.mid", "Hub"),
+                LinkUpsert(HELD_BY_MID, "test.held_by", DUAL_MID, ROOT_A),
+                *(
+                    AnchorUpsert(uuid, "test.leaf", f"Child {index}")
+                    for index, uuid in enumerate(children)
+                ),
+                *(
+                    LinkUpsert(uuid, "test.held_by", children[index], DUAL_MID)
+                    for index, uuid in enumerate(child_links)
+                ),
+            ),
+        ),
+    )
+    assert seeded.resulting_revision == 1
+
+    original_load = change_module.load_graph_objects
+    loaded: list[str] = []
+
+    def recording_load(connection, state, uuids):
+        loaded.extend(uuids)
+        return original_load(connection, state, uuids)
+
+    monkeypatch.setattr(change_module, "load_graph_objects", recording_load)
+    repointed = apply_graph_change(
+        path, GraphChangeRequest(1, (LinkUpsert(HELD_BY_MID, target_uuid=ROOT_B),))
+    )
+
+    assert repointed.status is OperationStatus.ACCEPTED
+    assert repointed.resulting_revision == 2
+    assert not set(loaded).intersection(children)
+    assert not set(loaded).intersection(child_links)
+
+
+def test_attaching_children_does_not_count_an_anchor_under_an_unloaded_data_type(
+    tmp_path: Path,
+) -> None:
+    """The same scoping applies to objects-per-anchor, not only to link roles.
+
+    The parent enters the closure as a link target. Counting it under a data
+    definition whose objects were never loaded for it reports it at zero and
+    rejects a batch in which the parent's own detail is untouched and present.
+    """
+    path = tmp_path / "dataleak" / "vellis.db"
+    top = "aaaacccc-0000-4000-8000-000000000001"
+    mid = "aaaacccc-0000-4000-8000-000000000002"
+    leaf = "aaaacccc-0000-4000-8000-000000000003"
+    held_mid = "bbbbcccc-0000-4000-8000-000000000001"
+    held_leaf = "bbbbcccc-0000-4000-8000-000000000002"
+    mid_detail = "ccccdddd-0000-4000-8000-000000000001"
+    leaf_detail = "ccccdddd-0000-4000-8000-000000000002"
+    initialize_with_definitions(
+        path,
+        (
+            AnchorTypeDefinition("test.top", "Top"),
+            AnchorTypeDefinition("test.mid", "Mid"),
+            AnchorTypeDefinition("test.leaf", "Leaf"),
+            LinkTypeDefinition(
+                "test.held_by",
+                "Exactly one containing parent",
+                ("test.mid", "test.leaf"),
+                ("test.top", "test.mid"),
+                Cardinality(1, 1),
+                Cardinality(0),
+            ),
+            AssociatedDataTypeDefinition(
+                "test.detail",
+                "Exactly one detail per element",
+                ("test.mid", "test.leaf"),
+                (PropertyDefinition("note", "Note", ValueKind.TEXT),),
+                Cardinality(1, 1),
+                Cardinality(1, 1),
+            ),
+        ),
+        recorded_at="2026-08-20T00:00:00Z",
+    )
+    seeded = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            0,
+            (
+                AnchorUpsert(top, "test.top", "Root"),
+                AnchorUpsert(mid, "test.mid", "Mid"),
+                LinkUpsert(held_mid, "test.held_by", mid, top),
+                AssociatedDataUpsert(
+                    mid_detail,
+                    "test.detail",
+                    (mid,),
+                    set_properties=(("note", ScalarValue.text("mid")),),
+                ),
+            ),
+        ),
+    )
+    assert seeded.resulting_revision == 1
+
+    attached = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            1,
+            (
+                AnchorUpsert(leaf, "test.leaf", "Leaf"),
+                LinkUpsert(held_leaf, "test.held_by", leaf, mid),
+                AssociatedDataUpsert(
+                    leaf_detail,
+                    "test.detail",
+                    (leaf,),
+                    set_properties=(("note", ScalarValue.text("leaf")),),
+                ),
+            ),
+        ),
+    )
+
+    assert attached.status is OperationStatus.ACCEPTED
+    assert attached.findings == ()
+    assert attached.resulting_revision == 2
