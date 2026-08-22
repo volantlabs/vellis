@@ -29,11 +29,13 @@ def _run(
     )
 
 
-def _documented_install_commands(root: Path) -> tuple[list[str], list[str], str]:
-    """Extract the install, no-install-trial, and clone command lines from README.md.
+def _documented_install_commands(root: Path) -> tuple[list[str], list[str]]:
+    """Extract and validate the install commands documented in README.md.
 
-    Parsed rather than duplicated, so a README that stops matching a working
-    install fails this check instead of silently going stale.
+    The tool-install and uvx lines are returned for execution. The clone block is
+    validated for shape only -- executing it would re-resolve every dependency into
+    yet another fresh venv for coverage the git+file:// arm already provides -- so a
+    typo there still fails here without paying for a second full sync.
     """
     readme = (root / "README.md").read_text(encoding="utf-8")
     section_match = re.search(r"^## Install\n(.*?)(?=^## |\Z)", readme, re.MULTILINE | re.DOTALL)
@@ -71,8 +73,7 @@ def _documented_install_commands(root: Path) -> tuple[list[str], list[str], str]
     source_url = f"git+file://{root}"
     install_argv = shlex.split(install_lines[0].replace(canonical_url, source_url))
     trial_argv = shlex.split(trial_lines[0].replace(canonical_url, source_url))
-    clone_source = str(root)
-    return install_argv, trial_argv, clone_source
+    return install_argv, trial_argv
 
 
 def _run_isolated_tool(
@@ -103,15 +104,15 @@ def _verify_documented_install(
 ) -> None:
     """Run the exact commands documented in README.md against this checkout's committed HEAD.
 
-    ``git+file://{root}`` (and the plain local ``git clone {root}``) exercise a real
-    clone's failure mode -- installing from a working-tree directory would pass even
-    if a file needed by ``git+https`` were untracked -- so this validates HEAD, not
-    the working tree. Every ``uv tool``/``uvx`` invocation routes through
+    ``git+file://{root}`` exercises a real clone's failure mode -- installing from a
+    working-tree directory would pass even if a file needed by ``git+https`` were
+    untracked -- so this validates HEAD, not the working tree. Every
+    ``uv tool``/``uvx`` invocation routes through
     ``_run_isolated_tool``, which re-verifies isolation itself rather than trusting a
     check performed elsewhere, so a refactor cannot silently overwrite the operator's
     real installed ``vellis``.
     """
-    install_argv, trial_argv, clone_source = _documented_install_commands(root)
+    install_argv, trial_argv = _documented_install_commands(root)
 
     tool_dir = temporary / "documented-install-tool-dir"
     tool_bin = temporary / "documented-install-tool-bin"
@@ -197,14 +198,6 @@ def _verify_documented_install(
         environment=environment,
         temporary=temporary,
     )
-
-    clone_root = temporary / "vellis"
-    _run("git", "clone", clone_source, str(clone_root), cwd=temporary)
-    _run("uv", "sync", cwd=clone_root, env=cache_environment)
-    clone_help = _run("uv", "run", "vellis", "--help", cwd=clone_root, env=cache_environment)
-    for subcommand in ("setup", "connect", "serve", "backup", "restore", "audit", "configure"):
-        if subcommand not in clone_help.stdout:
-            raise AssertionError(f"documented clone help omits subcommand {subcommand!r}")
 
     data_directory = temporary / "documented-install-data"
     _run(
