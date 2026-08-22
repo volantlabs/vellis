@@ -52,11 +52,14 @@ UUID = "00000000-0000-4000-8000-000000000001"
 
 
 def _missing_entry_result(client: ClientKind) -> CommandResult:
-    quote = "'" if client is ClientKind.CODEX else '"'
-    suffix = " found." if client is ClientKind.CODEX else "."
+    diagnostic = (
+        "Error: No MCP server named 'vellis' found."
+        if client is ClientKind.CODEX
+        else 'No MCP server named "vellis". Configured servers: another-server'
+    )
     return CommandResult(
         1,
-        stderr=f"No MCP server named {quote}vellis{quote}{suffix}",
+        stderr=diagnostic,
     )
 
 
@@ -2577,11 +2580,20 @@ def test_client_enumeration_distinguishes_absence_from_uncertain_failure(
     client: ClientKind,
 ) -> None:
     assert not entry_exists(client, lambda _arguments: _missing_entry_result(client))
-    with pytest.raises(RuntimeError, match="external configuration state is uncertain"):
-        entry_exists(
-            client,
-            lambda _arguments: CommandResult(1, stderr="failed to load configuration"),
-        )
+    other_client = ClientKind.CLAUDE if client is ClientKind.CODEX else ClientKind.CODEX
+    uncertain_results = (
+        CommandResult(1, stderr="failed to load configuration"),
+        CommandResult(
+            1,
+            stderr=(
+                f"{_missing_entry_result(client).stderr}\nfatal: configuration could not be parsed"
+            ),
+        ),
+        _missing_entry_result(other_client),
+    )
+    for result in uncertain_results:
+        with pytest.raises(RuntimeError, match="external configuration state is uncertain"):
+            entry_exists(client, lambda _arguments, result=result: result)
 
 
 def test_add_invocation_exception_after_removal_reports_changed_state_and_recovery(

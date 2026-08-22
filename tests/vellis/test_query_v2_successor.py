@@ -737,6 +737,19 @@ def test_streamed_pattern_above_sqlites_flat_join_limit_is_a_domain_result(
     assert result.payload.matches == ()
 
 
+def test_maximum_width_parallel_links_avoid_sqlite_expression_limit(tmp_path: Path) -> None:
+    database = _database(tmp_path)
+    nodes = (
+        PatternNode("source", PatternNodeKind.ANCHOR),
+        PatternNode("target", PatternNodeKind.ANCHOR),
+    )
+    links = tuple(PatternLink(f"link{index}", "source", "target") for index in range(998))
+    result = query_graph(database, GraphQuery(PatternSelection(1, nodes, links=links)))
+    assert result.status is OperationStatus.ACCEPTED
+    assert isinstance(result.payload, PatternQueryPayload)
+    assert result.payload.matches == ()
+
+
 def test_dense_pattern_stops_stream_after_maximum_plus_one_complete_bindings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

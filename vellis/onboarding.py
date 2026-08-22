@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import re
 import shlex
 import shutil
 import subprocess
@@ -77,10 +76,22 @@ def entry_exists(client: ClientKind, runner: Runner = subprocess_runner) -> bool
     result = runner((client.value, "mcp", "get", "vellis"))
     if result.returncode == 0:
         return True
-    diagnostic = f"{result.stdout}\n{result.stderr}"
-    if re.search(r"No MCP server named ['\"]vellis['\"](?: found)?\.", diagnostic):
+    lines = tuple(
+        line.strip()
+        for stream in (result.stdout, result.stderr)
+        for line in stream.splitlines()
+        if line.strip()
+    )
+    if len(lines) == 1 and _is_missing_entry_diagnostic(client, lines[0]):
         return False
     raise RuntimeError("client entry enumeration failed; external configuration state is uncertain")
+
+
+def _is_missing_entry_diagnostic(client: ClientKind, diagnostic: str) -> bool:
+    if client is ClientKind.CODEX:
+        return diagnostic == "Error: No MCP server named 'vellis' found."
+    prefix = 'No MCP server named "vellis".'
+    return diagnostic == prefix or diagnostic.startswith(f"{prefix} Configured servers: ")
 
 
 def add_command(

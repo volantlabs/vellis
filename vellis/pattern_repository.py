@@ -7,6 +7,7 @@ import sqlite3
 
 from vellis.domain import ObjectKind, ResolvedState
 from vellis.query_domain import (
+    DirectAssociation,
     PatternLink,
     PatternMatch,
     PatternNodeKind,
@@ -25,22 +26,23 @@ def select_pattern_bindings(
     register_query_functions(connection)
     node_indexes = {node.name: index for index, node in enumerate(selection.nodes)}
     node_order = _connected_node_order(selection, node_indexes)
+    steps = _evaluation_steps(selection, node_indexes, node_order)
     node_bindings: list[str | None] = [None] * len(selection.nodes)
     link_bindings: list[str | None] = [None] * len(selection.links)
-    selector_count = len(node_order) + len(selection.links)
+    binding_count = len(node_order) + len(selection.links)
     cursors: list[sqlite3.Cursor] = []
     rows: list[tuple[str, ...]] = []
     depth = 0
     try:
         while True:
-            if depth == selector_count:
+            if depth == len(steps):
                 complete = tuple(value for value in (*node_bindings, *link_bindings) if value)
-                assert len(complete) == selector_count
+                assert len(complete) == binding_count
                 rows.append(complete)
                 if len(rows) > selection.maximum_matches:
                     return None
                 depth -= 1
-                _clear_binding(depth, node_order, node_bindings, link_bindings)
+                _clear_binding(steps[depth], node_bindings, link_bindings)
                 continue
             if len(cursors) == depth:
                 cursors.append(
@@ -49,7 +51,7 @@ def select_pattern_bindings(
                         state,
                         selection,
                         node_indexes,
-                        node_order,
+                        steps,
                         node_bindings,
                         link_bindings,
                         depth,
@@ -57,20 +59,14 @@ def select_pattern_bindings(
                 )
             row = cursors[depth].fetchone()
             if row is not None:
-                _set_binding(
-                    depth,
-                    str(row["uuid"]),
-                    node_order,
-                    node_bindings,
-                    link_bindings,
-                )
+                _set_binding(steps[depth], str(row["uuid"]), node_bindings, link_bindings)
                 depth += 1
                 continue
             cursors.pop().close()
             if depth == 0:
                 break
             depth -= 1
-            _clear_binding(depth, node_order, node_bindings, link_bindings)
+            _clear_binding(steps[depth], node_bindings, link_bindings)
     finally:
         for cursor in cursors:
             cursor.close()
@@ -86,25 +82,32 @@ def _candidate_cursor(
     state: ResolvedState,
     selection: PatternSelection,
     node_indexes: dict[str, int],
-    node_order: tuple[int, ...],
+    steps: tuple[tuple[str, int], ...],
     node_bindings: list[str | None],
     link_bindings: list[str | None],
     depth: int,
 ) -> sqlite3.Cursor:
-    if depth < len(node_order):
+    kind, index = steps[depth]
+    if kind == "node":
         return _node_candidate_cursor(
             connection,
             state,
             selection,
-            node_indexes,
-            node_order[depth],
+            index,
             node_bindings,
         )
-    link_index = depth - len(node_order)
+    if kind == "association":
+        return _association_candidate_cursor(
+            connection,
+            state,
+            selection.direct_associations[index],
+            node_indexes,
+            node_bindings,
+        )
     return _link_candidate_cursor(
         connection,
         state,
-        selection.links[link_index],
+        selection.links[index],
         node_indexes,
         node_bindings,
         link_bindings,
@@ -115,7 +118,6 @@ def _node_candidate_cursor(
     connection: sqlite3.Connection,
     state: ResolvedState,
     selection: PatternSelection,
-    node_indexes: dict[str, int],
     node_index: int,
     node_bindings: list[str | None],
 ) -> sqlite3.Cursor:
@@ -135,80 +137,27 @@ def _node_candidate_cursor(
         parameters.extend(values)
     bound_nodes = tuple(value for value in node_bindings if value is not None)
     _exclude_bound_uuids(conditions, parameters, "v", bound_nodes)
-    _node_relationship_conditions(
-        state,
-        selection,
-        node_indexes,
-        node_index,
-        node_bindings,
-        conditions,
-        parameters,
-    )
     return connection.execute(
         f"SELECT v.uuid FROM graph_object_version AS v WHERE {' AND '.join(conditions)}",
         parameters,
     )
 
 
-def _node_relationship_conditions(
+def _association_candidate_cursor(
+    connection: sqlite3.Connection,
     state: ResolvedState,
-    selection: PatternSelection,
+    association: DirectAssociation,
     node_indexes: dict[str, int],
-    node_index: int,
     node_bindings: list[str | None],
-    conditions: list[str],
-    parameters: list[object],
-) -> None:
-    for value in selection.direct_associations:
-        anchor = node_indexes[value.anchor]
-        data = node_indexes[value.associated_data]
-        if node_index not in {anchor, data}:
-            continue
-        other = data if node_index == anchor else anchor
-        if node_bindings[other] is None:
-            continue
-        object_sql = _current_or_bound(data, node_index, node_bindings, parameters)
-        anchor_sql = _current_or_bound(anchor, node_index, node_bindings, parameters)
-        conditions.append(
-            "EXISTS (SELECT 1 FROM direct_association_version AS a "
-            f"WHERE a.object_uuid = {object_sql} AND a.anchor_uuid = {anchor_sql} "
-            f"AND {interval_sql('a')})"
-        )
-        parameters.extend(interval_parameters(state))
-    for link in selection.links:
-        source = node_indexes[link.source]
-        target = node_indexes[link.target]
-        if node_index not in {source, target}:
-            continue
-        other = target if node_index == source else source
-        if node_bindings[other] is None:
-            continue
-        link_conditions = [interval_sql("l"), "l.kind = 'link'"]
-        link_parameters: list[object] = [*interval_parameters(state)]
-        _json_filter(link_conditions, link_parameters, "l.type_key", link.type_keys)
-        _json_filter(link_conditions, link_parameters, "l.uuid", link.uuids)
-        source_sql = _current_or_bound(source, node_index, node_bindings, link_parameters)
-        target_sql = _current_or_bound(target, node_index, node_bindings, link_parameters)
-        link_conditions.extend((f"l.source_uuid = {source_sql}", f"l.target_uuid = {target_sql}"))
-        conditions.append(
-            "EXISTS (SELECT 1 FROM graph_object_version AS l "
-            f"WHERE {' AND '.join(link_conditions)})"
-        )
-        parameters.extend(link_parameters)
-
-
-def _current_or_bound(
-    index: int,
-    current: int,
-    node_bindings: list[str | None],
-    parameters: list[object],
-) -> str:
-    if index == current:
-        return "v.uuid"
-    value = node_bindings[index]
-    assert value is not None
-    parameters.append(value)
-    return "?"
+) -> sqlite3.Cursor:
+    anchor = node_bindings[node_indexes[association.anchor]]
+    associated_data = node_bindings[node_indexes[association.associated_data]]
+    assert anchor is not None and associated_data is not None
+    return connection.execute(
+        "SELECT a.object_uuid AS uuid FROM direct_association_version AS a "
+        f"WHERE a.object_uuid = ? AND a.anchor_uuid = ? AND {interval_sql('a')} LIMIT 1",
+        (associated_data, anchor, *interval_parameters(state)),
+    )
 
 
 def _link_candidate_cursor(
@@ -237,28 +186,28 @@ def _link_candidate_cursor(
 
 
 def _set_binding(
-    depth: int,
+    step: tuple[str, int],
     uuid: str,
-    node_order: tuple[int, ...],
     node_bindings: list[str | None],
     link_bindings: list[str | None],
 ) -> None:
-    if depth < len(node_order):
-        node_bindings[node_order[depth]] = uuid
-    else:
-        link_bindings[depth - len(node_order)] = uuid
+    kind, index = step
+    if kind == "node":
+        node_bindings[index] = uuid
+    elif kind == "link":
+        link_bindings[index] = uuid
 
 
 def _clear_binding(
-    depth: int,
-    node_order: tuple[int, ...],
+    step: tuple[str, int],
     node_bindings: list[str | None],
     link_bindings: list[str | None],
 ) -> None:
-    if depth < len(node_order):
-        node_bindings[node_order[depth]] = None
-    else:
-        link_bindings[depth - len(node_order)] = None
+    kind, index = step
+    if kind == "node":
+        node_bindings[index] = None
+    elif kind == "link":
+        link_bindings[index] = None
 
 
 def _exclude_bound_uuids(
@@ -268,8 +217,8 @@ def _exclude_bound_uuids(
     values: tuple[str, ...],
 ) -> None:
     if values:
-        conditions.append(f"{alias}.uuid NOT IN ({', '.join('?' for _ in values)})")
-        parameters.extend(values)
+        conditions.append(f"{alias}.uuid NOT IN (SELECT value FROM json_each(?))")
+        parameters.append(json.dumps(values, ensure_ascii=False, separators=(",", ":")))
 
 
 def _connected_node_order(
@@ -291,6 +240,32 @@ def _connected_node_order(
         order.append(candidate)
         remaining.remove(candidate)
     return tuple(order)
+
+
+def _evaluation_steps(
+    selection: PatternSelection,
+    node_indexes: dict[str, int],
+    node_order: tuple[int, ...],
+) -> tuple[tuple[str, int], ...]:
+    node_positions = {node_index: position for position, node_index in enumerate(node_order)}
+    steps: list[tuple[str, int]] = []
+    for position, node_index in enumerate(node_order):
+        steps.append(("node", node_index))
+        for index, association in enumerate(selection.direct_associations):
+            endpoints = (
+                node_positions[node_indexes[association.anchor]],
+                node_positions[node_indexes[association.associated_data]],
+            )
+            if max(endpoints) == position:
+                steps.append(("association", index))
+        for index, link in enumerate(selection.links):
+            endpoints = (
+                node_positions[node_indexes[link.source]],
+                node_positions[node_indexes[link.target]],
+            )
+            if max(endpoints) == position:
+                steps.append(("link", index))
+    return tuple(steps)
 
 
 def _json_filter(
