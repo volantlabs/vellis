@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:daed5a087a0974f99d885471f557bdf89f09b3c7
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:f486fe64c466945f2780326616f909bf2ceba4d5
+    implementation: git:a80775909cd7936e52b2b61fa3070492ebe4e6c9
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:f486fe64c466945f2780326616f909bf2ceba4d5
+    checkpoint: git:a80775909cd7936e52b2b61fa3070492ebe4e6c9
   observed: *target
 scope:
   authority_scope:
@@ -37,6 +37,7 @@ scope:
   implementation_scope:
     - system-evolution.yaml
     - vellis/mcp.py
+    - vellis/cardinality_validation.py
     - vellis/change_operations.py
     - tests/vellis/test_mcp_lifecycle_v2.py
     - tests/vellis/test_change_draft_v2.py
@@ -82,12 +83,12 @@ findings:
   - id: F004
     summary: The cardinality closure loads peers per definition but checks every closure endpoint under every in-scope definition, so an endpoint admitted by one link definition is counted under another with none of that definition's links loaded.
     classification: implementation defect
-    consequence: Peers are loaded per definition but every closure endpoint is checked under every in-scope definition, so an endpoint admitted through one definition is counted under another with none of that definition's links loaded, and a valid batch is rejected naming an object whose bound is satisfied. Reproduced at git:f93e8d0 with two minimum-one link definitions sharing a permitted source type.
+    consequence: Peers are loaded per definition but every closure endpoint is checked under every in-scope definition, so an endpoint admitted through one definition is counted under another with none of that definition's population loaded, and a valid batch is rejected naming an object whose bound is satisfied. This applies to objects-per-anchor as well as to link roles. Reproduced at git:f93e8d0 with two minimum-one link definitions sharing a permitted source type.
     authority_refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange]
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count]
-    disposition: open
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_an_anchor_under_an_unloaded_data_type]
+    disposition: resolved
     owner_work_item_id: W004
-    implementation_status: absent
+    implementation_status: conforming
     nearest_wrong_system: Peers are loaded for every closure endpoint under every definition, which repairs the count by making ordinary change depend on unrelated populations and on each endpoint's full degree.
     compatibility_effect: No accepted graph state changes. A batch wrongly rejected today becomes accepted; genuinely invalid batches still reject.
   - id: F005
@@ -95,23 +96,56 @@ findings:
     classification: implementation defect
     consequence: Every link incident to a closure endpoint is now loaded in either role with no gate on whether that role's bound is constraining. For the unbounded parent shape no finding can ever result, yet the whole incident population is materialized. Measured on one re-pointing operation against a hub with 400 children, loaded uuids rose from 6 to 806. This is an undeclared scale driver on the ordinary change path.
     authority_refs: [VellisRequirements::locality, VellisRequirements::atomicChange]
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count]
-    disposition: open
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree]
+    disposition: resolved
     owner_work_item_id: W004
-    implementation_status: absent
+    implementation_status: conforming
     nearest_wrong_system: A cap or sampling is added to bound the load, which silently stops checking a bound the model requires.
     compatibility_effect: No accepted graph state changes; the effect is on how much state one ordinary change materializes.
   - id: F006
-    summary: The pattern query rejects a selection whose match count exceeds maxMatches instead of paging it, and the rejection names a request member that does not exist.
+    summary: Three finding paths name request members the request does not have, so an agent cannot resolve them against its own document.
     classification: implementation defect
-    consequence: An over-limit pattern returns resultLimitExceeded with path /selection/maximumMatches while the accepted wire member is maxMatches, so the path does not identify the exact request member. Separately, rtg_query has no cursor and maxMatches is capped, so any connected question exceeding that cap cannot be asked and must be narrowed by predicates until it fits.
-    authority_refs: [VellisRequirements::mcpBoundary, VellisRequirements::querySafety]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties]
+    consequence: An over-limit pattern reports /selection/maximumMatches while the accepted member is maxMatches; a regex predicate finding reports the domain name text while the accepted member is value; and an empty selector name reports /selection/names/{index}, an array that does not exist, whose index is a synthetic position across the separate node and link name arrays. RTG014 requires an optional finding path to identify the exact request member.
+    authority_refs: [VellisRequirements::mcpBoundary]
+    evidence_refs: [command:just check]
     disposition: open
-    owner_work_item_id: W004
+    owner_work_item_id: W005
     implementation_status: absent
-    nearest_wrong_system: The path is corrected to maxMatches while the unpageable-query consequence stays undocumented, so agents keep meeting an unanswerable question with no guidance.
-    compatibility_effect: Correcting the finding path changes reported diagnostics only; no accepted input or result changes.
+    nearest_wrong_system: The visible maximumMatches path is corrected while the predicate and selector-name paths keep naming members no request carries.
+    compatibility_effect: Reported diagnostics only; no accepted input, result, or finding code changes.
+  - id: F007
+    summary: A connected question whose match set exceeds the fixed public item limit cannot be asked, because pattern selection rejects rather than pages.
+    classification: feasibility consequence
+    consequence: RTG006 establishes binding tuples only through maximum plus one and rejects an additional tuple without rows or hydrated values, and RTG014 fixes one public item limit of 1000 across every bounded collection, query maximum, page, and history maximum with no per-feature configurable limit. Narrowing by predicate or selecting by identity is therefore the intended path for a large population, and paging a pattern would be changed system meaning rather than a defect repair.
+    authority_refs: [VellisRequirements::querySafety, VellisRequirements::mcpBoundary]
+    evidence_refs: [command:just model-check]
+    disposition: accepted
+    owner_work_item_id: W005
+    implementation_status: not applicable
+    nearest_wrong_system: A cursor is added to pattern selection, silently replacing an accepted bounded-rejection guarantee with unbounded materialization.
+    compatibility_effect: None; accepted meaning is preserved and no behavior changes.
+  - id: F008
+    summary: The package check builds through an uncleaned build tree and never compares the built artifact against source, so it certifies a stale distribution.
+    classification: implementation defect
+    consequence: The setuptools backend reuses the ignored build directory and never purges files deleted from source, and package_smoke runs its build in the repository root, so the artifact it then installs and exercises can predate current source. Its only artifact assertion compares a version string. The committed distribution currently carries modules deleted from the source tree and one file that has no version-control history at all, so an owner following the documented install can run code that is not the code claimed.
+    authority_refs: [VellisRequirements::simpleOperation]
+    evidence_refs: [command:just package-check]
+    disposition: open
+    owner_work_item_id: W006
+    implementation_status: absent
+    nearest_wrong_system: The build directory is purged while the check still compares only a version string, so a cached or partial artifact continues to pass.
+    compatibility_effect: Build and verification tooling only; no product behavior, wire, or database change.
+  - id: F009
+    summary: An agent that exceeds the query bound is told the limit was exceeded but not how to proceed.
+    classification: implementation defect
+    consequence: RTG014 requires tool descriptions to guide bounded pattern narrowing, but the rtg_query description and the resultLimitExceeded summary state only that the maximum was exceeded. The intended remedy under RTG006 is to narrow by predicate or select by identity, and neither is discoverable from the boundary.
+    authority_refs: [VellisRequirements::mcpBoundary]
+    evidence_refs: [command:just check]
+    disposition: open
+    owner_work_item_id: W005
+    implementation_status: absent
+    nearest_wrong_system: Guidance is added to prose while the finding an agent actually receives still says only that a limit was exceeded.
+    compatibility_effect: Description and summary text only; no accepted input or result changes.
 decisions:
   - id: D001
     summary: Publish a merged top-level properties map alongside the existing oneOf in the shared union-schema builder, rather than collapsing the branches or special-casing each tool.
@@ -202,10 +236,10 @@ work_items:
     kind: implementation
     dependencies: [W001, W002]
     planned_baseline: {dimension: implementation, identity: "git:f486fe64c466945f2780326616f909bf2ceba4d5"}
-    finding_ids: [F004, F005, F006]
+    finding_ids: [F004, F005]
     decision_ids: []
     authority:
-      - refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange, VellisRequirements::locality, VellisRequirements::mcpBoundary, VellisVerification::cardinality, VellisVerification::activeChange]
+      - refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange, VellisRequirements::locality, VellisVerification::cardinality, VellisVerification::activeChange]
         coverage: partial
         remaining_work_item_ids: [W003]
     approval:
@@ -218,13 +252,67 @@ work_items:
       - Do not inspect .data.
       - Do not change which graph states are valid.
       - Do not cap or sample a bound the model requires to be checked.
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree, path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_an_anchor_under_an_unloaded_data_type, command:just check]
+    blocker: null
+    checkpoint: git:a80775909cd7936e52b2b61fa3070492ebe4e6c9
+  - id: W005
+    order: 4
+    label: Make boundary finding paths resolvable and the query bound navigable
+    kind: implementation
+    dependencies: [W001, W002]
+    planned_baseline: {dimension: implementation, identity: "git:a80775909cd7936e52b2b61fa3070492ebe4e6c9"}
+    finding_ids: [F006, F007, F009]
+    decision_ids: []
+    authority:
+      - refs: [VellisRequirements::mcpBoundary, VellisRequirements::querySafety, VellisVerification::mcpLifecycle]
+        coverage: partial
+        remaining_work_item_ids: [W003]
+    approval:
+      status: not-required
+      reason: RTG014 already requires a finding path to identify the exact request member and tool descriptions to guide bounded pattern narrowing.
+      checkpoint: null
+    nearest_wrong_system: The paths are corrected to match today's aliases with nothing that would notice the next alias drift.
+    compatibility_effect: Reported diagnostics and description text only. No accepted input, result, finding code, or database change.
+    non_effects:
+      - Do not inspect .data.
+      - Do not add paging, a cursor, or a configurable limit to pattern selection.
+      - Do not change which selections are accepted or rejected.
     lifecycle: active
     implementation_status: absent
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count]
+    evidence_refs: [command:just check]
+    blocker: null
+    checkpoint: null
+  - id: W006
+    order: 5
+    label: Make the package check reject a stale distribution
+    kind: implementation
+    dependencies: [W001, W002]
+    planned_baseline: {dimension: implementation, identity: "git:a80775909cd7936e52b2b61fa3070492ebe4e6c9"}
+    finding_ids: [F008]
+    decision_ids: []
+    authority:
+      - refs: [VellisRequirements::simpleOperation]
+        coverage: partial
+        remaining_work_item_ids: [W003]
+    approval:
+      status: not-required
+      reason: The check already claims to verify the distributable; making that claim true is a defect repair, not changed meaning.
+      checkpoint: null
+    nearest_wrong_system: The build tree is purged so the symptom disappears locally, while the check still cannot tell a stale artifact from a fresh one.
+    compatibility_effect: Build and verification tooling only. No product behavior, wire, or database change.
+    non_effects:
+      - Do not inspect .data.
+      - Do not run broad ignored-file cleanup; remove only the build and dist outputs.
+      - Do not add version-bump automation or change the release process.
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: [command:just package-check]
     blocker: null
     checkpoint: null
   - id: W003
-    order: 4
+    order: 6
     label: Verify, independently review, and close the agent-usable boundary fixes
     kind: closure
     dependencies: [W001, W002]
