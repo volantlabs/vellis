@@ -1,134 +1,198 @@
 schema_version: "1.0"
 evolution:
-  id: vellis-2-union-tool-schema-fix
-  objective: Make every public MCP tool schema acceptable to a strict client so the whole tool inventory loads rather than being rejected wholesale.
-  observable_distinction: A strict MCP client that validates inputSchema.type accepts all ten tools instead of rejecting the entire tools/list response, and the suite fails if any tool schema stops declaring type object.
-  lifecycle: complete
+  id: vellis-2-agent-usable-boundary
+  objective: Make the MCP boundary usable by a conforming client doing real agent work, so that every selected tool can actually receive its arguments and an incremental graph load never fails a cardinality count the change could not affect.
+  observable_distinction: A conforming MCP client can call rtg_validate and rtg_draft_inspect with their fresh and continuation arguments and receive the selected payload instead of an input-validation refusal, and attaching new children to an existing parent under a minimum-one links-per-source type is accepted instead of rejected with a cardinalityViolation naming the untouched parent.
+  lifecycle: active
   approval:
     status: not-required
-    reason: RTG014 already requires the boundary to expose its selected behaviors through ordinary typed JSON values; a schema a conforming client rejects is an implementation defect under that accepted meaning.
+    reason: RTG014 already requires the selected behaviors to be exposed through ordinary typed JSON values, and RTG003 already requires each count to apply to the complete permitted population of that exact one type. Both findings are implementation defects under sufficient accepted authority.
     checkpoint: null
   blocker: null
-  checkpoint: git:730929ff387bac8a243b125c71c6d62095f36210
+  checkpoint: null
 baselines:
   status: current
   source: &source
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:b7fe2e33508fb7f3539e5c2914e6756d42c958f7
+    implementation: git:daed5a087a0974f99d885471f557bdf89f09b3c7
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:b7fe2e33508fb7f3539e5c2914e6756d42c958f7
-  target: &target
-    model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:730929ff387bac8a243b125c71c6d62095f36210
-    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:730929ff387bac8a243b125c71c6d62095f36210
-  observed: *target
+    checkpoint: git:daed5a087a0974f99d885471f557bdf89f09b3c7
+  target: *source
+  observed: *source
 scope:
   authority_scope:
     - VellisRequirements::mcpBoundary
+    - VellisRequirements::localCardinality
+    - VellisRequirements::atomicChange
+    - VellisRequirements::locality
     - VellisVerification::mcpLifecycle
+    - VellisVerification::cardinality
+    - VellisVerification::activeChange
   implementation_scope:
     - system-evolution.yaml
     - vellis/mcp.py
+    - vellis/change_operations.py
     - tests/vellis/test_mcp_lifecycle_v2.py
-    - docs/install.md
+    - tests/vellis/test_change_draft_v2.py
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
     - No model authority, tool inventory, wire field, finding code, database schema, or database version change.
-    - No change to which inputs either union tool accepts; only the schema advertised for them.
+    - No change to which inputs any tool accepts; only the schema advertised for the two union tools.
+    - No change to which graph states are valid; only to which objects a change loads before counting.
 findings:
   - id: F001
-    summary: The two union-input tools advertised a top-level oneOf with no type, which a strict MCP client rejects.
+    summary: The two union-input tools advertise no top-level properties, so a conforming client drops every argument and the tools cannot be called at all.
     classification: implementation defect
-    consequence: rtg_draft_inspect and rtg_validate produced inputSchema without type object, and because a client validates the whole tools/list response, two malformed schemas made all ten tools unavailable rather than degrading only themselves.
+    consequence: rtg_validate and rtg_draft_inspect publish an inputSchema carrying only type object and oneOf. A client that forwards arguments by consulting top-level properties therefore sends an empty object, and both tools refuse every call with an input-validation error regardless of the arguments supplied. Two of the ten selected behaviors are unreachable, so an agent cannot page validation findings or inspect raw draft deltas at all.
     authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_public_server_lists_strict_selected_tools_and_calls_successor]
-    disposition: resolved
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties]
+    disposition: implementation-work
     owner_work_item_id: W001
     implementation_status: conforming
-    nearest_wrong_system: The server starts, reports healthy, and answers initialize, while every tool is silently unusable because the inventory response failed client-side validation.
-    compatibility_effect: No accepted input changes; each union branch already declared type object, so requests valid before remain valid and requests invalid before remain invalid.
-  - id: F002
-    summary: The tool-schema assertion excused oneOf schemas instead of requiring the MCP type, so it could never observe this defect.
+    nearest_wrong_system: The inventory loads, every schema declares type object, the suite is green, and the two union tools are still impossible to call because the advertised schema never names the members a client must forward.
+    compatibility_effect: No accepted input changes. The advertised schema gains a merged top-level properties map while the oneOf branches continue to decide acceptance, so requests valid before remain valid and requests invalid before remain invalid.
+  - id: F003
+    summary: The tool-schema assertion unioned the oneOf branch members instead of reading the published top-level members, so it could never observe that the union tools were uncallable.
     classification: implementation defect
-    consequence: The suite encoded the malformed shape as acceptable, and the installed-boundary probe counted ten tools without validating their schemas, so nothing in the gate could distinguish a loadable inventory from an unloadable one.
+    consequence: _top_level_properties special-cased a schema carrying oneOf and collected member names from inside the branches. The expected-properties assertion therefore passed for a schema that names its members nowhere a client forwards them from, so the gate stayed green while two of the ten selected behaviors could not be called at all.
     authority_refs: [VellisVerification::mcpLifecycle]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_public_server_lists_strict_selected_tools_and_calls_successor]
-    disposition: resolved
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties]
+    disposition: implementation-work
     owner_work_item_id: W001
     implementation_status: conforming
-    nearest_wrong_system: A schema assertion whose disjunction is satisfied by the very shape that breaks clients, so the gate stays green while the product is unusable.
+    nearest_wrong_system: An assertion whose disjunction is satisfied by the very shape that makes the tool unusable, so the suite reports coverage of a member set no client can reach.
     compatibility_effect: No product effect; the assertion is strictly narrower than before.
+  - id: F002
+    summary: The link cardinality closure loads an endpoint's peer links by only one role, so an endpoint pulled into the closure as a target is counted as a source with its outgoing links missing.
+    classification: implementation defect
+    consequence: _link_count_peers selects existing links whose source is in the source set or whose target is in the target set, while _cardinality_closure_uuids admits an endpoint that appears in either role and the complete-state validator then checks both roles for it. Attaching children to an existing parent under a minimum-one links-per-source type therefore rejects the batch with a cardinalityViolation reporting count 0 for a parent whose committed outgoing link was never loaded. Incremental tier-by-tier loading of any containment hierarchy is impossible.
+    authority_refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange]
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count]
+    disposition: implementation-work
+    owner_work_item_id: W002
+    implementation_status: absent
+    nearest_wrong_system: The count is repaired by loading the complete link population for the type, which makes ordinary change depend on unrelated populations and violates the locality requirement instead of the cardinality one.
+    compatibility_effect: No accepted graph state changes. A batch that was wrongly rejected becomes accepted; every batch that genuinely violates a bound is still rejected with the same finding code and subject.
 decisions:
   - id: D001
-    summary: Declare type object alongside oneOf in the shared union-schema builder rather than restructuring the input models or rewriting schemas downstream.
+    summary: Publish a merged top-level properties map alongside the existing oneOf in the shared union-schema builder, rather than collapsing the branches or special-casing each tool.
     authority_refs: [VellisRequirements::mcpBoundary]
-    alternatives: [Collapse each union into one optional-field model and lose the mutually exclusive fresh-versus-continuation distinction., Post-process generated schemas outside the builder., Special-case the two tools individually.]
+    alternatives:
+      - Collapse each union into one model with optional fields and lose the mutually exclusive fresh-versus-continuation distinction the oneOf encodes.
+      - Special-case the two tools with hand-written schemas that would drift from their input models.
+      - Leave the schema and require every client to read oneOf branches, which conforming argument-forwarding clients do not do.
     reversible: true
     owner_work_item_id: W001
-    evidence_intent: [Every tool schema declares type object., Both union tools still accept exactly their fresh and continuation shapes and still reject unknown members.]
+    evidence_intent:
+      - Every union tool advertises a top-level properties entry for each member any branch accepts.
+      - Both union tools still accept exactly their fresh and continuation shapes and still reject unknown members and cross-branch mixtures.
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_public_server_lists_strict_selected_tools_and_calls_successor]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties]
+  - id: D002
+    summary: Load peer links incident to any closure endpoint in either role, keeping the closure bounded by the changed neighbourhood rather than by the type's whole population.
+    authority_refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange, VellisRequirements::locality]
+    alternatives:
+      - Track source subjects and target subjects separately and check each endpoint only in the role whose count the batch can change, which is closer to the wording of atomicChange but redistributes role bookkeeping across the pure validator boundary.
+      - Load the complete link population of the affected type, which repairs the count by depending on unrelated populations.
+    reversible: true
+    owner_work_item_id: W002
+    evidence_intent:
+      - Attaching children to a committed parent under a minimum-one links-per-source type is accepted and the parent keeps its existing outgoing link.
+      - A batch that genuinely leaves an endpoint outside its bound is still rejected and still names that endpoint.
+      - The loaded closure stays proportional to the changed neighbourhood and does not grow with unrelated members of the same type.
+    implementation_status: absent
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count]
 work_items:
   - id: W001
     order: 1
-    label: Correct the union tool schemas and the assertion that excused them
+    label: Advertise callable top-level properties for the union input tools
     kind: implementation
     dependencies: []
-    planned_baseline: {dimension: implementation, identity: "git:b7fe2e33508fb7f3539e5c2914e6756d42c958f7"}
-    finding_ids: [F001, F002]
+    planned_baseline: {dimension: implementation, identity: "git:daed5a087a0974f99d885471f557bdf89f09b3c7"}
+    finding_ids: [F001, F003]
     decision_ids: [D001]
     authority:
       - refs: [VellisRequirements::mcpBoundary, VellisVerification::mcpLifecycle]
         coverage: partial
-        remaining_work_item_ids: [W002]
+        remaining_work_item_ids: [W003]
     approval:
       status: not-required
       reason: This corrects an implementation defect under sufficient accepted authority.
       checkpoint: null
-    nearest_wrong_system: The schema is patched for the two known tools while the assertion still permits the malformed shape, so the next union tool reintroduces the defect undetected.
-    compatibility_effect: No tool inventory, accepted input, wire field, or database change; only the advertised schema and one narrowed test assertion.
-    non_effects: [Do not inspect .data., Do not change which inputs either union tool accepts., Do not alter the tool inventory.]
-    lifecycle: complete
+    nearest_wrong_system: Top-level properties are published but the oneOf is dropped, so a cross-branch mixture such as a limit supplied together with a cursor is silently accepted.
+    compatibility_effect: Advertised schema only. No tool inventory, accepted input, wire field, or database change.
+    non_effects:
+      - Do not inspect .data.
+      - Do not change which inputs either union tool accepts.
+      - Do not alter the tool inventory.
+    lifecycle: active
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_public_server_lists_strict_selected_tools_and_calls_successor, command:just check]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties]
     blocker: null
-    checkpoint: git:730929ff387bac8a243b125c71c6d62095f36210
+    checkpoint: null
   - id: W002
     order: 2
-    label: Verify, independently review, and close the tool-schema fix
+    label: Complete the link cardinality closure for endpoints admitted in either role
+    kind: implementation
+    dependencies: []
+    planned_baseline: {dimension: implementation, identity: "git:daed5a087a0974f99d885471f557bdf89f09b3c7"}
+    finding_ids: [F002]
+    decision_ids: [D002]
+    authority:
+      - refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange, VellisRequirements::locality, VellisVerification::cardinality, VellisVerification::activeChange]
+        coverage: partial
+        remaining_work_item_ids: [W003]
+    approval:
+      status: not-required
+      reason: This corrects an implementation defect under sufficient accepted authority.
+      checkpoint: null
+    nearest_wrong_system: The closure is widened to the complete population of the affected link type, so the count becomes correct while ordinary change starts depending on unrelated populations.
+    compatibility_effect: A wrongly rejected batch becomes accepted. No genuinely invalid batch becomes acceptable.
+    non_effects:
+      - Do not inspect .data.
+      - Do not change which graph states are valid.
+      - Do not retain a complete graph or definition-set aggregate.
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count]
+    blocker: null
+    checkpoint: null
+  - id: W003
+    order: 3
+    label: Verify, independently review, and close the agent-usable boundary fixes
     kind: closure
-    dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: "git:730929ff387bac8a243b125c71c6d62095f36210"}
+    dependencies: [W001, W002]
+    planned_baseline: {dimension: implementation, identity: "git:daed5a087a0974f99d885471f557bdf89f09b3c7"}
     finding_ids: []
     decision_ids: []
     authority:
-      - refs: [VellisRequirements::mcpBoundary, VellisVerification::mcpLifecycle]
+      - refs: [VellisRequirements::mcpBoundary, VellisRequirements::localCardinality, VellisRequirements::atomicChange, VellisRequirements::locality, VellisVerification::mcpLifecycle, VellisVerification::cardinality, VellisVerification::activeChange]
         coverage: full
         remaining_work_item_ids: []
     approval:
       status: not-required
       reason: Closure verifies existing accepted meaning and applies deterministic bookkeeping.
       checkpoint: null
-    nearest_wrong_system: The narrowed assertion passes locally while a real client still cannot load the inventory, or the tightened schema silently changes which requests are accepted.
-    compatibility_effect: No additional compatibility effect beyond W001.
-    non_effects: [Do not open a model-authority change., Do not alter owner data.]
-    lifecycle: complete
-    implementation_status: conforming
+    nearest_wrong_system: Both fixes pass their focused tests while a real client still cannot complete an ordinary session, because nothing exercised the two behaviors end to end through the selected boundary.
+    compatibility_effect: No additional compatibility effect beyond W001 and W002.
+    non_effects:
+      - Do not open a model-authority change.
+      - Do not alter owner data.
+    lifecycle: pending
+    implementation_status: absent
     evidence_refs: [command:just check]
     blocker: null
-    checkpoint: git:730929ff387bac8a243b125c71c6d62095f36210
+    checkpoint: null
 closure:
-  finding_disposition: complete
+  finding_disposition: open
   model_status: unchanged
-  implementation_status: conforming
-  integration_status: conforming
-  external_status: conforming
-  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools advertise type object alongside their existing oneOf branches, which each already declared it, so no request that was valid becomes invalid and none that was invalid becomes valid.
+  implementation_status: absent
+  integration_status: not evaluated
+  external_status: not evaluated
+  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools gain a merged top-level properties map while their oneOf branches continue to decide acceptance, and the cardinality closure loads strictly more of the changed neighbourhood without admitting any additional valid graph state.
   reviews:
-    - {lens: authority and conformance, status: clean, reviewer: schema-authority-review, checkpoint: git:730929ff387bac8a243b125c71c6d62095f36210, evidence_refs: [command:just model-check, command:just check]}
-    - {lens: engineering and evidence, status: clean, reviewer: schema-engineering-review, checkpoint: git:730929ff387bac8a243b125c71c6d62095f36210, evidence_refs: [command:just check, path:tests/vellis/test_mcp_lifecycle_v2.py#test_public_server_lists_strict_selected_tools_and_calls_successor]}
-  evidence_refs: [command:just check]
-  checkpoint: git:730929ff387bac8a243b125c71c6d62095f36210
+    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+  evidence_refs: []
+  checkpoint: null

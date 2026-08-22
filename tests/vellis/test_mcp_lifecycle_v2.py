@@ -1120,13 +1120,10 @@ def _raw_null_schema_paths(
 
 
 def _top_level_properties(schema: dict[str, object]) -> set[str]:
-    if "oneOf" not in schema:
-        return set(cast(dict[str, object], schema.get("properties", {})))
-    return {
-        name
-        for branch in cast(list[dict[str, object]], schema["oneOf"])
-        for name in cast(dict[str, object], branch.get("properties", {}))
-    }
+    # Read the published top-level members only. Unioning the oneOf branches here
+    # would excuse a schema that names its members nowhere a client will forward
+    # them from, which is the exact shape that made both union tools uncallable.
+    return set(cast(dict[str, object], schema.get("properties", {})))
 
 
 def _activity_count(database: Path) -> int:
@@ -3201,3 +3198,50 @@ def test_claude_http_connect_explains_literal_runtime_template(
     assert "literal Authorization header template" in output
     assert "${VELLIS_HTTP_TOKEN}" in output
     assert "responsible for supplying and protecting" in output
+
+
+@pytest.mark.anyio
+async def test_union_tool_schemas_expose_callable_top_level_properties(
+    database: Path,
+) -> None:
+    """A conforming client forwards arguments by top-level properties.
+
+    A schema carrying only oneOf names its members nowhere the client looks, so
+    every argument is dropped in transit and the tool refuses each call as an
+    empty request. Publishing the merged members restores the call while oneOf
+    keeps deciding which branch applies.
+    """
+    async with Client(build_server(database)) as client:
+        tools = {value.name: value.inputSchema for value in await client.list_tools()}
+
+        for name, members in (
+            ("rtg_validate", {"scope", "limit", "cursor"}),
+            (
+                "rtg_draft_inspect",
+                {"categories", "operations", "typeKeys", "uuids", "limit", "cursor"},
+            ),
+        ):
+            schema = tools[name]
+            assert schema["type"] == "object"
+            assert set(cast(dict[str, object], schema["properties"])) == members
+            assert len(cast(list[object], schema["oneOf"])) == 2
+
+        fresh_validation = await client.call_tool("rtg_validate", {"scope": "current", "limit": 25})
+        fresh_inspection = await client.call_tool("rtg_draft_inspect", {"limit": 25})
+
+        # oneOf still decides acceptance: neither a cross-branch mixture nor an
+        # unknown member forms a domain request.
+        for name, arguments in (
+            ("rtg_validate", {"scope": "current", "limit": 25, "cursor": "abc"}),
+            ("rtg_validate", {"scope": "current", "limit": 25, "unknown": True}),
+            ("rtg_validate", {"scope": "current"}),
+            ("rtg_draft_inspect", {"limit": 25, "cursor": "abc"}),
+        ):
+            with pytest.raises(ToolError):
+                await client.call_tool(name, arguments)
+
+    assert fresh_validation.structured_content is not None
+    assert fresh_validation.structured_content["status"] == "accepted"
+    assert fresh_validation.structured_content["clean"] is True
+    assert fresh_inspection.structured_content is not None
+    assert fresh_inspection.structured_content["status"] == "accepted"

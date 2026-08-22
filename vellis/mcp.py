@@ -108,9 +108,28 @@ class _ConditionalTool(Tool):
 def _one_of_schema(*models: type[BaseModel]) -> dict[str, object]:
     # MCP requires every inputSchema to declare type "object"; a bare oneOf is
     # rejected by strict clients even though each branch is itself an object.
+    # Clients also forward arguments by consulting top-level "properties", so a
+    # schema carrying only oneOf loses every argument in transit and makes the
+    # tool uncallable. Publish the union of the branch members alongside oneOf,
+    # which still decides acceptance.
+    branches = [model.model_json_schema(by_alias=True) for model in models]
+    merged: dict[str, object] = {}
+    for branch in branches:
+        for name, member in branch.get("properties", {}).items():
+            if name in merged and merged[name] != member:
+                # The branches constrain this member differently; advertise it
+                # without constraint and let oneOf decide which branch applies.
+                merged[name] = {}
+            else:
+                merged.setdefault(name, member)
+    # The merged map is exactly the union of the members some branch accepts, so
+    # closing the object here refuses an unknown member without loosening any
+    # branch; oneOf still refuses a mixture drawn from more than one branch.
     return {
         "type": "object",
-        "oneOf": [model.model_json_schema(by_alias=True) for model in models],
+        "properties": merged,
+        "additionalProperties": False,
+        "oneOf": branches,
     }
 
 

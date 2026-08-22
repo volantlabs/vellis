@@ -2204,3 +2204,109 @@ def test_unstaged_property_on_unmaterializable_object_remains_unknown(tmp_path: 
         result = query_graph(path, GraphQuery(selection, DraftState()))
         assert result.status is OperationStatus.REJECTED
         assert result.findings[0].code is FindingCode.MISSING
+
+
+TOP = "aaaaaaaa-0000-4000-8000-000000000001"
+MID = "aaaaaaaa-0000-4000-8000-000000000002"
+LEAF = "aaaaaaaa-0000-4000-8000-000000000003"
+LEAF_2 = "aaaaaaaa-0000-4000-8000-000000000004"
+SIBLING_MID = "aaaaaaaa-0000-4000-8000-000000000005"
+CONTAINS_MID = "bbbbbbbb-0000-4000-8000-000000000001"
+CONTAINS_SIBLING = "bbbbbbbb-0000-4000-8000-000000000002"
+CONTAINS_LEAF = "bbbbbbbb-0000-4000-8000-000000000003"
+
+
+def _hierarchy_definitions():
+    return (
+        AnchorTypeDefinition("test.top", "Top"),
+        AnchorTypeDefinition("test.mid", "Mid"),
+        AnchorTypeDefinition("test.leaf", "Leaf"),
+        LinkTypeDefinition(
+            "test.contained_in",
+            "Exactly one containing parent",
+            ("test.mid", "test.leaf"),
+            ("test.top", "test.mid"),
+            Cardinality(1, 1),
+            Cardinality(0),
+        ),
+    )
+
+
+def _hierarchy_database(tmp_path: Path) -> Path:
+    path = tmp_path / "hierarchy" / "vellis.db"
+    initialize_with_definitions(path, _hierarchy_definitions(), recorded_at="2026-08-20T00:00:00Z")
+    seeded = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            0,
+            (
+                AnchorUpsert(TOP, "test.top", "Site"),
+                AnchorUpsert(MID, "test.mid", "Line"),
+                AnchorUpsert(SIBLING_MID, "test.mid", "Unrelated line"),
+                LinkUpsert(CONTAINS_MID, "test.contained_in", MID, TOP),
+                LinkUpsert(CONTAINS_SIBLING, "test.contained_in", SIBLING_MID, TOP),
+            ),
+        ),
+    )
+    assert seeded.resulting_revision == 1
+    return path
+
+
+def test_attaching_children_preserves_the_committed_parent_source_count(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A parent enters the closure as a link target; its own count must survive.
+
+    Attaching a child makes the parent's links-per-target count changeable, so the
+    parent joins the cardinality closure. The complete-state validator then checks
+    both of its roles, so the parent's committed outgoing link has to be loaded
+    too. Loading peers by one role only reports the parent at source count zero and
+    rejects an ordinary incremental load of any containment hierarchy.
+    """
+    path = _hierarchy_database(tmp_path)
+    original_load = change_module.load_graph_objects
+    loaded: list[str] = []
+
+    def recording_load(connection, state, uuids):
+        loaded.extend(uuids)
+        return original_load(connection, state, uuids)
+
+    monkeypatch.setattr(change_module, "load_graph_objects", recording_load)
+    attached = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            1,
+            (
+                AnchorUpsert(LEAF, "test.leaf", "Cell"),
+                LinkUpsert(CONTAINS_LEAF, "test.contained_in", LEAF, MID),
+            ),
+        ),
+    )
+
+    assert attached.status is OperationStatus.ACCEPTED
+    assert attached.findings == ()
+    assert attached.resulting_revision == 2
+    objects = _objects(path)
+    parent_link = objects[CONTAINS_MID]
+    assert isinstance(parent_link, Link)
+    assert parent_link.source_uuid == MID
+    assert parent_link.target_uuid == TOP
+
+    # The repaired closure stays proportional to the changed neighbourhood: an
+    # unrelated member of the same link type is never materialized.
+    assert SIBLING_MID not in loaded
+    assert CONTAINS_SIBLING not in loaded
+
+
+def test_attaching_children_still_rejects_a_child_left_outside_its_bound(
+    tmp_path: Path,
+) -> None:
+    path = _hierarchy_database(tmp_path)
+    rejected = apply_graph_change(
+        path, GraphChangeRequest(1, (AnchorUpsert(LEAF_2, "test.leaf", "Orphan cell"),))
+    )
+
+    assert rejected.status is OperationStatus.REJECTED
+    assert rejected.resulting_revision is None
+    assert [value.code for value in rejected.findings] == [FindingCode.CARDINALITY_VIOLATION]
+    assert rejected.findings[0].uuids == (LEAF_2,)

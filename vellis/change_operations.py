@@ -579,16 +579,22 @@ def _link_count_subjects(definition, changed_objects):
 
 
 def _link_count_peers(connection, type_key, sources, targets):
-    if not sources and not targets:
+    # An endpoint enters the closure through either role, and complete-state
+    # cardinality then checks both of its counts. Selecting peers by the matching
+    # role alone hides the endpoint's links in its other role, which reports a
+    # committed parent at source count zero the moment a child is attached to it.
+    # The endpoint set stays bounded by the changed neighbourhood, so this remains
+    # independent of unrelated members of the same type.
+    endpoints = set(sources) | set(targets)
+    if not endpoints:
         return set()
-    source_json = json.dumps(sorted(sources), separators=(",", ":"))
-    target_json = json.dumps(sorted(targets), separators=(",", ":"))
+    encoded = json.dumps(sorted(endpoints), separators=(",", ":"))
     rows = connection.execute(
         """SELECT uuid FROM graph_object_version
            WHERE valid_to_revision IS NULL AND type_key = ?
              AND (source_uuid IN (SELECT value FROM json_each(?))
                   OR target_uuid IN (SELECT value FROM json_each(?)))""",
-        (type_key, source_json, target_json),
+        (type_key, encoded, encoded),
     ).fetchall()
     return {str(row[0]) for row in rows}
 
