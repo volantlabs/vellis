@@ -3,13 +3,13 @@ evolution:
   id: vellis-2-distribution-install-fix
   objective: Give Vellis a working, guarded git-hosted install path so the documented onboarding command actually installs the tool and stays truthful over time.
   observable_distinction: The documented `uv tool install git+...` command installs and runs correctly, an automated check derived from README.md fails when that command or its required Install heading drifts, and package_smoke's expected version no longer risks silent drift from pyproject.toml.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: not-required
     reason: model/50-verification.sysml already requires proving the MCP boundary from installed wheel and source distribution; this closes an evidence and realization gap under that existing acceptance, and the owner selected the git+ distribution channel directly.
     checkpoint: null
   blocker: null
-  checkpoint: git:06727c3b7e04a9c2b08c9f76282515bb3ffb09c0
+  checkpoint: git:b7fe2e33508fb7f3539e5c2914e6756d42c958f7
 baselines:
   status: current
   source: &source
@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:7b32a6f7661048a57d0a91fea2580b4facbefd92
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:06727c3b7e04a9c2b08c9f76282515bb3ffb09c0
+    implementation: git:b7fe2e33508fb7f3539e5c2914e6756d42c958f7
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:06727c3b7e04a9c2b08c9f76282515bb3ffb09c0
+    checkpoint: git:b7fe2e33508fb7f3539e5c2914e6756d42c958f7
   observed: *target
 scope:
   authority_scope:
@@ -161,13 +161,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [command:just package-check, command:just check, path:tests/test_repository_policy.py#test_documented_subcommands_match_the_owner_command]
     blocker: null
-    checkpoint: git:06727c3b7e04a9c2b08c9f76282515bb3ffb09c0
+    checkpoint: git:b7fe2e33508fb7f3539e5c2914e6756d42c958f7
   - id: W002
     order: 2
     label: Verify, independently review, and close the install-path fix
     kind: closure
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: "git:06727c3b7e04a9c2b08c9f76282515bb3ffb09c0"}
+    planned_baseline: {dimension: implementation, identity: "git:b7fe2e33508fb7f3539e5c2914e6756d42c958f7"}
     finding_ids: []
     decision_ids: []
     authority:
@@ -181,11 +181,11 @@ work_items:
     nearest_wrong_system: Individual fixes look correct while the documented command still fails end-to-end, or public claims in README.md, docs/install.md, and CI diverge from actual behavior.
     compatibility_effect: No additional compatibility effect beyond W001.
     non_effects: [Do not open a model-authority change., Do not publish to PyPI.]
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs: [command:just package-check, command:just check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:b7fe2e33508fb7f3539e5c2914e6756d42c958f7
 closure:
   finding_disposition: complete
   model_status: unchanged
@@ -194,7 +194,7 @@ closure:
   external_status: conforming
   compatibility: No public tool, wire shape, database schema, or CLI subcommand changes. The documented install command, README, docs/install.md, AGENTS.md, CONTRIBUTING.md, CI, and two CLI error messages change; the owner-selected distribution channel is git+ install only, with no PyPI or release-artifact publication.
   reviews:
-    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
-    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: authority and conformance, status: clean, reviewer: install-closure-verification, checkpoint: git:b7fe2e33508fb7f3539e5c2914e6756d42c958f7, evidence_refs: [command:just check, command:just model-check]}
+    - {lens: engineering and evidence, status: clean, reviewer: install-closure-verification, checkpoint: git:b7fe2e33508fb7f3539e5c2914e6756d42c958f7, evidence_refs: [command:just check, command:just package-check]}
   evidence_refs: [command:just package-check, command:just check]
-  checkpoint: null
+  checkpoint: git:b7fe2e33508fb7f3539e5c2914e6756d42c958f7
