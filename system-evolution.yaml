@@ -3,7 +3,7 @@ evolution:
   id: vellis-2-union-tool-schema-fix
   objective: Make every public MCP tool schema acceptable to a strict client so the whole tool inventory loads rather than being rejected wholesale.
   observable_distinction: A strict MCP client that validates inputSchema.type accepts all ten tools instead of rejecting the entire tools/list response, and the suite fails if any tool schema stops declaring type object.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: not-required
     reason: RTG014 already requires the boundary to expose its selected behaviors through ordinary typed JSON values; a schema a conforming client rejects is an implementation defect under that accepted meaning.
@@ -115,11 +115,11 @@ work_items:
     nearest_wrong_system: The narrowed assertion passes locally while a real client still cannot load the inventory, or the tightened schema silently changes which requests are accepted.
     compatibility_effect: No additional compatibility effect beyond W001.
     non_effects: [Do not open a model-authority change., Do not alter owner data.]
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs: [command:just check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:730929ff387bac8a243b125c71c6d62095f36210
 closure:
   finding_disposition: complete
   model_status: unchanged
@@ -128,7 +128,7 @@ closure:
   external_status: conforming
   compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools advertise type object alongside their existing oneOf branches, which each already declared it, so no request that was valid becomes invalid and none that was invalid becomes valid.
   reviews:
-    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
-    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: authority and conformance, status: clean, reviewer: schema-authority-review, checkpoint: git:730929ff387bac8a243b125c71c6d62095f36210, evidence_refs: [command:just model-check, command:just check]}
+    - {lens: engineering and evidence, status: clean, reviewer: schema-engineering-review, checkpoint: git:730929ff387bac8a243b125c71c6d62095f36210, evidence_refs: [command:just check, path:tests/vellis/test_mcp_lifecycle_v2.py#test_public_server_lists_strict_selected_tools_and_calls_successor]}
   evidence_refs: [command:just check]
-  checkpoint: null
+  checkpoint: git:730929ff387bac8a243b125c71c6d62095f36210
