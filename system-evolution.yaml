@@ -1,211 +1,151 @@
 schema_version: "1.0"
 evolution:
-  id: vellis-2-pr-review-corrections
-  objective: Close the five model-decided defects reported by the Codex review of the pre-release pull request.
-  observable_distinction: Bounded queries stream to maximum plus one, malformed public text and uncertain client state reject safely, and audit detects ambiguous history and phrase-changing FTS corruption.
-  lifecycle: complete
+  id: vellis-2-distribution-install-fix
+  objective: Give Vellis a working, guarded git-hosted install path so the documented onboarding command actually installs the tool and stays truthful over time.
+  observable_distinction: The documented `uv tool install git+...` command installs and runs correctly, an automated check derived from README.md fails when that command or its required Install heading drifts, and package_smoke's expected version no longer risks silent drift from pyproject.toml.
+  lifecycle: active
   approval:
     status: not-required
-    reason: Current accepted authority already decides all five defects and the owner authorized pre-release remediation.
+    reason: model/50-verification.sysml already requires proving the MCP boundary from installed wheel and source distribution; this closes an evidence and realization gap under that existing acceptance, and the owner selected the git+ distribution channel directly.
     checkpoint: null
   blocker: null
-  checkpoint: git:26a653df590aa7e327a0529b3b07904f5e3feaa0
+  checkpoint: git:db360046afa80671080e5b1787be779cc225dff7
 baselines:
   status: current
   source: &source
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:6da7985aae97a01c13468d1ec4a4f77bc6c7d5bc
+    implementation: git:7b32a6f7661048a57d0a91fea2580b4facbefd92
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:6da7985aae97a01c13468d1ec4a4f77bc6c7d5bc
+    checkpoint: git:7b32a6f7661048a57d0a91fea2580b4facbefd92
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:26a653df590aa7e327a0529b3b07904f5e3feaa0
+    implementation: git:db360046afa80671080e5b1787be779cc225dff7
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:26a653df590aa7e327a0529b3b07904f5e3feaa0
+    checkpoint: git:db360046afa80671080e5b1787be779cc225dff7
   observed: *target
 scope:
   authority_scope:
-    - Vellis::'Connect trusted MCP agent'
-    - VellisRequirements::querySafety
-    - VellisRequirements::locality
-    - VellisRequirements::mcpBoundary
-    - VellisRequirements::lifecycle
-    - VellisRequirements::queryPredicates
     - VellisRequirements::simpleOperation
-    - VellisVerification::'Predicates Search And Bounds Are Exact'
-    - VellisVerification::lifecycle
     - VellisVerification::mcpLifecycle
   implementation_scope:
     - system-evolution.yaml
-    - vellis/pattern_repository.py
-    - vellis/query_repository.py
-    - vellis/mcp.py
-    - vellis/onboarding.py
-    - vellis/mcp_models.py
-    - vellis/audit.py
-    - vellis/audit_observability.py
-    - tests/vellis/
-    - docs/v2-pre-release-evidence.md
+    - README.md
+    - justfile
+    - pyproject.toml
+    - tools/package_smoke.py
+    - tests/test_repository_policy.py
+    - vellis/__main__.py
+    - docs/install.md
+    - AGENTS.md
+    - CONTRIBUTING.md
+    - .github/workflows/check.yml
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
-    - No model authority, public operation, wire field, finding code, database schema, or database version change.
-    - No numerical latency or throughput target, general query engine, configuration layer, or alternate audit store.
-    - No protected .data inspection or unrelated simplification campaign.
+    - No model authority, public MCP tool, wire shape, database schema, or database version change.
+    - No PyPI publish or GitHub Release artifact channel; the owner selected git+ install only.
+    - No change to the VEL001/VEL002 mode-selection requirements; only their CLI error text improved.
 findings:
   - id: F001
-    summary: Materialized intermediate binding CTEs can grow with all partial matches despite a small maximumMatches.
+    summary: The only documented install command referenced a wheel that no repository command produced, and no check ever ran it.
     classification: implementation defect
-    consequence: A bounded public query can consume temporary storage and work proportional to every partial binding before the final maximum-plus-one limit is observed.
-    authority_refs: [VellisRequirements::querySafety, VellisRequirements::locality]
-    evidence_refs: [path:tests/vellis/test_query_v2_successor.py#test_dense_pattern_stops_stream_after_maximum_plus_one_complete_bindings]
+    consequence: A person or agent following README.md could not install Vellis at all, and the installed-boundary proof VellisVerification::mcpLifecycle requires was only exercised through package_smoke's own ad hoc build, never through the publicly documented command.
+    authority_refs: [VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
+    evidence_refs: [path:tests/test_repository_policy.py#test_documented_subcommands_match_the_owner_command, path:README.md#install, path:docs/install.md#troubleshooting]
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
-    nearest_wrong_system: A two-node pattern with maximumMatches one materializes every matching node pair before detecting the second complete tuple.
-    compatibility_effect: Accepted and rejected query results remain unchanged; only evaluation resource shape changes.
+    nearest_wrong_system: A README install command that references a nonexistent artifact, or a regression guard that hardcodes its own copy of that command instead of parsing README.md, would both silently diverge from what a user actually runs.
+    compatibility_effect: No public tool, wire shape, or CLI subcommand changes; only install documentation and build tooling change.
   - id: F002
-    summary: Client entry enumeration treats every nonzero public CLI result as an absent entry.
+    summary: package_smoke.py held its own unguarded VERSION literal instead of reading pyproject.toml.
     classification: implementation defect
-    consequence: Malformed or unreadable external client configuration can be followed by an attempted add instead of a safe stop on uncertain state.
-    authority_refs: [Vellis::'Connect trusted MCP agent', VellisRequirements::mcpBoundary, VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_client_enumeration_distinguishes_absence_from_uncertain_failure]
+    consequence: A version bump that updated pyproject.toml, vellis/__init__.py, and the policy test literal could still leave package_smoke silently smoke-testing under a stale expected version.
+    authority_refs: [VellisVerification::mcpLifecycle]
+    evidence_refs: [command:just package-check]
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
-    nearest_wrong_system: A failed configuration parse and a documented missing-entry result both return false from entry enumeration.
-    compatibility_effect: Documented missing entries still register; other enumeration failures now stop before mutation.
-  - id: F003
-    summary: Escaped lone surrogates pass strict wire decoding and fail later during canonical UTF-8 encoding.
-    classification: implementation defect
-    consequence: Malformed public text becomes an unexpected execution failure rather than an invalid-arguments rejection with no state effect.
-    authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_non_utf8_unicode_surrogate_is_invalid_arguments_without_activity, path:tests/vellis/test_mcp_lifecycle_v2.py#test_top_level_text_surrogates_reject_before_domain_operation]
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: A lone surrogate in a nested object or top-level type-key collection reaches a domain operation and raises UnicodeEncodeError during publication or SQLite lookup.
-    compatibility_effect: Unicode scalar text remains accepted; only strings that cannot be encoded as UTF-8 are rejected at the wire boundary.
-  - id: F004
-    summary: Audit rejects inverted version intervals but not overlapping intervals for one version-family identity.
-    classification: implementation defect
-    consequence: A self-consistent but ambiguous historical lineage can pass audit, backup, and restore validation.
-    authority_refs: [VellisRequirements::lifecycle]
-    evidence_refs: [path:tests/vellis/test_history_recovery_v2.py#test_audit_detects_overlapping_versions_with_individually_valid_intervals]
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Two individually valid versions of one identity overlap at a revision and audit reports no interval finding.
-    compatibility_effect: Valid databases remain unchanged; semantically ambiguous version histories are newly rejected by audit.
-  - id: F005
-    summary: FTS audit compares aggregate vocabulary but not document identity and token position.
-    classification: implementation defect
-    consequence: Search index corruption that changes phrase results can pass audit and backup validation.
-    authority_refs: [VellisRequirements::lifecycle, VellisRequirements::queryPredicates]
-    evidence_refs: [path:tests/vellis/test_history_recovery_v2.py#test_audit_detects_phrase_changing_fts_token_position_corruption]
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Reversing two indexed tokens preserves aggregate counts while reversing which phrase query matches.
-    compatibility_effect: Search behavior and schema remain unchanged; audit becomes sensitive to per-document token positions.
-  - id: F006
-    summary: Closure evidence retained an obsolete complete-suite test count.
-    classification: stale baseline
-    consequence: A reviewer cannot distinguish the current verified candidate from an earlier test inventory using the gate table.
-    authority_refs: [VellisVerification::'Predicates Search And Bounds Are Exact', VellisVerification::lifecycle, VellisVerification::mcpLifecycle]
-    evidence_refs: [path:docs/v2-pre-release-evidence.md#verification, command:just check]
-    disposition: resolved
-    owner_work_item_id: W002
-    implementation_status: conforming
-    nearest_wrong_system: The narrative summary reports the current gate while its verification table preserves the superseded 798-test result.
-    compatibility_effect: No product effect; closure evidence now reports one reproducible complete-suite result.
+    nearest_wrong_system: A wheel built at a new version still passes package_smoke's installed-import assertion because its expected VERSION literal was never bumped alongside it.
+    compatibility_effect: No product effect; only the smoke test's own version comparison source changes.
 decisions:
   - id: D001
-    summary: Stream pattern bindings with bounded depth-first candidate cursors and retain only maximum plus one complete tuples.
-    authority_refs: [VellisRequirements::querySafety, VellisRequirements::locality]
-    alternatives: [Retain unbounded materialized CTEs., Limit incomplete prefixes and risk losing valid completions., Build a second in-memory graph query engine.]
+    summary: Derive the tested install command from README.md's own Install section rather than duplicating it in package_smoke.py.
+    authority_refs: [VellisVerification::mcpLifecycle]
+    alternatives: [Hardcode a second copy of the install command in the smoke test., Add a separate install-check tool and just recipe., Trust the README without any automated check.]
     reversible: true
     owner_work_item_id: W001
-    evidence_intent: [A dense pattern stops after maximum plus one complete tuples., One maximum-width pattern returns its exact 1,000 bindings and an unfiltered second match rejects., A relationship is checked as soon as its endpoints bind., Patterns above the SQLite flat-join limit remain supported., Public query meaning remains identical to the independent topology oracle.]
+    evidence_intent: [A renamed or missing Install heading fails the check., A command that no longer names the canonical repository URL fails the check., A genuinely broken install flag fails the check., The real UV_TOOL_DIR and UV_TOOL_BIN_DIR remain untouched by the check.]
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_query_v2_successor.py#test_dense_pattern_stops_stream_after_maximum_plus_one_complete_bindings, path:tests/vellis/test_query_v2_successor.py#test_streamed_pattern_above_sqlites_flat_join_limit_is_a_domain_result, path:tests/vellis/test_query_v2_successor.py#test_maximum_width_parallel_links_match_and_overflow_without_sqlite_limits, path:tests/vellis/test_query_v2_successor.py#test_streamed_pattern_checks_bound_relationship_before_opening_later_node]
+    evidence_refs: [command:just package-check]
   - id: D002
-    summary: Recognize only each supported public client's positive missing-entry diagnostic as absence.
-    authority_refs: [Vellis::'Connect trusted MCP agent', VellisRequirements::mcpBoundary, VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
-    alternatives: [Treat every nonzero result as absence., Parse private client configuration., Add a client-adapter framework.]
+    summary: Read package_smoke's expected VERSION from pyproject.toml via tomllib instead of a hardcoded literal.
+    authority_refs: [VellisVerification::mcpLifecycle]
+    alternatives: [Import vellis.__version__ directly., Leave the literal duplicated and rely on manual discipline.]
     reversible: true
     owner_work_item_id: W001
-    evidence_intent: [Codex and Claude documented absence diagnostics return false., Other nonzero results raise before remove or add.]
+    evidence_intent: [package_smoke's expected version always matches pyproject.toml without a separate edit.]
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_client_enumeration_distinguishes_absence_from_uncertain_failure]
-  - id: D003
-    summary: Compare expected and actual FTS vocabularies at instance granularity including document column and offset.
-    authority_refs: [VellisRequirements::lifecycle]
-    alternatives: [Retain aggregate row vocabulary., Rebuild and mutate the live index during audit., Add a second search representation.]
-    reversible: true
-    owner_work_item_id: W001
-    evidence_intent: [Phrase-changing token-order corruption is detected., A valid independently rebuilt index remains equivalent.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_history_recovery_v2.py#test_audit_detects_phrase_changing_fts_token_position_corruption]
+    evidence_refs: [command:just package-check]
 work_items:
   - id: W001
     order: 1
-    label: Correct bounded query evaluation and public-boundary and audit defects
+    label: Fix and guard the documented git+ install path
     kind: implementation
     dependencies: []
-    planned_baseline: {dimension: implementation, identity: "git:6da7985aae97a01c13468d1ec4a4f77bc6c7d5bc"}
-    finding_ids: [F001, F002, F003, F004, F005]
-    decision_ids: [D001, D002, D003]
+    planned_baseline: {dimension: implementation, identity: "git:7b32a6f7661048a57d0a91fea2580b4facbefd92"}
+    finding_ids: [F001, F002]
+    decision_ids: [D001, D002]
     authority:
-      - refs: [Vellis::'Connect trusted MCP agent', VellisRequirements::querySafety, VellisRequirements::locality, VellisRequirements::mcpBoundary, VellisRequirements::lifecycle, VellisRequirements::queryPredicates, VellisRequirements::simpleOperation, VellisVerification::'Predicates Search And Bounds Are Exact', VellisVerification::lifecycle, VellisVerification::mcpLifecycle]
+      - refs: [VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
         coverage: partial
         remaining_work_item_ids: [W002]
     approval:
       status: not-required
-      reason: This work corrects implementation defects under sufficient accepted authority.
+      reason: This work closes an evidence and realization gap under sufficient accepted authority; the owner directed the git+-only distribution channel.
       checkpoint: null
-    nearest_wrong_system: Nominal tests pass while bounded queries materialize all prefixes, malformed input crashes, uncertain client state mutates, or semantic corruption passes audit.
-    compatibility_effect: Results, tools, commands, schemas, and database format remain stable; rejection and audit precision improve.
-    non_effects: [Do not inspect .data., Do not add public surface or numerical performance promises., Do not mutate external client configuration during tests.]
+    nearest_wrong_system: The documented install command appears correct in isolation while package_smoke never actually exercises it, or a version bump silently leaves the smoke test comparing against a stale expected version.
+    compatibility_effect: No public tool, wire shape, database schema, or CLI subcommand changes; install documentation, build tooling, packaging metadata, CI, and two CLI error messages change.
+    non_effects: [Do not publish to PyPI or attach release artifacts., Do not change the VEL001/VEL002 mode-selection requirements., Do not mutate external client configuration during tests.]
     lifecycle: complete
     implementation_status: conforming
-    evidence_refs: [path:docs/v2-pre-release-evidence.md#pull-request-review-follow-up]
+    evidence_refs: [command:just package-check, command:just check, path:tests/test_repository_policy.py#test_documented_subcommands_match_the_owner_command]
     blocker: null
-    checkpoint: git:5d7426bcb2a99ab6e0a454e2bd59c9030afaa830
+    checkpoint: git:db360046afa80671080e5b1787be779cc225dff7
   - id: W002
     order: 2
-    label: Verify, independently review, and close the PR correction
+    label: Verify, independently review, and close the install-path fix
     kind: closure
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: "git:26a653df590aa7e327a0529b3b07904f5e3feaa0"}
-    finding_ids: [F006]
+    planned_baseline: {dimension: implementation, identity: "git:db360046afa80671080e5b1787be779cc225dff7"}
+    finding_ids: []
     decision_ids: []
     authority:
-      - refs: [Vellis::'Connect trusted MCP agent', VellisRequirements::querySafety, VellisRequirements::locality, VellisRequirements::mcpBoundary, VellisRequirements::lifecycle, VellisRequirements::queryPredicates, VellisRequirements::simpleOperation, VellisVerification::'Predicates Search And Bounds Are Exact', VellisVerification::lifecycle, VellisVerification::mcpLifecycle]
+      - refs: [VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
         coverage: full
         remaining_work_item_ids: []
     approval:
       status: not-required
       reason: Closure verifies existing accepted meaning and applies deterministic bookkeeping.
       checkpoint: null
-    nearest_wrong_system: Focused fixes pass while an integration regression or unsupported public-boundary consequence remains.
+    nearest_wrong_system: Individual fixes look correct while the documented command still fails end-to-end, or public claims in README.md, docs/install.md, and CI diverge from actual behavior.
     compatibility_effect: No additional compatibility effect beyond W001.
-    non_effects: [Do not resolve or reply to GitHub review threads without explicit owner authorization.]
-    lifecycle: complete
+    non_effects: [Do not open a model-authority change., Do not publish to PyPI.]
+    lifecycle: active
     implementation_status: conforming
-    evidence_refs: [path:docs/v2-pre-release-evidence.md#verification, command:just check, command:just package-check]
+    evidence_refs: [command:just package-check, command:just check]
     blocker: null
-    checkpoint: git:26a653df590aa7e327a0529b3b07904f5e3feaa0
+    checkpoint: null
 closure:
   finding_disposition: complete
-  model_status: accepted
+  model_status: unchanged
   implementation_status: conforming
   integration_status: conforming
   external_status: conforming
-  compatibility: Public tools, commands, wire shapes, finding taxonomy, query results, database schema, and database version remain stable. Malformed text and uncertain client enumeration now stop before mutation, and audit rejects two previously undetected semantic corruption forms.
+  compatibility: No public tool, wire shape, database schema, or CLI subcommand changes. The documented install command, README, docs/install.md, AGENTS.md, CONTRIBUTING.md, CI, and two CLI error messages change; the owner-selected distribution channel is git+ install only, with no PyPI or release-artifact publication.
   reviews:
-    - {lens: authority and conformance, status: clean, reviewer: /root/pr_authority_review_4, checkpoint: git:26a653df590aa7e327a0529b3b07904f5e3feaa0, evidence_refs: [path:docs/v2-pre-release-evidence.md#pull-request-review-follow-up, path:docs/v2-pre-release-evidence.md#verification, command:just model-check]}
-    - {lens: engineering and evidence, status: clean, reviewer: /root/pr_engineering_review_4, checkpoint: git:26a653df590aa7e327a0529b3b07904f5e3feaa0, evidence_refs: [path:docs/v2-pre-release-evidence.md#pull-request-review-follow-up, path:docs/v2-pre-release-evidence.md#simplicity-and-scope-reassessment, path:docs/v2-pre-release-evidence.md#verification, command:just check, command:just package-check]}
-  evidence_refs: [path:docs/v2-pre-release-evidence.md#pull-request-review-follow-up, path:docs/v2-pre-release-evidence.md#verification, command:just check, command:just package-check]
-  checkpoint: git:26a653df590aa7e327a0529b3b07904f5e3feaa0
+    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+  evidence_refs: [command:just package-check, command:just check]
+  checkpoint: null
