@@ -18,8 +18,13 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
     checkpoint: git:daed5a087a0974f99d885471f557bdf89f09b3c7
-  target: *source
-  observed: *source
+  target: &target
+    model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
+    implementation: git:f486fe64c466945f2780326616f909bf2ceba4d5
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
+    checkpoint: git:f486fe64c466945f2780326616f909bf2ceba4d5
+  observed: *target
 scope:
   authority_scope:
     - VellisRequirements::mcpBoundary
@@ -47,7 +52,7 @@ findings:
     consequence: rtg_validate and rtg_draft_inspect publish an inputSchema carrying only type object and oneOf. A client that forwards arguments by consulting top-level properties therefore sends an empty object, and both tools refuse every call with an input-validation error regardless of the arguments supplied. Two of the ten selected behaviors are unreachable, so an agent cannot page validation findings or inspect raw draft deltas at all.
     authority_refs: [VellisRequirements::mcpBoundary]
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
     nearest_wrong_system: The inventory loads, every schema declares type object, the suite is green, and the two union tools are still impossible to call because the advertised schema never names the members a client must forward.
@@ -58,7 +63,7 @@ findings:
     consequence: _top_level_properties special-cased a schema carrying oneOf and collected member names from inside the branches. The expected-properties assertion therefore passed for a schema that names its members nowhere a client forwards them from, so the gate stayed green while two of the ten selected behaviors could not be called at all.
     authority_refs: [VellisVerification::mcpLifecycle]
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
     nearest_wrong_system: An assertion whose disjunction is satisfied by the very shape that makes the tool unusable, so the suite reports coverage of a member set no client can reach.
@@ -69,9 +74,9 @@ findings:
     consequence: _link_count_peers selects existing links whose source is in the source set or whose target is in the target set, while _cardinality_closure_uuids admits an endpoint that appears in either role and the complete-state validator then checks both roles for it. Attaching children to an existing parent under a minimum-one links-per-source type therefore rejects the batch with a cardinalityViolation reporting count 0 for a parent whose committed outgoing link was never loaded. Incremental tier-by-tier loading of any containment hierarchy is impossible.
     authority_refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange]
     evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: absent
+    implementation_status: conforming
     nearest_wrong_system: The count is repaired by loading the complete link population for the type, which makes ordinary change depend on unrelated populations and violates the locality requirement instead of the cardinality one.
     compatibility_effect: No accepted graph state changes. A batch that was wrongly rejected becomes accepted; every batch that genuinely violates a bound is still rejected with the same finding code and subject.
 decisions:
@@ -101,7 +106,7 @@ decisions:
       - Attaching children to a committed parent under a minimum-one links-per-source type is accepted and the parent keeps its existing outgoing link.
       - A batch that genuinely leaves an endpoint outside its bound is still rejected and still names that endpoint.
       - The loaded closure stays proportional to the changed neighbourhood and does not grow with unrelated members of the same type.
-    implementation_status: absent
+    implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count]
 work_items:
   - id: W001
@@ -126,11 +131,11 @@ work_items:
       - Do not inspect .data.
       - Do not change which inputs either union tool accepts.
       - Do not alter the tool inventory.
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties, command:just check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:f486fe64c466945f2780326616f909bf2ceba4d5
   - id: W002
     order: 2
     label: Complete the link cardinality closure for endpoints admitted in either role
@@ -153,17 +158,17 @@ work_items:
       - Do not inspect .data.
       - Do not change which graph states are valid.
       - Do not retain a complete graph or definition-set aggregate.
-    lifecycle: pending
-    implementation_status: absent
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count]
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count, command:just check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:f486fe64c466945f2780326616f909bf2ceba4d5
   - id: W003
     order: 3
     label: Verify, independently review, and close the agent-usable boundary fixes
     kind: closure
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:daed5a087a0974f99d885471f557bdf89f09b3c7"}
+    planned_baseline: {dimension: implementation, identity: "git:f486fe64c466945f2780326616f909bf2ceba4d5"}
     finding_ids: []
     decision_ids: []
     authority:
@@ -179,8 +184,8 @@ work_items:
     non_effects:
       - Do not open a model-authority change.
       - Do not alter owner data.
-    lifecycle: pending
-    implementation_status: absent
+    lifecycle: active
+    implementation_status: conforming
     evidence_refs: [command:just check]
     blocker: null
     checkpoint: null
