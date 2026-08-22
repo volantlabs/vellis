@@ -9,7 +9,7 @@ evolution:
     reason: model/50-verification.sysml already requires proving the MCP boundary from installed wheel and source distribution; this closes an evidence and realization gap under that existing acceptance, and the owner selected the git+ distribution channel directly.
     checkpoint: null
   blocker: null
-  checkpoint: git:b59d2b1ec0ebb91f9434f420f775024e769c837b
+  checkpoint: git:06727c3b7e04a9c2b08c9f76282515bb3ffb09c0
 baselines:
   status: current
   source: &source
@@ -20,16 +20,17 @@ baselines:
     checkpoint: git:7b32a6f7661048a57d0a91fea2580b4facbefd92
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:b59d2b1ec0ebb91f9434f420f775024e769c837b
+    implementation: git:06727c3b7e04a9c2b08c9f76282515bb3ffb09c0
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:b59d2b1ec0ebb91f9434f420f775024e769c837b
+    checkpoint: git:06727c3b7e04a9c2b08c9f76282515bb3ffb09c0
   observed: *target
 scope:
   authority_scope:
     - VellisRequirements::simpleOperation
     - VellisRequirements::initialization
     - VellisRequirements::starter
+    - VellisRequirements::lifecycle
     - VellisVerification::mcpLifecycle
   implementation_scope:
     - system-evolution.yaml
@@ -39,6 +40,7 @@ scope:
     - tools/package_smoke.py
     - tests/test_package_smoke.py
     - tests/test_repository_policy.py
+    - tests/vellis/test_mcp_lifecycle_v2.py
     - vellis/__main__.py
     - docs/install.md
     - AGENTS.md
@@ -55,7 +57,7 @@ findings:
     classification: implementation defect
     consequence: A person or agent following README.md could not install Vellis at all, and the installed-boundary proof VellisVerification::mcpLifecycle requires was only exercised through package_smoke's own ad hoc build, never through the publicly documented command.
     authority_refs: [VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
-    evidence_refs: [path:tests/test_repository_policy.py#test_documented_subcommands_match_the_owner_command, path:README.md#install, path:docs/install.md#troubleshooting]
+    evidence_refs: [command:just package-check, path:tests/test_repository_policy.py#test_documented_subcommands_match_the_owner_command, path:README.md#install]
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
@@ -88,7 +90,7 @@ findings:
     classification: implementation defect
     consequence: A future refactor that dropped the UV_TOOL_DIR/UV_TOOL_BIN_DIR override could silently install into the operator's real ~/.local/share/uv/tools and ~/.local/bin while the guard still reported clean.
     authority_refs: [VellisVerification::mcpLifecycle]
-    evidence_refs: [path:tests/test_package_smoke.py#test_run_isolated_tool_rejects_environment_outside_temp_root, path:tests/test_package_smoke.py#test_run_isolated_tool_rejects_missing_overrides]
+    evidence_refs: [path:tests/test_package_smoke.py#test_run_isolated_tool_rejects_environment_outside_temp_root, path:tests/test_package_smoke.py#test_run_isolated_tool_refuses_an_environment_without_overrides]
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
@@ -109,7 +111,7 @@ findings:
     summary: The noninteractive setup mode-selection error restated the rule without naming its remedy, and its first fix repeated F003's own defect by naming only two of the four valid flags.
     classification: implementation defect
     consequence: An unattended agent intending --from-v1 or --from-backup, having omitted the flag, was told only about --starter/--blank, an equally incomplete remedy to the one F003 fixed for --connect.
-    authority_refs: [VellisRequirements::initialization, VellisRequirements::starter]
+    authority_refs: [VellisRequirements::initialization, VellisRequirements::starter, VellisRequirements::lifecycle]
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_noninteractive_setup_mode_error_names_every_valid_flag]
     disposition: resolved
     owner_work_item_id: W001
@@ -145,7 +147,7 @@ work_items:
     finding_ids: [F001, F002, F003, F004, F005, F006]
     decision_ids: [D001, D002]
     authority:
-      - refs: [VellisRequirements::simpleOperation, VellisRequirements::initialization, VellisRequirements::starter, VellisVerification::mcpLifecycle]
+      - refs: [VellisRequirements::simpleOperation, VellisRequirements::initialization, VellisRequirements::starter, VellisRequirements::lifecycle, VellisVerification::mcpLifecycle]
         coverage: partial
         remaining_work_item_ids: [W002]
     approval:
@@ -159,17 +161,17 @@ work_items:
     implementation_status: conforming
     evidence_refs: [command:just package-check, command:just check, path:tests/test_repository_policy.py#test_documented_subcommands_match_the_owner_command]
     blocker: null
-    checkpoint: git:b59d2b1ec0ebb91f9434f420f775024e769c837b
+    checkpoint: git:06727c3b7e04a9c2b08c9f76282515bb3ffb09c0
   - id: W002
     order: 2
     label: Verify, independently review, and close the install-path fix
     kind: closure
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: "git:b59d2b1ec0ebb91f9434f420f775024e769c837b"}
+    planned_baseline: {dimension: implementation, identity: "git:06727c3b7e04a9c2b08c9f76282515bb3ffb09c0"}
     finding_ids: []
     decision_ids: []
     authority:
-      - refs: [VellisRequirements::simpleOperation, VellisRequirements::initialization, VellisRequirements::starter, VellisVerification::mcpLifecycle]
+      - refs: [VellisRequirements::simpleOperation, VellisRequirements::initialization, VellisRequirements::starter, VellisRequirements::lifecycle, VellisVerification::mcpLifecycle]
         coverage: full
         remaining_work_item_ids: []
     approval:
