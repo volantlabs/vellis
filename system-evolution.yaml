@@ -9,7 +9,7 @@ evolution:
     reason: Current accepted authority already decides all five defects and the owner authorized pre-release remediation.
     checkpoint: null
   blocker: null
-  checkpoint: git:a84b3a89375d67c69f6badc68351f6b3809148c3
+  checkpoint: git:8401d90396c8703ed18f907f418baa116fa18a2b
 baselines:
   status: current
   source: &source
@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:6da7985aae97a01c13468d1ec4a4f77bc6c7d5bc
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:a84b3a89375d67c69f6badc68351f6b3809148c3
+    implementation: git:8401d90396c8703ed18f907f418baa116fa18a2b
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:a84b3a89375d67c69f6badc68351f6b3809148c3
+    checkpoint: git:8401d90396c8703ed18f907f418baa116fa18a2b
   observed: *target
 scope:
   authority_scope:
@@ -171,13 +171,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:docs/v2-pre-release-evidence.md#pull-request-review-follow-up]
     blocker: null
-    checkpoint: git:6c64eb1667513b8bf1a845ebc8a995919b3462f2
+    checkpoint: git:8401d90396c8703ed18f907f418baa116fa18a2b
   - id: W002
     order: 2
     label: Verify, independently review, and close the PR correction
     kind: closure
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: "git:a84b3a89375d67c69f6badc68351f6b3809148c3"}
+    planned_baseline: {dimension: implementation, identity: "git:8401d90396c8703ed18f907f418baa116fa18a2b"}
     finding_ids: [F006]
     decision_ids: []
     authority:
@@ -207,4 +207,4 @@ closure:
     - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
     - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
   evidence_refs: [path:docs/v2-pre-release-evidence.md#pull-request-review-follow-up, path:docs/v2-pre-release-evidence.md#verification, command:just check, command:just package-check]
-  checkpoint: git:a84b3a89375d67c69f6badc68351f6b3809148c3
+  checkpoint: git:8401d90396c8703ed18f907f418baa116fa18a2b
