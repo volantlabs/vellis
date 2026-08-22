@@ -68,20 +68,20 @@ def _fts_terms_equivalent(connection):
     )
     connection.execute(
         """CREATE VIRTUAL TABLE temp.audit_expected_vocab
-           USING fts5vocab(audit_expected_fts, row)"""
+           USING fts5vocab(audit_expected_fts, instance)"""
     )
     connection.execute(
         """CREATE VIRTUAL TABLE temp.audit_actual_vocab
-           USING fts5vocab(main, search_fts, row)"""
+           USING fts5vocab(main, search_fts, instance)"""
     )
     missing = connection.execute(
         """SELECT count(*) FROM (
-           SELECT term, doc, cnt FROM temp.audit_expected_vocab
-           EXCEPT SELECT term, doc, cnt FROM temp.audit_actual_vocab)"""
+           SELECT term, doc, col, offset FROM temp.audit_expected_vocab
+           EXCEPT SELECT term, doc, col, offset FROM temp.audit_actual_vocab)"""
     ).fetchone()[0]
     extra = connection.execute(
         """SELECT count(*) FROM (
-           SELECT term, doc, cnt FROM temp.audit_actual_vocab
-           EXCEPT SELECT term, doc, cnt FROM temp.audit_expected_vocab)"""
+           SELECT term, doc, col, offset FROM temp.audit_actual_vocab
+           EXCEPT SELECT term, doc, col, offset FROM temp.audit_expected_vocab)"""
     ).fetchone()[0]
     return not missing and not extra

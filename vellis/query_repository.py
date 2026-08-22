@@ -20,16 +20,14 @@ from vellis.domain import (
 from vellis.query_domain import (
     DisplayNameField,
     HydratedObject,
-    PatternLink,
     PatternMatch,
-    PatternNode,
     PatternNodeKind,
     PatternSelection,
     Predicate,
     PredicateOperator,
     PropertySelection,
 )
-from vellis.search_repository import register_query_functions, structured_fts_expression
+from vellis.search_repository import structured_fts_expression
 from vellis.sqlite_values import property_from_row
 from vellis.state_repository import interval_parameters, interval_sql
 
@@ -105,42 +103,6 @@ def pattern_identity_findings(
     return _ordered_findings(findings)
 
 
-def select_pattern_bindings(
-    connection: sqlite3.Connection,
-    state: ResolvedState,
-    selection: PatternSelection,
-) -> tuple[PatternMatch, ...] | None:
-    register_query_functions(connection)
-    ctes: list[str] = []
-    parameters: list[object] = []
-    for index, node in enumerate(selection.nodes):
-        sql, values = _node_cte(connection, state, node, index)
-        ctes.append(sql)
-        parameters.extend(values)
-    for index, link in enumerate(selection.links):
-        sql, values = _link_cte(state, link, index)
-        ctes.append(sql)
-        parameters.extend(values)
-    bindings, binding_values, final_name = _binding_ctes(state, selection)
-    ctes.extend(bindings)
-    parameters.extend(binding_values)
-    selector_count = len(selection.nodes) + len(selection.links)
-    columns = ", ".join(f"c{index}" for index in range(selector_count))
-    sql = f"WITH {', '.join(ctes)} SELECT {columns} FROM {final_name} LIMIT ?"
-    parameters.append(selection.maximum_matches + 1)
-    rows = connection.execute(sql, parameters).fetchall()
-    if len(rows) > selection.maximum_matches:
-        return None
-    names = tuple(node.name for node in selection.nodes) + tuple(
-        link.name for link in selection.links
-    )
-    matches = tuple(
-        PatternMatch(tuple((name, str(row[f"c{index}"])) for index, name in enumerate(names)))
-        for row in rows
-    )
-    return tuple(sorted(matches, key=lambda match: tuple(uuid for _, uuid in match.bindings)))
-
-
 def hydration_requests_for_matches(
     selection: PatternSelection, matches: tuple[PatternMatch, ...]
 ) -> tuple[HydrationRequest, ...]:
@@ -190,156 +152,7 @@ def load_hydrated_objects(
     )
 
 
-def _node_cte(
-    connection: sqlite3.Connection,
-    state: ResolvedState,
-    node: PatternNode,
-    index: int,
-) -> tuple[str, list[object]]:
-    alias = "v"
-    conditions = [interval_sql(alias), f"{alias}.kind = ?"]
-    parameters: list[object] = [
-        *interval_parameters(state),
-        ObjectKind.ANCHOR.value
-        if node.kind is PatternNodeKind.ANCHOR
-        else ObjectKind.ASSOCIATED_DATA.value,
-    ]
-    _json_filter(conditions, parameters, f"{alias}.type_key", node.type_keys)
-    _json_filter(conditions, parameters, f"{alias}.uuid", node.uuids)
-    for predicate in node.predicates:
-        condition, values = _predicate_sql(connection, state, alias, predicate)
-        conditions.append(condition)
-        parameters.extend(values)
-    sql = (
-        f"n{index}(uuid) AS (SELECT {alias}.uuid "
-        f"FROM graph_object_version AS {alias} WHERE {' AND '.join(conditions)})"
-    )
-    return sql, parameters
-
-
-def _link_cte(state: ResolvedState, link: PatternLink, index: int) -> tuple[str, list[object]]:
-    conditions = [interval_sql("v"), "v.kind = 'link'"]
-    parameters: list[object] = [*interval_parameters(state)]
-    _json_filter(conditions, parameters, "v.type_key", link.type_keys)
-    _json_filter(conditions, parameters, "v.uuid", link.uuids)
-    sql = (
-        f"l{index}(uuid, source_uuid, target_uuid) AS ("
-        "SELECT v.uuid, v.source_uuid, v.target_uuid FROM graph_object_version AS v "
-        f"WHERE {' AND '.join(conditions)})"
-    )
-    return sql, parameters
-
-
-def _binding_ctes(
-    state: ResolvedState, selection: PatternSelection
-) -> tuple[list[str], list[object], str]:
-    node_indexes = {node.name: index for index, node in enumerate(selection.nodes)}
-    order = _connected_node_order(selection, node_indexes)
-    ctes: list[str] = []
-    parameters: list[object] = []
-    added: set[int] = set()
-    previous = ""
-    for step, node_index in enumerate(order):
-        name = f"b{step}"
-        materialized = " MATERIALIZED" if step < len(order) + len(selection.links) - 1 else ""
-        if not added:
-            sql = (
-                f"{name} AS{materialized} "
-                f"(SELECT n{node_index}.uuid AS c{node_index} FROM n{node_index})"
-            )
-        else:
-            conditions, values = _node_join_conditions(
-                state, selection, node_indexes, node_index, added
-            )
-            sql = (
-                f"{name} AS{materialized} "
-                f"(SELECT {previous}.*, n{node_index}.uuid AS c{node_index} "
-                f"FROM {previous} JOIN n{node_index} ON {' AND '.join(conditions)})"
-            )
-            parameters.extend(values)
-        ctes.append(sql)
-        previous = name
-        added.add(node_index)
-    node_count = len(selection.nodes)
-    for link_index, link in enumerate(selection.links):
-        name = f"b{len(order) + link_index}"
-        materialized = " MATERIALIZED" if link_index < len(selection.links) - 1 else ""
-        conditions = [
-            f"l{link_index}.source_uuid = {previous}.c{node_indexes[link.source]}",
-            f"l{link_index}.target_uuid = {previous}.c{node_indexes[link.target]}",
-        ]
-        conditions.extend(
-            f"l{link_index}.uuid <> {previous}.c{node_count + prior}" for prior in range(link_index)
-        )
-        sql = (
-            f"{name} AS{materialized} "
-            f"(SELECT {previous}.*, l{link_index}.uuid AS c{node_count + link_index} "
-            f"FROM {previous} JOIN l{link_index} ON {' AND '.join(conditions)})"
-        )
-        ctes.append(sql)
-        previous = name
-    return ctes, parameters, previous
-
-
-def _connected_node_order(
-    selection: PatternSelection, node_indexes: dict[str, int]
-) -> tuple[int, ...]:
-    neighbors = {index: set() for index in range(len(selection.nodes))}
-    for value in selection.direct_associations:
-        left, right = node_indexes[value.anchor], node_indexes[value.associated_data]
-        neighbors[left].add(right)
-        neighbors[right].add(left)
-    for value in selection.links:
-        left, right = node_indexes[value.source], node_indexes[value.target]
-        neighbors[left].add(right)
-        neighbors[right].add(left)
-    order = [0]
-    remaining = set(range(1, len(selection.nodes)))
-    while remaining:
-        candidate = min(index for index in remaining if neighbors[index].intersection(order))
-        order.append(candidate)
-        remaining.remove(candidate)
-    return tuple(order)
-
-
-def _node_join_conditions(
-    state: ResolvedState,
-    selection: PatternSelection,
-    node_indexes: dict[str, int],
-    node_index: int,
-    added: set[int],
-) -> tuple[list[str], list[object]]:
-    conditions = [f"n{node_index}.uuid <> b{len(added) - 1}.c{prior}" for prior in sorted(added)]
-    parameters: list[object] = []
-    previous = f"b{len(added) - 1}"
-    for value in selection.direct_associations:
-        anchor, data = node_indexes[value.anchor], node_indexes[value.associated_data]
-        if node_index not in {anchor, data} or not ({anchor, data} - {node_index}) <= added:
-            continue
-        conditions.append(
-            "EXISTS (SELECT 1 FROM direct_association_version AS a "
-            f"WHERE a.object_uuid = {_binding_uuid(data, node_index, previous)} "
-            f"AND a.anchor_uuid = {_binding_uuid(anchor, node_index, previous)} "
-            f"AND {interval_sql('a')})"
-        )
-        parameters.extend(interval_parameters(state))
-    for link_index, value in enumerate(selection.links):
-        source, target = node_indexes[value.source], node_indexes[value.target]
-        if node_index not in {source, target} or not ({source, target} - {node_index}) <= added:
-            continue
-        conditions.append(
-            f"EXISTS (SELECT 1 FROM l{link_index} "
-            f"WHERE l{link_index}.source_uuid = {_binding_uuid(source, node_index, previous)} "
-            f"AND l{link_index}.target_uuid = {_binding_uuid(target, node_index, previous)})"
-        )
-    return conditions, parameters
-
-
-def _binding_uuid(index: int, current: int, previous: str) -> str:
-    return f"n{current}.uuid" if index == current else f"{previous}.c{index}"
-
-
-def _predicate_sql(
+def compile_predicate(
     connection: sqlite3.Connection,
     state: ResolvedState,
     object_alias: str,

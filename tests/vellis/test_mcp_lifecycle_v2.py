@@ -39,6 +39,7 @@ from vellis.onboarding import (
     RegistrationResult,
     TransportKind,
     add_command,
+    entry_exists,
     register_client,
     resolve_vellis_executable,
 )
@@ -48,6 +49,15 @@ from vellis.settings_operations import HttpTokenChangedError
 from vellis.starter import everyday_life_starter
 
 UUID = "00000000-0000-4000-8000-000000000001"
+
+
+def _missing_entry_result(client: ClientKind) -> CommandResult:
+    quote = "'" if client is ClientKind.CODEX else '"'
+    suffix = " found." if client is ClientKind.CODEX else "."
+    return CommandResult(
+        1,
+        stderr=f"No MCP server named {quote}vellis{quote}{suffix}",
+    )
 
 
 def _content(result) -> dict[str, object]:
@@ -1365,6 +1375,30 @@ async def test_unknown_wire_member_is_invalid_arguments_not_domain_result(databa
 
 
 @pytest.mark.anyio
+async def test_non_utf8_unicode_surrogate_is_invalid_arguments_without_activity(
+    database: Path,
+) -> None:
+    before = _activity_count(database)
+    async with Client(build_server(database)) as client:
+        with pytest.raises(ToolError):
+            await client.call_tool(
+                "rtg_change",
+                {
+                    "expectedRevision": 0,
+                    "upserts": [
+                        {
+                            "kind": "anchor",
+                            "uuid": UUID,
+                            "typeKey": "missing",
+                            "displayName": "\ud800",
+                        }
+                    ],
+                },
+            )
+    assert _activity_count(database) == before
+
+
+@pytest.mark.anyio
 async def test_every_selected_tool_reaches_one_successor_operation(database: Path) -> None:
     calls = {
         "rtg_type_summary": {},
@@ -2538,6 +2572,18 @@ def test_client_replacement_probes_before_remove_and_reports_recovery(tmp_path: 
     assert "TOKEN" not in result.recovery_command
 
 
+@pytest.mark.parametrize("client", tuple(ClientKind))
+def test_client_enumeration_distinguishes_absence_from_uncertain_failure(
+    client: ClientKind,
+) -> None:
+    assert not entry_exists(client, lambda _arguments: _missing_entry_result(client))
+    with pytest.raises(RuntimeError, match="external configuration state is uncertain"):
+        entry_exists(
+            client,
+            lambda _arguments: CommandResult(1, stderr="failed to load configuration"),
+        )
+
+
 def test_add_invocation_exception_after_removal_reports_changed_state_and_recovery(
     tmp_path: Path,
 ) -> None:
@@ -2685,7 +2731,7 @@ def test_successful_add_with_failed_final_probe_reports_changed_unconfirmed_read
 
     def runner(arguments: tuple[str, ...]) -> CommandResult:
         if arguments == ("codex", "mcp", "get", "vellis"):
-            return CommandResult(1)
+            return _missing_entry_result(ClientKind.CODEX)
         return CommandResult(0)
 
     def probe(*args, **kwargs):
@@ -2720,7 +2766,7 @@ def test_claude_http_registration_checks_public_help_and_keeps_token_out_of_argv
     def runner(arguments: tuple[str, ...]) -> CommandResult:
         calls.append(arguments)
         if arguments == ("claude", "mcp", "get", "vellis"):
-            return CommandResult(1)
+            return _missing_entry_result(ClientKind.CLAUDE)
         if arguments == ("claude", "mcp", "add", "--help"):
             return CommandResult(
                 0,
@@ -2756,7 +2802,7 @@ def test_registration_success_is_ready_only_after_both_target_probes(
     def runner(arguments: tuple[str, ...]) -> CommandResult:
         events.append(arguments)
         if arguments == ("codex", "mcp", "get", "vellis"):
-            return CommandResult(0 if exists else 1)
+            return CommandResult(0) if exists else _missing_entry_result(ClientKind.CODEX)
         return CommandResult(0)
 
     def probe(*args, **kwargs) -> None:
@@ -2813,7 +2859,7 @@ def test_confirmation_and_preflight_failures_never_report_readiness_or_mutate(
 
     def absent(arguments: tuple[str, ...]) -> CommandResult:
         calls.append(arguments)
-        return CommandResult(1)
+        return _missing_entry_result(ClientKind.CODEX)
 
     with pytest.raises(OSError, match="preflight failed"):
         register_client(
@@ -2836,7 +2882,7 @@ def test_claude_http_refuses_help_that_only_mentions_headers(tmp_path: Path) -> 
     def runner(arguments: tuple[str, ...]) -> CommandResult:
         calls.append(arguments)
         if arguments == ("claude", "mcp", "get", "vellis"):
-            return CommandResult(1)
+            return _missing_entry_result(ClientKind.CLAUDE)
         if arguments == ("claude", "mcp", "add", "--help"):
             return CommandResult(0, stdout="--header HTTP header")
         pytest.fail("unsupported automation must not mutate the client")

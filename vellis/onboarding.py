@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -74,7 +75,12 @@ def stdio_target(data_directory: Path, *, executable: Path | None = None) -> tup
 
 def entry_exists(client: ClientKind, runner: Runner = subprocess_runner) -> bool:
     result = runner((client.value, "mcp", "get", "vellis"))
-    return result.returncode == 0
+    if result.returncode == 0:
+        return True
+    diagnostic = f"{result.stdout}\n{result.stderr}"
+    if re.search(r"No MCP server named ['\"]vellis['\"](?: found)?\.", diagnostic):
+        return False
+    raise RuntimeError("client entry enumeration failed; external configuration state is uncertain")
 
 
 def add_command(

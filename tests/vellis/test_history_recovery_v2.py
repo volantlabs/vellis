@@ -902,6 +902,78 @@ def test_read_only_audit_detects_independent_relation_corruption(
     assert _activity_count(path) == count
 
 
+def test_audit_detects_overlapping_versions_with_individually_valid_intervals(
+    tmp_path: Path,
+) -> None:
+    path = _database(tmp_path)
+    _seed(path)
+    assert (
+        apply_graph_change(
+            path,
+            GraphChangeRequest(1, (AnchorUpsert(PERSON, display_name="Alice Two"),)),
+        ).resulting_revision
+        == 2
+    )
+    assert (
+        apply_graph_change(
+            path,
+            GraphChangeRequest(2, (AnchorUpsert(PERSON, display_name="Alice Three"),)),
+        ).resulting_revision
+        == 3
+    )
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "UPDATE graph_object_version SET valid_to_revision = 3 "
+            "WHERE uuid = ? AND valid_from_revision = 1",
+            (PERSON,),
+        )
+    report = audit_database(path)
+    assert any("graph_object_version contains 1 overlapping" in item for item in report.findings)
+
+
+def test_audit_detects_phrase_changing_fts_token_position_corruption(tmp_path: Path) -> None:
+    path = _database(tmp_path)
+    assert (
+        apply_graph_change(
+            path,
+            GraphChangeRequest(0, (AnchorUpsert(PERSON, "test.person", "alpha beta"),)),
+        ).resulting_revision
+        == 1
+    )
+    with sqlite3.connect(path) as connection:
+        document_id = int(
+            connection.execute(
+                "SELECT document_id FROM search_document "
+                "WHERE object_uuid = ? AND valid_to_revision IS NULL",
+                (PERSON,),
+            ).fetchone()[0]
+        )
+        connection.execute(
+            "INSERT INTO search_fts(search_fts, rowid, content) VALUES ('delete', ?, ?)",
+            (document_id, "alpha beta"),
+        )
+        connection.execute(
+            "INSERT INTO search_fts(rowid, content) VALUES (?, ?)",
+            (document_id, "beta alpha"),
+        )
+        assert (
+            connection.execute(
+                "SELECT count(*) FROM search_fts WHERE search_fts MATCH ?",
+                ('"alpha beta"',),
+            ).fetchone()[0]
+            == 0
+        )
+        assert (
+            connection.execute(
+                "SELECT count(*) FROM search_fts WHERE search_fts MATCH ?",
+                ('"beta alpha"',),
+            ).fetchone()[0]
+            == 1
+        )
+    report = audit_database(path)
+    assert any("search FTS terms differ" in item for item in report.findings)
+
+
 @pytest.mark.parametrize(
     ("relation", "key_column"),
     [

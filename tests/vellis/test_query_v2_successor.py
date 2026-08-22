@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 import vellis.definition_repository as definition_repository
+import vellis.pattern_repository as pattern_repository
 import vellis.query_repository as query_repository
 import vellis.read_operations as read_operations
 from tests.vellis.v2_query_fixture import initialized_query_database
@@ -591,14 +592,12 @@ def test_bound_is_checked_before_hydration(tmp_path: Path, monkeypatch: pytest.M
             (PatternNode("owner", PatternNodeKind.ANCHOR, ("test.person",)),),
         )
         assert (
-            query_repository.select_pattern_bindings(
+            pattern_repository.select_pattern_bindings(
                 connection, read_operations.resolve_state(connection), selected
             )
             is None
         )
-        binding_sql = next(value for value in traced if value.startswith("WITH n0"))
-        plan = connection.execute(f"EXPLAIN QUERY PLAN {binding_sql}").fetchall()
-        assert all("ORDER BY" not in str(row[3]) for row in plan)
+        assert any(value.startswith("SELECT v.uuid FROM graph_object_version") for value in traced)
     finally:
         connection.close()
 
@@ -717,21 +716,13 @@ def test_sql_topology_matches_independent_oracle_and_catches_distinctness_mutant
         links=(PatternLink("edge", "left", "right", uuids=(L2,)),),
     )
     assert evaluate_pattern(distinct, graph) == ()
-    original_conditions = query_repository._node_join_conditions
-
-    def without_distinctness(state, selection, node_indexes, node_index, added):
-        conditions, parameters = original_conditions(
-            state, selection, node_indexes, node_index, added
-        )
-        return [value for value in conditions if "<>" not in value], parameters
-
-    monkeypatch.setattr(query_repository, "_node_join_conditions", without_distinctness)
+    monkeypatch.setattr(pattern_repository, "_exclude_bound_uuids", lambda *_args: None)
     mutant = query_graph(database, GraphQuery(distinct))
     assert isinstance(mutant.payload, PatternQueryPayload)
     assert mutant.payload.matches != evaluate_pattern(distinct, graph)
 
 
-def test_connected_pattern_above_sqlites_flat_join_limit_is_a_domain_result(
+def test_streamed_pattern_above_sqlites_flat_join_limit_is_a_domain_result(
     tmp_path: Path,
 ) -> None:
     database = _database(tmp_path)
@@ -744,9 +735,58 @@ def test_connected_pattern_above_sqlites_flat_join_limit_is_a_domain_result(
     assert result.status is OperationStatus.ACCEPTED
     assert isinstance(result.payload, PatternQueryPayload)
     assert result.payload.matches == ()
-    binding_ctes, _, final_name = query_repository._binding_ctes(ResolvedState(1), selection)
-    assert all("AS MATERIALIZED" in value for value in binding_ctes[:-1])
-    assert binding_ctes[-1].startswith(f"{final_name} AS (")
+
+
+def test_dense_pattern_stops_stream_after_maximum_plus_one_complete_bindings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selection = PatternSelection(
+        1,
+        (
+            PatternNode("source", PatternNodeKind.ANCHOR),
+            PatternNode("target", PatternNodeKind.ANCHOR),
+        ),
+        links=(PatternLink("edge", "source", "target"),),
+    )
+    fetches = [0, 0, 0]
+    closed: list[int] = []
+
+    class Cursor:
+        def __init__(self, depth: int, values: tuple[str, ...]) -> None:
+            self.depth = depth
+            self.values = iter(values)
+
+        def fetchone(self):
+            fetches[self.depth] += 1
+            value = next(self.values, None)
+            return None if value is None else {"uuid": value}
+
+        def close(self) -> None:
+            closed.append(self.depth)
+
+    def candidate(*args):
+        depth = args[-1]
+        values = (
+            ("source",)
+            if depth == 0
+            else tuple(f"target-{index}" for index in range(100))
+            if depth == 1
+            else (f"edge-{fetches[1]}",)
+        )
+        return Cursor(depth, values)
+
+    monkeypatch.setattr(pattern_repository, "_candidate_cursor", candidate)
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    try:
+        assert (
+            pattern_repository.select_pattern_bindings(connection, ResolvedState(0), selection)
+            is None
+        )
+    finally:
+        connection.close()
+    assert fetches == [1, 2, 3]
+    assert sorted(closed) == [0, 1, 2, 2]
 
 
 def test_case_sensitive_payload_is_rejected_for_non_text_operator(tmp_path: Path) -> None:

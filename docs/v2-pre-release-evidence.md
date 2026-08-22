@@ -1,9 +1,10 @@
 # Vellis v2 pre-release closure-correction evidence
 
-This is the non-authoritative evidence narrative for evolution
-`vellis-2-pre-release-closure-corrections`. Product authority remains the textual SysML under
-`model/`; this document records the correction outcomes, independent owner narratives, and
-reproduced simplicity measurements against source baseline
+This is the non-authoritative evidence narrative for completed evolution
+`vellis-2-pre-release-closure-corrections` and its bounded pull-request follow-up
+`vellis-2-pr-review-corrections`. Product authority remains the textual SysML under `model/`; this
+document records correction outcomes, independent owner narratives, and reproduced simplicity
+measurements against original source baseline
 `7d007fd0b7e2ac6e8671bc297400f1490dd03a62`.
 
 ## Bounded correction outcome
@@ -42,6 +43,24 @@ Focused evidence is in the revised existing tests rather than a parallel contrac
   strict-boundary result from an inclusive mutant.
 - Existing MCP schemas and 1,000/1,001 behavior remain the public-boundary evidence for the one
   fixed item limit.
+
+## Pull-request review follow-up
+
+Codex reviewed pre-release head `6da7985aae97a01c13468d1ec4a4f77bc6c7d5bc` and reported five
+implementation defects already decided by current model authority. Each was independently
+reproduced before correction; no model, public operation, wire shape, finding taxonomy, relation, or
+database-version change was required.
+
+| Review finding | Correction and discriminating evidence |
+|---|---|
+| Intermediate query bindings were materialized without the public result bound. | Pattern evaluation now streams candidates through an iterative depth-first traversal and retains only `maximumMatches + 1` complete tuples. A dense synthetic stream proves early termination; the public topology/oracle matrix and a 65-node pattern preserve query meaning and avoid SQLite's flat-join limit. |
+| Client enumeration treated every nonzero result as absence. | Codex and Claude missing-entry diagnostics remain accepted as absence; another nonzero diagnostic raises on uncertain external state before remove or add. |
+| A lone Unicode surrogate reached canonical UTF-8 encoding. | The strict wire-model boundary recursively rejects strings that are not UTF-8 encodable. A real MCP request carrying an escaped surrogate is an invalid-arguments error and appends no activity. |
+| Version interval audit omitted overlap detection. | Every version relation is checked by its family identity for intersecting intervals. The focused counterexample has individually valid bounds but two active versions at revision 2 and now produces an overlap finding. |
+| FTS audit compared only aggregate token counts. | Independent rebuilt and live vocabularies are compared by term, document, column, and offset. Reversing indexed token order while retaining source content changes phrase results and now fails audit. |
+
+The affected query, MCP lifecycle, history, audit, backup, and recovery suites passed 202 tests after
+the correction. The final gate and review results below are refreshed at the frozen closure token.
 
 ## Installed owner narratives
 
@@ -128,8 +147,8 @@ the Phase 0 rules; line counts are diagnostic, not design targets.
 | Measure | Phase 0 | Correction candidate | Change |
 |---|---:|---:|---:|
 | Authored SysML lines | 4,750 | 2,483 | -2,267 |
-| Product Python lines under `vellis/` | 23,854 | 20,638 | -3,216 |
-| Test Python lines | 28,692 | 16,482 | -12,210 |
+| Product Python lines under `vellis/` | 23,854 | 20,805 | -3,049 |
+| Test Python lines | 28,692 | 16,640 | -12,052 |
 | Product C901 findings above 10 | 37 | 0 | -37 |
 | `vellis/ + tools/` C901 findings above 10 | 53 | 11 | -42 |
 | Persistent application relations | 39 | 25 | -14 |
@@ -137,9 +156,10 @@ the Phase 0 rules; line counts are diagnostic, not design targets.
 | Product private FastMCP/MCP references | 4 | 0 | -4 |
 | Canonical definition resolvers | 4 | 1 | -3 |
 
-The product has 64 Python modules after deleting the forwarding alias, averaging about 322 physical
-lines. The largest logical production module is the 768-line schema declaration; the next is the
-763-line query validator. No class has more than seven public methods. The ten MCP tools, seven CLI
+The product has 65 Python modules after deleting the forwarding alias and isolating bounded pattern
+evaluation, averaging about 320 physical lines. The largest logical production module is the
+773-line schema declaration; the next is the 763-line query validator. No class has more than seven
+public methods. The ten MCP tools, seven CLI
 commands, 25 persistent relations, 20 named temporary relations, one canonical resolver, and
 database version are unchanged.
 
@@ -158,9 +178,10 @@ and the historical deletion-sequencing lesson. None is a material pre-release pr
 
 ## Verification
 
-The affected domain, starter/storage, change/draft, query, MCP lifecycle, v1 import,
-history/recovery, and repository-policy selection passed 561 tests. The complete candidate passed
-798 tests through ordinary `just check`.
+The earlier affected domain, starter/storage, change/draft, query, MCP lifecycle, v1 import,
+history/recovery, and repository-policy selection passed 561 tests. The pull-request follow-up's
+focused selection passed 202 tests. The complete candidate passed 804 tests through ordinary
+`just check`.
 
 | Gate | Candidate result |
 |---|---|
@@ -178,7 +199,7 @@ The regenerated SQLite schema text is byte-identical to baseline and retains dat
 Mechanical closure inventories report 25 persistent and 20 temporary relations, one production
 item-limit definition, no `v1_pointer.py`, no generated double-slash or synthetic-parent finding
 path, zero product C901 findings, zero private MCP references, one canonical definition resolver,
-ten tools, and seven CLI commands. The installed entry reaches all 63 non-metadata product modules,
+ten tools, and seven CLI commands. The installed entry reaches all 64 non-metadata product modules,
 so no orphan predecessor path remains. No command in this correction accessed the protected
 `.data/` directory.
 

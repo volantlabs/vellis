@@ -26,6 +26,7 @@ from vellis.draft_read_operations import (
 from vellis.draft_repository import load_draft_definitions, load_draft_graph
 from vellis.draft_sql_overlay import install_draft_graph_overlay
 from vellis.graph_repository import load_graph_objects
+from vellis.pattern_repository import select_pattern_bindings
 from vellis.public_wire import public_result
 from vellis.query_domain import (
     GraphQuery,
@@ -44,7 +45,6 @@ from vellis.query_repository import (
     load_object_headers,
     pattern_execution_finding,
     pattern_identity_findings,
-    select_pattern_bindings,
 )
 from vellis.query_validation import (
     query_findings,

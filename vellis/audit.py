@@ -268,14 +268,17 @@ def _check_sqlite_integrity(connection: sqlite3.Connection, findings: list[str])
 
 
 def _check_intervals(connection: sqlite3.Connection, findings: list[str]) -> None:
-    for relation in (
-        "graph_object_version",
-        "direct_association_version",
-        "property_version",
-        "definition_version",
-        "definition_permitted_type",
-        "property_definition_version",
-        "property_definition_allowed_value",
+    for relation, identity_columns in (
+        ("graph_object_version", ("uuid",)),
+        ("direct_association_version", ("object_uuid", "anchor_uuid")),
+        ("property_version", ("object_uuid", "property_name")),
+        ("definition_version", ("type_key",)),
+        ("definition_permitted_type", ("type_key", "role", "permitted_type_key")),
+        ("property_definition_version", ("type_key", "property_name")),
+        (
+            "property_definition_allowed_value",
+            ("type_key", "property_name", "ordinal"),
+        ),
     ):
         count = int(
             connection.execute(
@@ -288,6 +291,29 @@ def _check_intervals(connection: sqlite3.Connection, findings: list[str]) -> Non
         )
         if count:
             findings.append(f"{relation} contains {count} invalid version intervals")
+        overlaps = _overlapping_intervals(connection, relation, identity_columns)
+        if overlaps:
+            findings.append(f"{relation} contains {overlaps} overlapping version intervals")
+
+
+def _overlapping_intervals(
+    connection: sqlite3.Connection,
+    relation: str,
+    identity_columns: tuple[str, ...],
+) -> int:
+    identity = " AND ".join(f"earlier.{column} = later.{column}" for column in identity_columns)
+    return int(
+        connection.execute(
+            f"""
+            SELECT count(*) FROM {relation} AS earlier
+            JOIN {relation} AS later
+              ON {identity}
+             AND earlier.valid_from_revision < later.valid_from_revision
+             AND (earlier.valid_to_revision IS NULL
+                  OR earlier.valid_to_revision > later.valid_from_revision)
+            """
+        ).fetchone()[0]
+    )
 
 
 def _check_child_boundaries(connection: sqlite3.Connection, findings: list[str]) -> None:

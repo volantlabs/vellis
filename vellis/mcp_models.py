@@ -79,6 +79,23 @@ def _reject_explicit_null(value):
     return value
 
 
+def _require_utf8_strings(value) -> None:
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise ValueError("text must contain only Unicode scalar values") from error
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            _require_utf8_strings(key)
+            _require_utf8_strings(item)
+        return
+    if isinstance(value, list | tuple):
+        for item in value:
+            _require_utf8_strings(item)
+
+
 type OmissibleArgument[T] = Annotated[OmissibleInput[T], BeforeValidator(_reject_explicit_null)]
 
 
@@ -95,6 +112,7 @@ class WireModel(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def reject_explicit_json_null(cls, value):
+        _require_utf8_strings(value)
         if not isinstance(value, dict):
             return value
         for name, field in cls.model_fields.items():

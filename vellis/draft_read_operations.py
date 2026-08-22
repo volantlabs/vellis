@@ -22,6 +22,7 @@ from vellis.domain import (
     SystemEnvelope,
     TimestampValue,
 )
+from vellis.pattern_repository import select_pattern_bindings
 from vellis.query_domain import (
     DefinitionNeighborhood,
     GraphQuery,
@@ -38,7 +39,6 @@ from vellis.query_repository import (
     hydration_requests_for_matches,
     load_hydrated_objects,
     pattern_execution_finding,
-    select_pattern_bindings,
 )
 from vellis.search_repository import structured_fts_expression
 from vellis.sqlite_values import property_from_row
