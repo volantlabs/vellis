@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:daed5a087a0974f99d885471f557bdf89f09b3c7
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:d5129c664c662a880d57e55fe42b80acae5d239c
+    implementation: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:d5129c664c662a880d57e55fe42b80acae5d239c
+    checkpoint: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
   observed: *target
 scope:
   authority_scope:
@@ -38,6 +38,8 @@ scope:
     - system-evolution.yaml
     - vellis/mcp.py
     - vellis/cardinality_validation.py
+    - tools/package_smoke.py
+    - tests/test_package_smoke.py
     - vellis/query_validation.py
     - vellis/read_operations.py
     - vellis/draft_read_operations.py
@@ -132,10 +134,10 @@ findings:
     classification: implementation defect
     consequence: The setuptools backend reuses the ignored build directory and never purges files deleted from source, and package_smoke runs its build in the repository root, so the artifact it then installs and exercises can predate current source. Its only artifact assertion compares a version string. The committed distribution currently carries modules deleted from the source tree and one file that has no version-control history at all, so an owner following the documented install can run code that is not the code claimed.
     authority_refs: [VellisRequirements::simpleOperation]
-    evidence_refs: [command:just package-check]
-    disposition: open
+    evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_deleted_from_source, path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, command:just package-check]
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: absent
+    implementation_status: conforming
     nearest_wrong_system: The build directory is purged while the check still compares only a version string, so a cached or partial artifact continues to pass.
     compatibility_effect: Build and verification tooling only; no product behavior, wire, or database change.
   - id: F009
@@ -238,7 +240,7 @@ work_items:
     label: Scope cardinality checking to the exact definition and role whose count the batch can change
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:f486fe64c466945f2780326616f909bf2ceba4d5"}
+    planned_baseline: {dimension: implementation, identity: "git:a4ff63bf00bd60da6eb1fcce48446113304187b4"}
     finding_ids: [F004, F005]
     decision_ids: []
     authority:
@@ -259,13 +261,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree, path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_an_anchor_under_an_unloaded_data_type, command:just check]
     blocker: null
-    checkpoint: git:d5129c664c662a880d57e55fe42b80acae5d239c
+    checkpoint: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
   - id: W005
     order: 4
     label: Make boundary finding paths resolvable and the query bound navigable
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:d5129c664c662a880d57e55fe42b80acae5d239c"}
+    planned_baseline: {dimension: implementation, identity: "git:a4ff63bf00bd60da6eb1fcce48446113304187b4"}
     finding_ids: [F006, F007, F009]
     decision_ids: []
     authority:
@@ -286,13 +288,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, command:just check]
     blocker: null
-    checkpoint: git:d5129c664c662a880d57e55fe42b80acae5d239c
+    checkpoint: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
   - id: W006
     order: 5
     label: Make the package check reject a stale distribution
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:d5129c664c662a880d57e55fe42b80acae5d239c"}
+    planned_baseline: {dimension: implementation, identity: "git:a4ff63bf00bd60da6eb1fcce48446113304187b4"}
     finding_ids: [F008]
     decision_ids: []
     authority:
@@ -309,17 +311,17 @@ work_items:
       - Do not inspect .data.
       - Do not run broad ignored-file cleanup; remove only the build and dist outputs.
       - Do not add version-bump automation or change the release process.
-    lifecycle: active
-    implementation_status: absent
-    evidence_refs: [command:just package-check]
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_deleted_from_source, path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, command:just package-check, command:just check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
   - id: W003
     order: 6
     label: Verify, independently review, and close the agent-usable boundary fixes
     kind: closure
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:f486fe64c466945f2780326616f909bf2ceba4d5"}
+    planned_baseline: {dimension: implementation, identity: "git:a4ff63bf00bd60da6eb1fcce48446113304187b4"}
     finding_ids: []
     decision_ids: []
     authority:
@@ -335,8 +337,8 @@ work_items:
     non_effects:
       - Do not open a model-authority change.
       - Do not alter owner data.
-    lifecycle: pending
-    implementation_status: absent
+    lifecycle: active
+    implementation_status: conforming
     evidence_refs: [command:just check]
     blocker: null
     checkpoint: null
