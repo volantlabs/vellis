@@ -180,6 +180,17 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: One both-roles case is added while the oracle keeps declaring a two-role model it never generates a deciding state for.
     compatibility_effect: Evidence only; no product behavior, wire, or database change.
+  - id: F012
+    summary: The derived finding-path sweep read only plain string constants, so every path addressed by position went unread while the test appeared to cover the whole boundary.
+    classification: implementation defect
+    consequence: An indexed path is written as an f-string, and that is the dominant form behind the boundary, so seven modules emitted roots the sweep never saw. Renaming an indexed root to a response payload collection left the whole suite green, reinstating on rtg_type_inspect's duplicate-key, unknown-key and kind-mismatch findings the same unresolvable path F010 removed, and those are reached in ordinary use rather than only above the item limit. The sweep had been derived on the module and constructor axes but not on the form axis.
+    authority_refs: [VellisRequirements::mcpBoundary]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary]
+    disposition: resolved
+    owner_work_item_id: W007
+    implementation_status: conforming
+    nearest_wrong_system: The one interpolated form is read while the sweep keeps recognizing forms by enumeration, so the next way a path is composed drifts out of coverage exactly as the module and constructor lists did.
+    compatibility_effect: Evidence only; no product behavior, wire, or database change.
 decisions:
   - id: D001
     summary: Publish a merged top-level properties map alongside the existing oneOf in the shared union-schema builder, rather than collapsing the branches or special-casing each tool.
@@ -366,7 +377,7 @@ work_items:
     kind: implementation
     dependencies: [W004, W005]
     planned_baseline: {dimension: implementation, identity: "git:42c9ee0048aed6c9fe34303eb2b1ba755c045c35"}
-    finding_ids: [F010, F011]
+    finding_ids: [F010, F011, F012]
     decision_ids: []
     authority:
       - refs: [VellisRequirements::mcpBoundary, VellisRequirements::localCardinality, VellisVerification::cardinality, VellisVerification::activeChange]
