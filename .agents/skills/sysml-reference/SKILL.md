@@ -150,6 +150,10 @@ established from the current model and pinned baseline.
 | connection or interface? | A link between things versus a specified interaction surface. |
 | allocation or satisfaction? | Mapping responsibility versus claiming that an obligation is met. |
 | constraint or requirement? | A predicate that holds versus an obligation on a subject with satisfiers and evidence. |
+| part definition, package, or interface definition for a software boundary? | What the boundary owns. A part when it owns governed state, lifecycle, or failure responsibility. A package when it only groups a namespace or viewpoint and owns nothing. An interface definition when it fixes what one part may assume about another without owning either side. |
+| dependency or connection for permitted direction? | Whether anything flows. A dependency states that one element relies on another and constrains direction only. A connection is a link along which interaction occurs, so it needs an intentional interaction to justify it. |
+| owned state or referenced state at subsystem granularity? | Which part the model holds responsible when the value is wrong. Composite ownership names one responsible part; a reference lets several parts read state one of them owns. |
+| when does a private call boundary warrant a port? | Whether the project means to fix the assumption across independent implementation work. A private code call is not an interaction surface by itself; a boundary the project intends to hold, and states a prohibition for, is. |
 
 Use the active construct inventory rather than treating this table as exhaustive.
 
@@ -273,5 +277,7 @@ Do not maintain a second bundled language summary as a substitute for the pinned
 
 ## References
 
+- [Modeling altitude](references/altitude.md): one subject expressed at process, system, and software
+  altitude, so the difference is visible rather than described.
 - [SysML v2 is not SysML v1](references/v1-displacement.md): displaced v1 and UML notation, and valid
   v2 forms whose meaning is easy to misread.
