@@ -42,16 +42,13 @@ inventory or become a second requirements system.
 
 Information moves in both directions:
 
-1. Whole-model planning identifies every implementation-bearing authority neighborhood, forms its
-   semantic dependency graph, and derives a complete campaign for human approval.
-2. Model work hands implementation a current, qualified semantic slice with observable obligations,
+1. Model work hands implementation a current, qualified semantic slice with observable obligations,
    full or partial authority coverage, remaining obligations, decisive cases, non-effects, and
    explicit realization deferrals.
-3. Implementation work chooses the smallest sufficient realization, builds the slice, and produces
+2. Implementation work chooses the smallest sufficient realization, builds the slice, and produces
    discriminating conformance evidence and a separate implementation status.
-4. The campaign reviews and checkpoints that slice, resumes with the next dependency-ready slice,
-   and closes only after full-system integration and runnable evidence.
-5. Implementation defects remain implementation work. A reproducible model gap returns to the model.
+3. Review and checkpoint that slice together, then take the next dependency-ready work.
+4. Implementation defects remain implementation work. A reproducible model gap returns to the model.
    A feasibility limit reaches the model only when its demonstrated consequence changes
    stakeholder-visible system behavior or an intentionally selected realization boundary.
 
@@ -118,35 +115,6 @@ covering only part of a larger requirement, but the remainder must be explicit a
 requirement or verification case must not be reported complete. Coverage is judged against each
 cited accepted authority element's complete meaning, not merely the task prompt or row summary;
 `full` necessarily means that no obligation remains.
-
-## Whole-model planning and durable campaign state
-
-Whole-model planning begins cold from the complete accepted authority. It derives independently
-reviewable obligation neighborhoods, semantic dependencies, inseparable cycles, and end-to-end
-semantic slices before consulting existing source topology. Integration and closure slices appear
-only when modeled meaning spans prior slices. Necessary toolchain setup belongs to the first semantic
-slice that uses and proves it, not an architecture-only phase.
-
-The resulting campaign record contains the current baseline, qualified authority references,
-many-to-many slice coverage, dependencies, implementation status, evidence references, consequential
-realization decisions, blockers, approval, and checkpoints. It contains no copied requirements,
-stories, tasks, estimates, architecture, or serialized model. A fresh agent must reread the cited
-model authority before acting.
-
-Every selected realization decision has one evidence-bearing completion owner: a slice, or closure
-when the effect is intentionally deferred until the runnable system boundary. The selected meaning,
-authority links, reversibility, and ownership are frozen with the approved plan; implementation
-status and evidence advance during execution. Plan-bearing evidence intent names the nearest wrong
-realization each decision's eventual proof must exclude without claiming prospective evidence.
-Planning reconstructs both the authority-coverage map and a decision-to-work-item matrix. Reviews
-disposition each owned decision separately—nearby tests or a conforming authority row cannot
-substitute for its evidence.
-
-The complete plan and every material replan require human approval. A stale baseline, genuine model
-gap, material plan gap, or stakeholder-visible feasibility consequence pauses execution and
-invalidates that approval. Code defects and bounded model-preserving realization choices remain
-autonomous implementation work. Approval applies to the complete campaign: independently reviewed
-routine slice checkpoints are recovery boundaries, not repeated human approval gates.
 
 ## Translate gaps back into system meaning
 
@@ -225,7 +193,7 @@ boundaries solely to prolong discovery. The two-pair budget and its stop conditi
 `$sysml-evolution`.
 
 Reviewers stay on the selected slice and its evidence unless that slice intentionally changes the
-campaign process. A slice is complete only when the final pair finds no material modeled-behavior,
+method itself. A slice is complete only when the final pair finds no material modeled-behavior,
 authority-coverage, evidence, implementation, declared-safety, or ordinary-recovery issue. Its
 compact handoff states the checkpoint, checks, review counts, elapsed time, and any pause reason;
 reproducible project artifacts carry the technical detail instead of reviewer transcripts.
@@ -234,65 +202,13 @@ Use targeted checks while implementing and remediating. Normally run the full pr
 before the initial pair and once against the remediated state before the final pair; rerun it sooner
 only when the change or project binding makes that evidence necessary.
 
-## Long-running execution and closure
-
-A continuation harness may keep one inexpensive, context-light manager alive, but durable meaning
-does not depend on that conversation. On each cycle the manager validates the campaign and project
-checkpoint, obtains one machine-readable disposition, and launches one fresh worker for the named
-slice or closure item. The worker owns the only writer role, executes exactly that item, obtains its
-fresh read-only reviews, checkpoints or pauses, returns a compact result, and terminates. The manager
-never implements, reviews, or consumes reviewer transcripts; it independently revalidates the
-checkpoint before dispatching the next fresh worker.
-
-Each child is launched once. A parent awaits child work through a harness-native blocking join, or
-runs independent children sequentially when such a join is unavailable. Concurrent execution is an
-optimization, not a conformance condition. Shell sleeps, timers, repeated status checks, background
-no-ops, monitors, and overlapping wait tasks must not be used to spend model turns keeping a parent
-alive.
-
-The disposition binds campaign identity, project revision, worktree condition, current checkpoint,
-and selected work to a state token. A worker rechecks that token before mutation, so activation or
-other intervening work invalidates stale duplicate dispatch. Explainable active-slice work resumes in
-a fresh worker; unexplained dirty state stops. The manager waits directly while a worker is live and
-uses a timed retry only for transient launcher or quota failure. Three identical failures against one
-state token stop rather than loop indefinitely.
-
-This structure is provider-neutral. A non-normative Vellis trial may use Claude Sonnet Medium for the
-manager and fresh Opus 5 Medium workers, with Opus 5 Low as a manager substitute. Model choice does
-not affect authority or approval. Optional timing, review-count, check-count, and harness-usage
-telemetry remains outside model authority and the approved campaign projection.
-
-After focused evidence passes, independent agents review authority/conformance and
-engineering/evidence. The writer batches every material finding and then obtains one final review
-pair. A clean final pair permits the implementation, evidence, documentation truth, and campaign
-state to checkpoint together in one ordinary commit. An active slice retains the preceding
-recoverable checkpoint until the new one commits. The committed `HEAD` containing the current ledger
-is the recovery state; checkpoint labels are navigation identifiers. Project validation detects
-ordinary dirty state, stale approval, plan drift, missing current evidence, and interruption, while
-trusting the repository owner, executing agent, Git implementation, and committed checker.
-Project checkpoint validation also preserves the approved plan-bearing projection through every
-slice and closure checkpoint. A changed baseline, authority map, coverage contribution, dependency,
-verification reference, or consequential realization decision returns the campaign to planning and
-human approval rather than silently changing the execution plan.
-
-When closure discovers that a selected decision was omitted, resume its owner if that work item is
-unfinished. If the owner was already checkpointed complete, preserve the selection and add a
-corrective work item through renewed planning. Reopen the owner choice only when new evidence changes
-stakeholder-visible meaning or the selected realization boundary.
-
-After the last planned slice, a separate closure cycle reconstructs complete model coverage, tests
-cross-slice semantics, exercises the selected external boundary from a fresh environment, performs a
-cold-agent reconstruction, and subtracts unsupported machinery. Application completion requires a
-current baseline, full aggregate authority coverage, conforming integration evidence, a runnable
-selected boundary, and no blocker.
-
 ## Vellis as a proving case
 
 Vellis binds the portable core through `AGENTS.md`, `model/README.md`, its pinned reference and
 validator tooling, `system-evolution.yaml`, and its `just` checks.
 Post-build evolution is inspectable with `just system-evolution-check` and
 `just system-evolution-status`; its record indexes findings, decisions, work, and rebaselining but
-does not become product authority or a second implementation campaign. Vellis derives observed
+does not become product authority or a second execution engine. Vellis derives observed
 model, language, lockfile, Git implementation, and checkpoint identities from the repository and
 binds completed independent reviews to their reviewer and reviewed checkpoint; those are project
 bindings, not assumptions embedded in the portable skill.
