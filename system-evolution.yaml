@@ -43,6 +43,7 @@ scope:
     - tools/package_smoke.py
     - tests/test_package_smoke.py
     - vellis/domain_validation.py
+    - vellis/discovery_operations.py
     - vellis/query_validation.py
     - vellis/read_operations.py
     - vellis/draft_read_operations.py
@@ -304,7 +305,7 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another, path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, path:tests/vellis/test_change_draft_v2.py#test_scoped_change_agrees_with_whole_state_validation, path:tests/vellis/test_change_draft_v2.py#test_attaching_a_child_does_not_load_a_hub_whose_target_bound_cannot_fire, path:tests/vellis/test_change_draft_v2.py#test_adding_an_outgoing_link_does_not_load_a_hub_whose_source_bound_cannot_fire, path:tests/vellis/test_change_draft_v2.py#test_adding_a_data_object_does_not_load_an_anchor_whose_bound_cannot_fire, command:just check]
     blocker: null
-    checkpoint: git:435b72a6c2f5b15745df1601b38df54cc6235968
+    checkpoint: git:a80775909cd7936e52b2b61fa3070492ebe4e6c9
   - id: W005
     order: 4
     label: Make boundary finding paths resolvable and the query bound navigable
@@ -331,7 +332,7 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, command:just check]
     blocker: null
-    checkpoint: git:435b72a6c2f5b15745df1601b38df54cc6235968
+    checkpoint: git:d5129c664c662a880d57e55fe42b80acae5d239c
   - id: W006
     order: 5
     label: Make the package check reject a stale distribution
@@ -358,7 +359,7 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building, path:tests/test_package_smoke.py#test_only_build_distribution_can_run_a_uv_build, command:just package-check, command:just check]
     blocker: null
-    checkpoint: git:435b72a6c2f5b15745df1601b38df54cc6235968
+    checkpoint: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
   - id: W007
     order: 6
     label: Close the finding-path class and give role scoping evidence that rejects the both-role system
@@ -417,7 +418,7 @@ closure:
   implementation_status: absent
   integration_status: not evaluated
   external_status: not evaluated
-  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools gain a merged top-level properties map while their oneOf branches continue to decide acceptance. The cardinality closure materializes strictly less than the source baseline. W002 widened peer selection to both roles, and W004 both reverted that widening and skipped any role whose bound cannot produce a finding, so an ordinary change no longer loads an endpoint's degree to satisfy an unbounded bound. No additional graph state becomes valid in either direction.
+  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools gain a merged top-level properties map while their oneOf branches continue to decide acceptance. The cardinality closure materializes strictly less than the source baseline, because W004 reverted W002's both-role peer widening and skips any role whose bound cannot produce a finding. The type summary's over-limit refusal now carries no finding path, having previously named a response payload collection; its code and summary are unchanged and no other refusal loses a path. No additional graph state becomes valid in either direction.
   reviews:
     - {lens: authority and conformance, status: findings, reviewer: authority-conformance-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
     - {lens: engineering and evidence, status: findings, reviewer: engineering-evidence-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}

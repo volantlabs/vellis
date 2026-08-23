@@ -3449,14 +3449,30 @@ def _emitted_finding_roots(source: str) -> set[str]:
         if not isinstance(node, ast.Call):
             continue
         for argument in (*node.args, *(value.value for value in node.keywords)):
-            if not isinstance(argument, ast.Constant) or not isinstance(argument.value, str):
+            literal = _leading_literal(argument)
+            if literal is None or not literal.startswith("/"):
                 continue
-            if not argument.value.startswith("/"):
-                continue
-            segment = argument.value[1:].split("/")[0]
+            segment = literal[1:].split("/")[0]
             if segment:
                 roots.add(segment)
     return roots
+
+
+def _leading_literal(argument: ast.expr) -> str | None:
+    """The text an argument begins with, whether or not it interpolates.
+
+    An indexed path is an f-string, and every member addressed by position is
+    written that way, so reading only plain constants would leave the dominant
+    form of finding path unread while appearing to sweep the whole boundary.
+    Only the leading run matters: the root is what has to be addressable.
+    """
+    if isinstance(argument, ast.Constant):
+        return argument.value if isinstance(argument.value, str) else None
+    if isinstance(argument, ast.JoinedStr) and argument.values:
+        first = argument.values[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            return first.value
+    return None
 
 
 @pytest.mark.anyio
