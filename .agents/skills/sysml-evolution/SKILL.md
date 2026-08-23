@@ -1,6 +1,6 @@
 ---
 name: sysml-evolution
-description: Assess, plan, execute, resume, review, and close principled changes to an already implemented textual SysML v2 system while keeping accepted model authority, implementation, evidence, realization decisions, and documentation synchronized. Use for post-build audits, implementation-to-model feedback, defects spanning model and code, stakeholder changes, dependency or platform consequences, performance or resource findings, incremental feature evolution, and rebaselining after accepted updates; use sysml-implementation-planning and sysml-implementation-campaign instead for a complete greenfield implementation or a replacement whole-model campaign.
+description: Assess, plan, execute, resume, review, and close principled changes to an already implemented textual SysML v2 system while keeping accepted model authority, implementation, evidence, realization decisions, and documentation synchronized. Use for post-build audits, implementation-to-model feedback, defects spanning model and code, stakeholder changes, dependency or platform consequences, performance or resource findings, incremental feature evolution, and rebaselining after accepted updates.
 ---
 
 # SysML System Evolution
@@ -50,8 +50,6 @@ file, issue, change request, or equivalent system of record.
      skills, then obtain the project's human acceptance of changed system meaning;
    - correct implementation defects and choose bounded model-preserving realization decisions with
      `$sysml-implementation`;
-   - use `$sysml-implementation-planning` and `$sysml-implementation-campaign` when the accepted
-     target requires complete-model decomposition or long-running multi-slice supervision;
    - stop on stale baselines, unresolved external dependencies, or consequential feasibility choices
      requiring stakeholder direction.
 6. Derive dependency-ordered work items from semantic effects, not files or architecture layers.
@@ -80,9 +78,8 @@ Use the lightest durable coordination that preserves the change:
   when context loss, approval, or cross-authority coordination is immaterial.
 - **One cohesive evolution set:** use this skill and one baseline-bound evolution record containing
   all related findings and work items.
-- **Complete or long-running implementation campaign:** route the accepted target model to
-  `$sysml-implementation-planning` and `$sysml-implementation-campaign`; do not grow the evolution
-  record into a second campaign engine.
+- **Complete or long-running rebuild:** split it into independently valuable evolution sets rather
+  than growing one record into a second execution engine.
 
 ## Portable boundary
 

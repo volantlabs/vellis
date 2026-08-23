@@ -31,10 +31,6 @@ skills-check:
     @uv run python tools/validate_skills.py
     @uv run python tools/sync_agent_skills.py --check
 
-# Validate the model-derived implementation campaign and its current baseline.
-implementation-campaign-check:
-    @uv run python tools/implementation_campaign.py check
-
 # Validate the active model-and-implementation evolution record.
 system-evolution-check:
     @uv run python tools/system_evolution.py check
@@ -51,10 +47,6 @@ package-check:
 system-evolution-status:
     @uv run python tools/system_evolution.py status
 
-# Show the current implementation campaign lifecycle and next work.
-implementation-campaign-status:
-    @uv run python tools/implementation_campaign.py status
-
 # Emit one machine-readable manager disposition without changing campaign state.
 implementation-campaign-dispatch identical_failures="0" expected_state_token="":
     @expected={{quote(expected_state_token)}}; if test -n "$expected"; then uv run python tools/implementation_campaign.py dispatch --identical-failures {{quote(identical_failures)}} --expect-state-token "$expected"; else uv run python tools/implementation_campaign.py dispatch --identical-failures {{quote(identical_failures)}}; fi
@@ -66,14 +58,6 @@ implementation-campaign-review-frame work_item lens:
 # Validate the candidate result against frozen pre-bookkeeping state.
 implementation-campaign-worker-result-check result state_token checkpoint:
     @uv run python tools/implementation_campaign.py worker-result-check --result {{quote(result)}} --expect-state-token {{quote(state_token)}} --expect-checkpoint {{quote(checkpoint)}}
-
-# Print current model, language, and validator baseline digests without changing the campaign.
-implementation-campaign-baseline:
-    @uv run python tools/implementation_campaign.py baseline
-
-# Validate clean committed HEAD, approved plan projection, current checkpoint, and current evidence.
-implementation-campaign-checkpoint-check:
-    @uv run python tools/implementation_campaign.py checkpoint-check
 
 # Regenerate managed skill links.
 skills-sync:

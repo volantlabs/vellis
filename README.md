@@ -74,8 +74,6 @@ STDIO or bearer-protected HTTP for one owner.
   remodeling review.
 - [`system-evolution.yaml`](system-evolution.yaml) is the current execution and evidence index, not
   product authority.
-- [`implementation-campaign.yaml`](implementation-campaign.yaml) is an inactive historical campaign
-  record; its explicit validation recipes remain available for future campaign work.
 - [`.agents/skills/`](.agents/skills/) contains the portable SysML workflow and Vellis-specific
   extensions.
 

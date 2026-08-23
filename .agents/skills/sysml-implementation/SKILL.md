@@ -1,6 +1,6 @@
 ---
 name: sysml-implementation
-description: Consume one bounded semantic slice of accepted textual SysML v2 system authority and turn it into model-conformant software, discriminating evidence, and conformance review. Use when planning or implementing a selected slice, continuing that slice after a model change, choosing realization details the model intentionally leaves open, mapping its requirements and verification cases to evidence, or diagnosing divergence between current model authority and source code; use sysml-implementation-planning for whole-model decomposition and sysml-implementation-campaign for long-running multi-slice execution.
+description: Consume one bounded semantic slice of accepted textual SysML v2 system authority and turn it into model-conformant software, discriminating evidence, and conformance review. Use when planning or implementing a selected slice, continuing that slice after a model change, choosing realization details the model intentionally leaves open, mapping its requirements and verification cases to evidence, or diagnosing divergence between current model authority and source code.
 ---
 
 # SysML Implementation
@@ -32,7 +32,7 @@ safety- or security-relevant software without requiring concerns those systems d
 1. Establish whether the task is bounded-slice planning, implementation, conformance review, or
    diagnosis. Keep a planning or review request read-only unless the user also requests changes. If
    the task covers the complete system or manages several slices over time, route it to
-   `$sysml-implementation-planning` or `$sysml-implementation-campaign` before continuing.
+   `$sysml-evolution` before continuing.
 2. Follow project safety and authority instructions. Read the model cold before taking cues from
    existing implementation structure. If the project supplies a semantic handoff from model work,
    verify it against the current model and change set rather than trusting prior conversation. Otherwise

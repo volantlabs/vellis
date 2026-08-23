@@ -38,37 +38,13 @@ def test_all_source_skills_have_valid_metadata() -> None:
     assert errors == []
 
 
-def test_implementation_skill_routing_distinguishes_plan_slice_and_campaign() -> None:
+def test_implementation_skill_routing_distinguishes_slice_from_evolution() -> None:
     skill_root = model_layout.ROOT / ".agents" / "skills"
-    planner = (skill_root / "sysml-implementation-planning" / "SKILL.md").read_text(
-        encoding="utf-8"
-    )
     executor = (skill_root / "sysml-implementation" / "SKILL.md").read_text(encoding="utf-8")
-    campaign = (skill_root / "sysml-implementation-campaign" / "SKILL.md").read_text(
-        encoding="utf-8"
-    )
+    evolution = (skill_root / "sysml-evolution" / "SKILL.md").read_text(encoding="utf-8")
 
-    assert "complete accepted" in planner.split("---", 2)[1]
     assert "one bounded semantic slice" in executor.split("---", 2)[1]
-    assert "long-running autonomous implementation" in campaign.split("---", 2)[1]
-
-
-def test_campaign_skill_separates_thin_manager_from_one_item_workers() -> None:
-    skill_root = model_layout.ROOT / ".agents" / "skills" / "sysml-implementation-campaign"
-    campaign = (skill_root / "SKILL.md").read_text(encoding="utf-8")
-    supervision = (skill_root / "references" / "campaign-supervision.md").read_text(
-        encoding="utf-8"
-    )
-    execution = (skill_root / "references" / "execution-and-resume.md").read_text(encoding="utf-8")
-
-    assert "manager context thin" in campaign
-    assert "does not implement" in supervision
-    assert "exactly one selected slice or closure contract" in supervision
-    assert "without selecting or\n  activating the next slice" in execution
-    assert "deterministic\natomic bookkeeping transition" in execution
-    assert "Any substantive mutation after a\nclean pair invalidates it" in execution
-    assert "three consecutive non-clean pairs" in execution
-
+    assert "already implemented" in evolution.split("---", 2)[1]
 
 def test_portable_core_validation_is_axis_selected() -> None:
     guidance = (model_layout.ROOT / "AGENTS.md").read_text(encoding="utf-8")

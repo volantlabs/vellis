@@ -78,7 +78,7 @@ agent must be able to reconstruct it from qualified model elements and repositor
 the modeling agent's hidden context.
 
 For a complete-system implementation request, hand accepted authority to
-`$sysml-implementation-planning` for coverage-complete decomposition before any multi-slice campaign
+`$sysml-evolution` for a change set spanning accepted authority, realization, and evidence
 begins. Continue to use `$sysml-implementation` for one bounded slice. If a running campaign returns a
 genuine model gap or stakeholder-visible feasibility consequence, review the smallest affected
 semantic path, then require the revised campaign plan to be approved again; do not treat campaign

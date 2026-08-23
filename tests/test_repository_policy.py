@@ -44,15 +44,6 @@ def test_documented_commands_exist() -> None:
     assert documented <= _just_recipes()
 
 
-def test_ordinary_check_excludes_inactive_campaign_gate() -> None:
-    justfile = (ROOT / "justfile").read_text(encoding="utf-8")
-    check_line = next(line for line in justfile.splitlines() if line.startswith("check:"))
-
-    assert "implementation-campaign-check" not in check_line
-    assert "implementation-campaign-check:" in justfile
-    assert "implementation-campaign-checkpoint-check:" in justfile
-
-
 def test_reference_finder_quotes_untrusted_questions() -> None:
     result = subprocess.run(
         ["just", "--dry-run", "model-reference-find", "$(printf unsafe)"],

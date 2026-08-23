@@ -9,14 +9,14 @@ from typing import Any
 import yaml
 
 try:
-    from .implementation_campaign import (
+    from .record_common import (
         UniqueKeyLoader,
         _evidence_reference_findings,
         _sha256,
         authority_digest,
     )
 except ImportError:  # pragma: no cover - direct script execution
-    from implementation_campaign import (  # type: ignore[no-redef]
+    from record_common import (  # type: ignore[no-redef]
         UniqueKeyLoader,
         _evidence_reference_findings,
         _sha256,
@@ -27,7 +27,6 @@ except ImportError:  # pragma: no cover - direct script execution
 def is_vellis_check_command(command: str, *, root: Path) -> bool:
     fixed = {
         "just check",
-        "just implementation-campaign-check",
         "just model-check",
         "just model-reference-check",
         "just package-check",

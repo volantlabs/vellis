@@ -50,17 +50,15 @@ uv run vellis serve --transport stdio --data-dir <that same directory>
 
 ## Skill routing
 
-The portable MBSwE core is `$sysml-reference`, `$sysml-modeling`,
-`$sysml-implementation-planning`, `$sysml-implementation`,
-`$sysml-implementation-campaign`, and `$sysml-evolution`. Use `$rtg-schema-design` for RTG meaning
+The portable MBSwE core is `$sysml-reference`, `$sysml-modeling`, `$sysml-implementation`, and
+`$sysml-evolution`. Use `$rtg-schema-design` for RTG meaning
 and governance and `$documentation-sync` after model, workflow, tool, skill, template, or public-
 guidance changes.
 
 - Use `$sysml-reference` for every consequential SysML or KerML choice.
 - Use `$sysml-modeling` for system meaning, requirements, satisfiers, verification, adequacy, and
   simplification.
-- Use `$sysml-implementation-planning` and `$sysml-implementation-campaign` for a complete-system
-  build; use `$sysml-implementation` for one accepted semantic slice.
+- Use `$sysml-implementation` for one accepted semantic slice.
 - Use `$sysml-evolution` for post-build findings or changes spanning accepted authority,
   realization, evidence, compatibility, and rebaselining.
 
@@ -80,8 +78,7 @@ reference, inherited constraint, or consequential effect cannot be resolved. Do 
 system readiness from a partial read.
 
 For ordinary post-build evolution, use the current `system-evolution.yaml` authority closure and
-baseline. Do not read the stale completed `implementation-campaign.yaml` unless reconstructing
-campaign history, checking a preserved campaign decision, or replanning the complete system.
+baseline.
 
 Read existing implementation only after the first authority pass; never infer architecture from
 source layout, framework examples, familiar names, or incidental tests.
@@ -164,6 +161,4 @@ Use `uv` and `just`. `just model-setup` fetches checksum-pinned language referen
 `just model-check`. Do not edit generated reference corpora.
 
 Run focused checks during work and normally `just check` before completion. Use
-`just implementation-campaign-check` plus the post-commit
-`just implementation-campaign-checkpoint-check` for campaign work, and
 `just system-evolution-check` for evolution work. Keep `.data/` untouched.

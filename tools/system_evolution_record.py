@@ -9,14 +9,14 @@ import yaml
 from jsonschema import Draft202012Validator
 
 try:
-    from .implementation_campaign import UniqueKeyLoader
     from .model_layout import SYSTEM_EVOLUTION_PATH, SYSTEM_EVOLUTION_SCHEMA_PATH
+    from .record_common import UniqueKeyLoader
 except ImportError:  # pragma: no cover - direct script execution
-    from implementation_campaign import UniqueKeyLoader  # type: ignore[no-redef]
     from model_layout import (  # type: ignore[no-redef]
         SYSTEM_EVOLUTION_PATH,
         SYSTEM_EVOLUTION_SCHEMA_PATH,
     )
+    from record_common import UniqueKeyLoader  # type: ignore[no-redef]
 
 
 def load_record(path: Path = SYSTEM_EVOLUTION_PATH) -> dict[str, Any]:
