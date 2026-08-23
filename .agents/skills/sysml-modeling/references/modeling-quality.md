@@ -82,20 +82,24 @@
 
 ## Structure and responsibility
 
-- Group behavior as capabilities before introducing parts.
-- Add a logical part only for independently meaningful lifecycle, identity, governed state,
-  invariant, failure, safety, security, resource, external-interaction, substitution, physical, or
-  selected realization responsibility.
+- Add a logical part for independently meaningful lifecycle, identity, governed state, invariant,
+  failure, safety, security, resource, external-interaction, substitution, physical, or selected
+  realization responsibility, or for an internal boundary the project selects as binding and states
+  a prohibition for.
 - Use performed behavior when a part carries out referenced behavior during its lifetime.
 - Use allocations only to relate genuinely distinct source and target responsibility structures.
   Do not allocate behavior back to the element already performing it.
 - A code module, class, function family, process, service, table, pipeline stage, or test fixture is
-  not evidence of a system part by itself.
-- A system part does not prescribe one code component. One modeled responsibility may be realized by
-  several software components, and one software mechanism may support several modeled elements.
-- Do not add ports or interfaces merely to represent private code calls. A private dependency can
-  remain an implementation choice unless the interaction boundary is system meaning.
-- Keep packages as intentional namespaces or viewpoints, not automatic architecture layers.
+  not evidence of a system part by discovery alone; it becomes one when the project selects it as
+  binding, and the model then states what that selection forbids.
+- A system part does not prescribe one code component: one modeled responsibility may be realized by
+  several software components, and one software mechanism may support several modeled elements
+  within one modeled part, never across two.
+- Model an interface or port where the project means to fix what one part may assume about another.
+  A private code call is not an interface by itself; a boundary the project intends to hold across
+  independent implementation work is, and code may not reach around one the model declares.
+- Keep packages as intentional namespaces or viewpoints, not automatic architecture layers; a
+  package is a selected architectural boundary only where the project means to govern it.
 - Avoid part hierarchies that merely reproduce documents, teams, process phases, screens, or source
   directories.
 
@@ -157,19 +161,21 @@ satisfaction, and verification decisions in the active official baseline.
 
 - Produce handoffs from qualified model authority and decisive cases, not a copied declaration
   inventory.
-- State implementation cohesion cues without relabeling them as modeled subsystems. Examples include
-  a family of pure calculations, one group of invariants, a state-transition boundary, a timing
-  concern, or an interaction adapter.
+- State implementation cohesion cues without relabeling them as modeled subsystems, and without
+  offering one that crosses a boundary the model has already drawn. Examples include a family of
+  pure calculations, one group of invariants, a state-transition boundary, a timing concern, or an
+  interaction adapter.
 - State which system boundary finer code must preserve: identity, lifecycle, state ownership,
   atomicity, timing, safety, failure responsibility, physical interaction, or selected external
   behavior.
-- Allow a task-local many-to-many realization map. It explains software design but does not become a
-  second system model.
+- Allow a task-local many-to-many realization map inside each modeled boundary; it explains software
+  design without becoming a second system model, and it may not span a boundary the model draws.
 - Translate implementation feedback upward. Replace “this class needs another field” with the
   system-level distinction, smallest failing instance, and differing observable consequences before
   editing the model.
 - A new helper, module, class, process, or deployment unit requires model change only when it creates
-  or selects new system meaning.
+  or selects new system meaning; one that crosses a boundary the model has already drawn is a defect
+  to fix in code.
 
 ## Reasoning demonstrations
 
@@ -182,9 +188,9 @@ These are questions to ask, not templates or prescribed architecture.
   when behavior occurs. Use a guard, event, state transition, or black-box requirement when the
   condition matters.
 - **Logical part versus software component:** one transformation system may be implemented with
-  parser, analyzer, optimizer, and emitter modules. Those modules do not become four subsystems unless
-  the system assigns them independent lifecycle, state, failure, interaction, or realization
-  responsibility.
+  parser, analyzer, optimizer, and emitter modules. Those modules do not become subsystems by being
+  modules; they become subsystems when the project decides those boundaries must hold and the model
+  states what crossing one would break.
 - **State versus value:** an operating mode that changes permitted behavior and transitions on events
   may need state semantics. A display color selected from an enumeration usually remains a value.
 - **Flow versus storage:** modeled transfer of samples from a sensor to an estimator does not select

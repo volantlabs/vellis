@@ -53,6 +53,17 @@ dimension; absence is a gap only when the current system claim depends on it.
 
 ## Subtraction review
 
+Separate selected structure from transcribed structure before subtracting: structure the project
+intentionally selected as binding architecture is not a subtraction candidate on shape alone, and a
+selection that constrains nothing was not a selection.
+
+For a part, port, interface, package, or allocation, ask what it forbids: name one implementation
+it rules out that a competent engineer would otherwise plausibly choose. Rules out nothing is
+decoration; remove it however architectural it looks. Rules out something is authority; keep it
+however software-shaped it looks, and require the prohibition to be written into the model or the
+handoff rather than implied or asserted in review. Transcription and deliberate architecture
+declare the same shapes and differ only in origin and in what they forbid.
+
 For every element ask:
 
 1. Which stakeholder outcome, use case, requirement, invariant, interaction, failure, analysis, or
@@ -71,16 +82,16 @@ Warning signs include:
 - action trees that name stages without connecting the information, matter, energy, state, or control
   that makes the stages meaningful;
 - empty subtype families that differ only by label;
-- capability groupings promoted to parts solely to anticipate code modules or team boundaries;
-- speculative services, adapters, controllers, managers, repositories, runtimes, devices, databases,
-  protocols, or deployment units;
+- capability groupings promoted to parts with no stated prohibition, solely to anticipate code
+  modules or team boundaries;
+- structure that rules out no plausible implementation, most often services, adapters, controllers,
+  managers, repositories, runtimes, deployment units, devices, databases, or protocols;
 - request or response envelopes and serialization shapes standing in for domain meaning;
 - generic predicates, base types, identifiers, extension points, or configuration with no current
   semantic need;
 - duplicate authoritative representations or independently stored derived values;
 - persistence, events, checkpoints, caches, transport, retry, paging, synchronization, or migration
   machinery stronger than the selected system behavior;
-- ports, interfaces, flows, or messages with no intentional interaction;
 - state machines or lifecycle machinery with no behavior that depends on state;
 - variability or interchangeable parts representing a realization decision that is merely deferred;
 - package structure that mirrors documents, process phases, teams, or code layers;
@@ -100,8 +111,10 @@ Warning signs include:
 Use these groups to diagnose behavior, not as another checklist to satisfy:
 
 - **Transcription:** noun substitution, familiar-name matching, interface mirroring, and symmetry
-  completion create elements because source material contains matching names or columns. Return to
-  the stakeholder distinction and keep only elements that change its meaning.
+  completion create elements because source material contains matching names or columns. The defect
+  is the origin, not the shape: the same declaration is authority when the project selected it and
+  transcription when source material supplied it. Return to the stakeholder distinction and keep
+  only elements that change its meaning.
 - **Authority theater:** prose repair, parser theater, and citation theater substitute comments,
   successful parsing, or nearby references for correct native semantics and design evidence. State
   the instance-level commitment and exercise it.
@@ -116,6 +129,9 @@ Use these groups to diagnose behavior, not as another checklist to satisfy:
   subtract.
 - **Decision churn:** repeated reviews reopen explicit stakeholder decisions without new evidence or
   an explicit reassessment scope. Preserve continuity while still challenging incidental structure.
+- **Decorative architecture:** parts, ports, and packages that look like an architectural
+  commitment but rule nothing out, so the model grows while the implementer stays exactly as free.
+  State the prohibition the element is meant to carry or delete the element.
 
 For execution of a formal plan, also look for quiet omission: a plan item marked complete because a
 nearby name exists, a negative commitment checked in only one artifact, or a later edit invalidating
