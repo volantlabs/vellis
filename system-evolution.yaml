@@ -213,6 +213,17 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Each emitting module is bound to its tools by a hand-kept map, which drifts the first time a module is called from a new tool, exactly as the module, constructor, form, and position lists each drifted.
     compatibility_effect: Evidence only; no product behavior, wire, or database change.
+  - id: F015
+    summary: The per-tool scope walked each whole branch statement, so the second union tool claimed the first, and the module only the first reaches went unswept while the sweep reported the boundary covered.
+    classification: implementation defect
+    consequence: Deriving each union tool's builder walked the entire if statement rather than its own branch body, and a walk descends into the else, so draft inspect was bound to the validate builder. Draft inspection operations was then claimed by no tool and skipped entirely, and neither added guard caught it because both tools were present and both reach sets non-empty. Substituting an anchor type keys root there survived the whole suite and produced a duplicate inspection filter finding naming a member the draft inspect schema does not carry, on an ordinary request. Both review lenses reproduced it independently.
+    authority_refs: [VellisRequirements::mcpBoundary]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary]
+    disposition: resolved
+    owner_work_item_id: W007
+    implementation_status: conforming
+    nearest_wrong_system: The branch binding is corrected and nothing asserts that every module the boundary reaches is claimed, so the next derivation error again removes a module from coverage while every existing guard still passes.
+    compatibility_effect: Evidence only; no product behavior, wire, or database change.
 decisions:
   - id: D001
     summary: Publish a merged top-level properties map alongside the existing oneOf in the shared union-schema builder, rather than collapsing the branches or special-casing each tool.
@@ -399,7 +410,7 @@ work_items:
     kind: implementation
     dependencies: [W004, W005]
     planned_baseline: {dimension: implementation, identity: "git:a8f145fc11cb639e941a0e47e59555ea97d2a24b"}
-    finding_ids: [F010, F011, F012, F013, F014]
+    finding_ids: [F010, F011, F012, F013, F014, F015]
     decision_ids: []
     authority:
       - refs: [VellisRequirements::mcpBoundary, VellisRequirements::localCardinality, VellisVerification::cardinality, VellisVerification::activeChange]

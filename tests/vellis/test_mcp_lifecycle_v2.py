@@ -3519,6 +3519,18 @@ def _module_imports(directory: Path) -> dict[str, set[str]]:
     return edges
 
 
+def _reachable_from(start: str, edges: dict[str, set[str]]) -> set[str]:
+    """Every module reachable from one module by imports."""
+    found = {start}
+    pending = [start]
+    while pending:
+        for value in edges.get(pending.pop(), ()):
+            if value not in found:
+                found.add(value)
+                pending.append(value)
+    return found
+
+
 def _tool_reach(directory: Path) -> dict[str, set[str]]:
     """Which modules each published tool can reach, derived from the boundary.
 
@@ -3557,12 +3569,17 @@ def _tool_reach(directory: Path) -> dict[str, set[str]]:
         right = node.test.comparators[0]
         if not isinstance(right, ast.Constant) or not isinstance(right.value, str):
             continue
-        for inner in ast.walk(node):
-            if isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name):
-                if inner.func.id in functions:
-                    builders[right.value] = inner.func.id
+        # Only this branch's own body. Walking the whole statement descends
+        # into the elif chain, so the last branch silently claims every tool
+        # named above it and the modules those tools reach go unswept.
+        for statement in node.body:
+            for inner in ast.walk(statement):
+                if isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name):
+                    if inner.func.id in functions:
+                        builders[right.value] = inner.func.id
 
     reach: dict[str, set[str]] = {}
+    edges = _module_imports(directory)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Tuple) or len(node.elts) != 3:
             continue
@@ -3570,15 +3587,10 @@ def _tool_reach(directory: Path) -> dict[str, set[str]]:
         if not isinstance(name, ast.Constant) or not isinstance(name.value, str):
             continue
         chosen = factory.id if isinstance(factory, ast.Name) else builders.get(name.value)
-        found = entry_modules(chosen) if chosen else set()
-        pending = list(found)
-        edges = _module_imports(directory)
-        while pending:
-            for value in edges.get(pending.pop(), ()):
-                if value not in found:
-                    found.add(value)
-                    pending.append(value)
-        reach[name.value] = found
+        entries = entry_modules(chosen) if chosen else set()
+        reach[name.value] = (
+            set().union(*(_reachable_from(value, edges) for value in entries)) if entries else set()
+        )
     return reach
 
 
@@ -3602,6 +3614,21 @@ async def test_no_finding_path_names_something_absent_from_the_boundary(
     reach = _tool_reach(directory)
     assert set(reach) == set(members), "tool discovery disagrees with the published inventory"
     assert all(reach.values()), "a tool reached no module, so its scope would be vacuous"
+    # A non-empty reach is not a correct one. If the boundary can reach a module
+    # that emits findings but no tool claims it, the sweep would skip it while
+    # still reporting the boundary covered.
+    boundary = _reachable_from("mcp.py", _module_imports(directory))
+    claimed = set().union(*reach.values())
+    unclaimed = sorted(
+        value.name
+        for value in directory.glob("*.py")
+        if value.name in boundary
+        and value.name not in claimed
+        and _emits_findings(ast.parse(value.read_text()))
+    )
+    assert unclaimed == [], (
+        f"finding-emitting modules the boundary reaches but no tool claims: {unclaimed}"
+    )
 
     modules = [
         value
