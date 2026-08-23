@@ -538,6 +538,8 @@ def _cardinality_closure_uuids(connection, definitions, changed_objects):
                 if isinstance(value, Anchor)
                 and value.type_key in definition.permitted_anchor_type_keys
             )
+            if not _constrains(definition.objects_per_anchor):
+                subjects = set()
             uuids.update(subjects)
             uuids.update(_data_count_peers(connection, definition.type_key, subjects))
             scope[definition.type_key] = CardinalitySubjects(data_anchors=frozenset(subjects))
@@ -548,12 +550,26 @@ def _cardinality_closure_uuids(connection, definitions, changed_objects):
                 if isinstance(value, Link) and value.type_key == definition.type_key
             )
             sources, targets = _link_count_subjects(definition, changed_objects)
+            if not _constrains(definition.links_per_source):
+                sources = set()
+            if not _constrains(definition.links_per_target):
+                targets = set()
             uuids.update((*sources, *targets))
             uuids.update(_link_count_peers(connection, definition.type_key, sources, targets))
             scope[definition.type_key] = CardinalitySubjects(
                 link_sources=frozenset(sources), link_targets=frozenset(targets)
             )
     return uuids, scope
+
+
+def _constrains(cardinality) -> bool:
+    """Whether this bound can ever produce a finding.
+
+    An unbounded role admits every count, so neither its subjects nor its
+    population need loading. Materializing them would make an ordinary change
+    cost the endpoint's whole degree to satisfy a bound that cannot be violated.
+    """
+    return cardinality.minimum > 0 or cardinality.maximum is not None
 
 
 def _data_count_peers(connection, type_key, subjects):

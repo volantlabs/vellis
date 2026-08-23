@@ -41,7 +41,7 @@ system-evolution-check:
 
 # Build the distributable wheel and source distribution into dist/.
 build:
-    @uv build --wheel --sdist --out-dir dist
+    @uv run python tools/package_smoke.py --build-only
 
 # Build and smoke-test the installable wheel and source distribution.
 package-check:

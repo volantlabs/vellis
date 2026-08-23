@@ -217,3 +217,22 @@ def test_module_digests_ignore_a_directory_setuptools_does_not_package(tmp_path:
     (scratch / "note.py").write_text("# developer scratch, not packaged\n")
 
     _assert_installed_matches_source(package, "wheel")
+
+
+def test_the_justfile_never_builds_outside_the_purging_entry_point() -> None:
+    """`just build` ships artifacts too, so it needs the same purge.
+
+    A recipe invoking uv build directly rebuilds through the uncleaned tree, and
+    the AST guard over this module would not see it.
+    """
+    recipes = (ROOT / "justfile").read_text(encoding="utf-8")
+    offenders = [
+        line.strip()
+        for line in recipes.splitlines()
+        if "uv build" in line and "package_smoke.py" not in line
+    ]
+
+    assert offenders == [], (
+        f"uv build invoked directly from the justfile at {offenders}; "
+        "such a build skips the purge of the stale intermediate tree"
+    )

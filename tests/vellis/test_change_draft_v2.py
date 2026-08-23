@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from random import Random
 from threading import Barrier, Lock
 
 import pytest
@@ -46,6 +47,7 @@ from vellis.domain import (
     ScalarValue,
     ValueKind,
 )
+from vellis.domain_validation import graph_cardinality_findings
 from vellis.draft_inspection_operations import inspect_draft
 from vellis.draft_operations import (
     activate_draft,
@@ -2767,3 +2769,215 @@ def test_adding_a_second_data_object_still_sees_the_committed_one(tmp_path: Path
     assert second.status is OperationStatus.REJECTED
     assert [value.code for value in second.findings] == [FindingCode.CARDINALITY_VIOLATION]
     assert second.findings[0].uuids == (TARGET_TOP,)
+
+
+ORACLE_ANCHORS = ("test.top", "test.mid")
+ORACLE_SHAPES = (
+    (Cardinality(0, 1), Cardinality(0, 1), Cardinality(0, 1)),
+    (Cardinality(1, 1), Cardinality(0), Cardinality(1, 1)),
+    (Cardinality(0), Cardinality(1, 2), Cardinality(0, 2)),
+    # Isolates the data rule: no link bound can reject, so only objects-per-anchor
+    # can, and a link-side check cannot mask a data-side gap.
+    (Cardinality(0), Cardinality(0), Cardinality(1, 1)),
+    (Cardinality(0), Cardinality(0), Cardinality(0, 1)),
+)
+
+
+def _oracle_definitions(per_source: Cardinality, per_target: Cardinality, per_anchor: Cardinality):
+    return (
+        AnchorTypeDefinition("test.top", "Top"),
+        AnchorTypeDefinition("test.mid", "Mid"),
+        LinkTypeDefinition(
+            "test.holds", "Holds", ORACLE_ANCHORS, ORACLE_ANCHORS, per_source, per_target
+        ),
+        AssociatedDataTypeDefinition(
+            "test.detail",
+            "Detail",
+            ORACLE_ANCHORS,
+            (PropertyDefinition("note", "Note", ValueKind.TEXT),),
+            Cardinality(1, 1),
+            per_anchor,
+        ),
+    )
+
+
+@pytest.mark.parametrize("shape", range(len(ORACLE_SHAPES)))
+def test_accepted_changes_never_commit_a_state_whole_validation_rejects(
+    tmp_path: Path, shape: int
+) -> None:
+    """Every accepted batch must leave a state complete validation calls clean.
+
+    Scoped incremental checking is a per-definition, per-role optimisation of
+    whole-state validation. Asserting the two agree covers every role and subject
+    kind at once, including combinations no hand-written case enumerates.
+    """
+    definitions = _oracle_definitions(*ORACLE_SHAPES[shape])
+    anchors = [f"0a0a0a0a-0000-4000-8000-{index:012d}" for index in range(6)]
+    links = [f"0b0b0b0b-0000-4000-8000-{index:012d}" for index in range(6)]
+    data = [f"0c0c0c0c-0000-4000-8000-{index:012d}" for index in range(6)]
+    # Anchors that start absent, so the generator can create one bare. A new
+    # endpoint is a subject of every role its type permits, and a minimum bound
+    # on any of those roles must reject it.
+    spare = [f"0a0a0a0a-0000-4000-8000-{index:012d}" for index in range(6, 10)]
+    random = Random(20260822 + shape)
+    path = tmp_path / f"oracle{shape}" / "vellis.db"
+    initialize_with_definitions(path, definitions, recorded_at="2026-08-20T00:00:00Z")
+
+    # A six-cycle with one detail each satisfies every shape's minima, so the
+    # generator starts from a valid state instead of rejecting everything.
+    seeded = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            0,
+            (
+                *(AnchorUpsert(value, "test.top", "a") for value in anchors),
+                *(
+                    LinkUpsert(links[index], "test.holds", anchors[index], anchors[(index + 1) % 6])
+                    for index in range(6)
+                ),
+                *(
+                    AssociatedDataUpsert(
+                        data[index],
+                        "test.detail",
+                        (anchors[index],),
+                        set_properties=(("note", ScalarValue.text("n")),),
+                    )
+                    for index in range(6)
+                ),
+            ),
+        ),
+    )
+    assert seeded.status is OperationStatus.ACCEPTED, seeded.findings
+    revision = seeded.resulting_revision or 0
+    accepted = 0
+
+    for _ in range(80):
+        commands: list[AnchorUpsert | AssociatedDataUpsert | LinkUpsert] = []
+        removals: list[str] = []
+        for _ in range(random.randint(1, 3)):
+            choice = random.random()
+            if choice < 0.18:
+                commands.append(
+                    AnchorUpsert(random.choice(anchors), random.choice(ORACLE_ANCHORS), "a")
+                )
+            elif choice < 0.25:
+                commands.append(
+                    AnchorUpsert(random.choice(spare), random.choice(ORACLE_ANCHORS), "bare")
+                )
+            elif choice < 0.55:
+                commands.append(
+                    LinkUpsert(random.choice(links), target_uuid=random.choice(anchors + spare))
+                )
+            elif choice < 0.7:
+                commands.append(
+                    AssociatedDataUpsert(
+                        random.choice(data), anchor_uuids=(random.choice(anchors + spare),)
+                    )
+                )
+            elif choice < 0.8:
+                # Move one seeded detail onto another seeded anchor, which already
+                # holds one. Only its committed peer makes the excess visible.
+                source, destination = random.sample(range(6), 2)
+                commands.append(
+                    AssociatedDataUpsert(data[source], anchor_uuids=(anchors[destination],))
+                )
+            elif choice < 0.9:
+                commands.append(
+                    LinkUpsert(
+                        random.choice(links),
+                        "test.holds",
+                        random.choice(anchors),
+                        random.choice(anchors),
+                    )
+                )
+            else:
+                removals.append(random.choice(links + data))
+        seen: set[str] = set()
+        unique = [value for value in commands if not (value.uuid in seen or seen.add(value.uuid))]
+        pruned = [value for value in dict.fromkeys(removals) if value not in seen]
+
+        outcome = apply_graph_change(
+            path, GraphChangeRequest(revision, tuple(unique), tuple(pruned))
+        )
+        if outcome.status is not OperationStatus.ACCEPTED:
+            continue
+        if outcome.resulting_revision is not None:
+            revision = outcome.resulting_revision
+            accepted += 1
+        state = read_state(path)
+        residual = graph_cardinality_findings(state.graph, state.definitions)
+        assert residual == (), (
+            f"an accepted change committed a state whole validation rejects: {residual}"
+        )
+
+    assert accepted >= 5, "the generator produced too few accepted changes to be meaningful"
+
+
+def test_attaching_a_child_does_not_load_a_hub_whose_bound_cannot_be_violated(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """An unbounded role admits every count, so its population is not needed.
+
+    Loading a hub's whole in-degree to satisfy a bound that can never fire makes
+    an ordinary attach cost the hub's degree.
+    """
+    path = tmp_path / "unbounded" / "vellis.db"
+    initialize_with_definitions(
+        path,
+        (
+            AnchorTypeDefinition("test.top", "Top"),
+            AnchorTypeDefinition("test.leaf", "Leaf"),
+            LinkTypeDefinition(
+                "test.holds",
+                "Any number of children per parent",
+                ("test.leaf",),
+                ("test.top",),
+                Cardinality(1, 1),
+                Cardinality(0),
+            ),
+        ),
+        recorded_at="2026-08-20T00:00:00Z",
+    )
+    children = tuple(f"0d0d0d0d-0000-4000-8000-{index:012d}" for index in range(1, 61))
+    child_links = tuple(f"0e0e0e0e-0000-4000-8000-{index:012d}" for index in range(1, 61))
+    seeded = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            0,
+            (
+                AnchorUpsert(TARGET_TOP, "test.top", "Hub"),
+                *(
+                    AnchorUpsert(uuid, "test.leaf", f"Child {index}")
+                    for index, uuid in enumerate(children)
+                ),
+                *(
+                    LinkUpsert(uuid, "test.holds", children[index], TARGET_TOP)
+                    for index, uuid in enumerate(child_links)
+                ),
+            ),
+        ),
+    )
+    assert seeded.resulting_revision == 1
+
+    original_load = change_module.load_graph_objects
+    loaded: list[str] = []
+
+    def recording_load(connection, state, uuids):
+        loaded.extend(uuids)
+        return original_load(connection, state, uuids)
+
+    monkeypatch.setattr(change_module, "load_graph_objects", recording_load)
+    attached = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            1,
+            (
+                AnchorUpsert(TARGET_LEAF, "test.leaf", "New child"),
+                LinkUpsert(HOLDS_LEAF, "test.holds", TARGET_LEAF, TARGET_TOP),
+            ),
+        ),
+    )
+
+    assert attached.status is OperationStatus.ACCEPTED
+    assert not set(loaded).intersection(children)
+    assert not set(loaded).intersection(child_links)

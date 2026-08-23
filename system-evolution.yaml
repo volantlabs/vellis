@@ -50,6 +50,7 @@ scope:
     - tests/vellis/test_change_draft_v2.py
     - tests/vellis/test_query_v2_successor.py
     - CONTRIBUTING.md
+    - justfile
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
     - No model authority, tool inventory, wire field, finding code, database schema, or database version change.
@@ -103,7 +104,7 @@ findings:
   - id: F005
     summary: Widening peer loading to both roles made closure cost proportional to an endpoint's total degree even when the opposite role's bound can never be violated.
     classification: implementation defect
-    consequence: Every link incident to a closure endpoint is now loaded in either role with no gate on whether that role's bound is constraining. For the unbounded parent shape no finding can ever result, yet the whole incident population is materialized. Measured on one re-pointing operation against a hub with 400 children, loaded uuids rose from 6 to 806. This is an undeclared scale driver on the ordinary change path.
+    consequence: Every link incident to a closure endpoint is now loaded in either role with no gate on whether that role's bound is constraining. For the unbounded parent shape no finding can ever result, yet the whole incident population is materialized. A re-pointing operation loaded the hub's entire opposite-role degree, which the committed test pins by asserting no unrelated child is materialized. This is an undeclared scale driver on the ordinary change path.
     authority_refs: [VellisRequirements::locality, VellisRequirements::atomicChange]
     evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree]
     disposition: resolved
@@ -278,7 +279,7 @@ work_items:
       - Do not cap or sample a bound the model requires to be checked.
     lifecycle: complete
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree, path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_an_anchor_under_an_unloaded_data_type, command:just check]
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another, path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, path:tests/vellis/test_change_draft_v2.py#test_accepted_changes_never_commit_a_state_whole_validation_rejects, path:tests/vellis/test_change_draft_v2.py#test_attaching_a_child_does_not_load_a_hub_whose_bound_cannot_be_violated, command:just check]
     blocker: null
     checkpoint: git:7993373cdbe84643358fffd761940fca475b3d35
   - id: W005

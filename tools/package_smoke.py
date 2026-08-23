@@ -804,6 +804,12 @@ asyncio.run(main())
 """
 
 
+def build_only() -> int:
+    """Build into dist/ for local inspection, through the same purge."""
+    _build_distribution(ROOT, ROOT / "dist", os.environ.copy())
+    return 0
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="vellis-package-") as temporary_text:
         temporary = Path(temporary_text)
@@ -822,4 +828,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    import sys as _sys
+
+    if "--build-only" in _sys.argv[1:]:
+        raise SystemExit(build_only())
     raise SystemExit(main())
