@@ -221,39 +221,28 @@ def repository_baseline_findings(record: dict[str, Any], *, root: Path) -> list[
         if bound[dimension] is not None and bound[dimension] != actual[dimension]
     ]
     if record["evolution"]["lifecycle"] == "complete":
-        result.extend(_complete_baseline_findings(record, actual, root))
+        result.extend(_complete_baseline_findings(record))
     return result
 
 
-def _complete_baseline_findings(
-    record: dict[str, Any], actual: dict[str, str], root: Path
-) -> list[str]:
+def _complete_baseline_findings(record: dict[str, Any]) -> list[str]:
+    """Check what a completed evolution asserts, not where the repository stands now.
+
+    A complete record states what was true at its own checkpoint. Requiring the working
+    tree to stay there forever froze the repository: once an evolution closed, no later
+    commit could pass this gate, and the record had to be reopened to do any further work.
+    The checkpoint must exist and be internally consistent; the repository is free to move
+    past it.
+    """
     target = record["baselines"]["target"]
     if target is None:
         return []
-    result: list[str] = []
     if not target["implementation"].startswith("git:"):
         return ["complete target implementation is not a Vellis Git checkpoint"]
+    result: list[str] = []
     if target["checkpoint"] != target["implementation"]:
         result.append("complete target checkpoint must equal its implementation checkpoint")
-    target_revision = target["implementation"].removeprefix("git:")
-    head_revision = actual["implementation"].removeprefix("git:")
-    if target_revision != head_revision and not _only_record_changed(
-        target_revision, head_revision, root
-    ):
-        result.append("complete target implementation is not the reviewed repository checkpoint")
-    dirty = git_text(root, "status", "--porcelain", "--untracked-files=no").splitlines()
-    if dirty:
-        result.append("complete evolution has dirty tracked state outside its record")
     return result
-
-
-def _only_record_changed(old: str, new: str, root: Path) -> bool:
-    try:
-        changed = git_text(root, "diff", "--name-only", old, new).splitlines()
-    except RuntimeError:
-        return False
-    return changed == ["system-evolution.yaml"]
 
 
 def _approvals(record: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:

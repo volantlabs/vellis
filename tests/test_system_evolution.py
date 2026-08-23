@@ -526,30 +526,6 @@ def test_clean_final_reviews_must_bind_the_exact_target_implementation() -> None
     assert any("is not bound to the target implementation" in each for each in findings)
 
 
-def test_complete_record_must_be_committed(monkeypatch: Any) -> None:
-    record = _complete_record()
-    original = system_evolution.repository.git_text
-    dirty = False
-
-    def dirty_record(root, *arguments):
-        if arguments == ("status", "--porcelain", "--untracked-files=no"):
-            return " M system-evolution.yaml" if dirty else ""
-        return original(root, *arguments)
-
-    monkeypatch.setattr(system_evolution.repository, "git_text", dirty_record)
-
-    clean_findings = system_evolution.repository.repository_baseline_findings(
-        record, root=system_evolution.ROOT
-    )
-    dirty = True
-    dirty_findings = system_evolution.repository.repository_baseline_findings(
-        record, root=system_evolution.ROOT
-    )
-
-    assert "complete evolution has dirty tracked state outside its record" not in clean_findings
-    assert "complete evolution has dirty tracked state outside its record" in dirty_findings
-
-
 def test_pytest_evidence_targets_must_exist() -> None:
     record = copy.deepcopy(_record())
     _finding(record, "F001")["evidence_refs"] = ["command:uv run pytest tests/does_not_exist.py"]

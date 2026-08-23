@@ -9,7 +9,7 @@ evolution:
     continuation arguments and receive the selected payload instead of an input-validation refusal, and attaching
     new children to an existing parent under a minimum-one links-per-source type is accepted instead of rejected
     with a cardinalityViolation naming the untouched parent.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: not-required
     reason: RTG014 already requires the selected behaviors to be exposed through ordinary typed JSON values, and
@@ -17,7 +17,7 @@ evolution:
       findings are implementation defects under sufficient accepted authority.
     checkpoint: null
   blocker: null
-  checkpoint: null
+  checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
 baselines:
   source:
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
@@ -27,10 +27,10 @@ baselines:
     checkpoint: git:daed5a087a0974f99d885471f557bdf89f09b3c7
   target:
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:8f40ae048af49980feeb8a5f99b3eb69c3370b81
+    implementation: git:9c90ae02742052d19e28ce6633311c1d865d1623
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:8f40ae048af49980feeb8a5f99b3eb69c3370b81
+    checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
 scope:
   authority_scope:
   - VellisRequirements::mcpBoundary
@@ -645,14 +645,14 @@ work_items:
   non_effects:
   - Do not open a model-authority change.
   - Do not alter owner data.
-  lifecycle: active
+  lifecycle: complete
   implementation_status: conforming
   evidence_refs:
   - path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary
   - path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role
   - command:just check
   blocker: null
-  checkpoint: null
+  checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
   authority_refs:
   - VellisRequirements::mcpBoundary
   - VellisRequirements::localCardinality
@@ -687,14 +687,14 @@ work_items:
   non_effects:
   - Do not open a model-authority change.
   - Do not alter owner data.
-  lifecycle: pending
+  lifecycle: complete
   implementation_status: conforming
   evidence_refs:
   - path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties
   - path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request
   - command:just check
   blocker: null
-  checkpoint: null
+  checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
   authority_refs:
   - VellisRequirements::mcpBoundary
   - VellisRequirements::localCardinality
@@ -720,22 +720,22 @@ work_items:
     evidence_ref: command:just check
 reviews:
 - lens: authority and conformance
-  status: findings
-  reviewer: authority-conformance-review-1
-  checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404
+  status: clean
+  reviewer: authority-final
+  checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
   evidence_refs:
   - command:just check
   scope: closure
 - lens: engineering and evidence
-  status: findings
-  reviewer: engineering-evidence-review-1
-  checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404
+  status: clean
+  reviewer: engineering-closure
+  checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
   evidence_refs:
   - command:just check
   scope: closure
 closure:
   model_status: unchanged
-  implementation_status: absent
+  implementation_status: conforming
   compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and version all
     remain stable. The union tools gain a merged top-level properties map. The cardinality closure materializes
     no more than the source baseline, since W004 reverted W002's both-role widening and skips any role whose bound
@@ -743,5 +743,6 @@ closure:
     readdressed from closure position to UUID, plus the type summary's over-limit path dropped and an unreachable
     draft definition guard shortened. The type summary's finding summary also names rtg_type_inspect. Finding codes
     and outcome summaries are unchanged.
-  evidence_refs: []
-  checkpoint: null
+  evidence_refs:
+  - command:just check
+  checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
