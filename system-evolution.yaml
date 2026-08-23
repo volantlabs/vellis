@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:daed5a087a0974f99d885471f557bdf89f09b3c7
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
+    implementation: git:25d8c96503216fba64175fb12e99e379b7f4cb35
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
+    checkpoint: git:25d8c96503216fba64175fb12e99e379b7f4cb35
   observed: *target
 scope:
   authority_scope:
@@ -257,7 +257,7 @@ work_items:
     label: Scope cardinality checking to the exact definition and role whose count the batch can change
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:a4ff63bf00bd60da6eb1fcce48446113304187b4"}
+    planned_baseline: {dimension: implementation, identity: "git:25d8c96503216fba64175fb12e99e379b7f4cb35"}
     finding_ids: [F004, F005]
     decision_ids: [D003]
     authority:
@@ -278,13 +278,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree, path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_an_anchor_under_an_unloaded_data_type, command:just check]
     blocker: null
-    checkpoint: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
+    checkpoint: git:25d8c96503216fba64175fb12e99e379b7f4cb35
   - id: W005
     order: 4
     label: Make boundary finding paths resolvable and the query bound navigable
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:a4ff63bf00bd60da6eb1fcce48446113304187b4"}
+    planned_baseline: {dimension: implementation, identity: "git:25d8c96503216fba64175fb12e99e379b7f4cb35"}
     finding_ids: [F006, F007, F009]
     decision_ids: []
     authority:
@@ -305,13 +305,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, command:just check]
     blocker: null
-    checkpoint: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
+    checkpoint: git:25d8c96503216fba64175fb12e99e379b7f4cb35
   - id: W006
     order: 5
     label: Make the package check reject a stale distribution
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:a4ff63bf00bd60da6eb1fcce48446113304187b4"}
+    planned_baseline: {dimension: implementation, identity: "git:25d8c96503216fba64175fb12e99e379b7f4cb35"}
     finding_ids: [F008]
     decision_ids: []
     authority:
@@ -332,13 +332,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_purge_build_tree_removes_the_intermediate_build_directory, command:just package-check, command:just check]
     blocker: null
-    checkpoint: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
+    checkpoint: git:25d8c96503216fba64175fb12e99e379b7f4cb35
   - id: W003
     order: 6
     label: Verify, independently review, and close the agent-usable boundary fixes
     kind: closure
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:a4ff63bf00bd60da6eb1fcce48446113304187b4"}
+    planned_baseline: {dimension: implementation, identity: "git:25d8c96503216fba64175fb12e99e379b7f4cb35"}
     finding_ids: []
     decision_ids: []
     authority:
