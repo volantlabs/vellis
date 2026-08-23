@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import os
+import re
 import socket
 import sqlite3
 import subprocess
@@ -3433,6 +3434,7 @@ async def test_change_finding_paths_name_a_request_member_or_a_subject(
 # RTG014 admits an affected-state subject as well as a request member, and these
 # are the roots the boundary addresses state by.
 _AFFECTED_STATE_ROOTS = frozenset({"objects", "definitions", "draft"})
+_CONTINUATION = re.compile(r"\{\}(?:/[A-Za-z0-9_{}]+)+")
 
 
 def _request_member_names(schema: object, found: set[str]) -> set[str]:
@@ -3467,8 +3469,8 @@ def _emits_findings(tree: ast.Module) -> bool:
     return bool(referenced & {"Finding", "FindingCode"})
 
 
-def _rooted_path_roots(tree: ast.Module) -> set[str]:
-    """The first segment of every document-rooted path literal in the module.
+def _addressed_names(tree: ast.Module) -> set[str]:
+    """Every name the module's paths require a request to carry.
 
     Deliberately indifferent to where the literal appears. Recognizing paths by
     the call they are passed to missed whichever wrapper a module used; by their
@@ -3476,8 +3478,14 @@ def _rooted_path_roots(tree: ast.Module) -> set[str]:
     bound to a local name first. A path is a path wherever it is written, and a
     relative fragment is composed onto a parent rather than starting at the
     root.
+
+    Every segment is a name a request must carry, not only the first. A path
+    correct at its root and wrong below it is exactly as unresolvable as one
+    wrong at the root. An interpolation placeholder and an array index address
+    a position rather than a member, and the segments under an affected-state
+    root are identity data, so none of those name anything.
     """
-    roots: set[str] = set()
+    names: set[str] = set()
     # A constant inside an f-string is a fragment of that path, not a path. The
     # trailing run of an indexed member reads as rooted on its own otherwise.
     interpolated = {
@@ -3491,19 +3499,30 @@ def _rooted_path_roots(tree: ast.Module) -> set[str]:
             continue
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             literal = node.value
-        elif (
-            isinstance(node, ast.JoinedStr)
-            and node.values
-            and isinstance(node.values[0], ast.Constant)
-            and isinstance(node.values[0].value, str)
-        ):
-            literal = node.values[0].value
+        elif isinstance(node, ast.JoinedStr):
+            literal = "".join(
+                part.value
+                if isinstance(part, ast.Constant) and isinstance(part.value, str)
+                else "{}"
+                for part in node.values
+            )
         else:
             continue
-        segment = literal[1:].split("/")[0] if literal.startswith("/") else ""
-        if segment:
-            roots.add(segment)
-    return roots
+        rooted = literal.startswith("/")
+        # A fragment composed onto a parent supplies no root, but the members it
+        # names below the join point are members all the same. It is a
+        # continuation only if it is a placeholder followed by path segments;
+        # ordinary prose containing a slash is not.
+        if not rooted and not _CONTINUATION.fullmatch(literal):
+            continue
+        segments = [value for value in literal.split("/") if value]
+        if not segments:
+            continue
+        if rooted and segments[0] in _AFFECTED_STATE_ROOTS:
+            names.add(segments[0])
+            continue
+        names.update(value for value in segments if "{" not in value and not value.isdigit())
+    return names
 
 
 def _module_imports(directory: Path) -> dict[str, set[str]]:
@@ -3649,7 +3668,7 @@ async def test_no_finding_path_names_something_absent_from_the_boundary(
         swept += 1
         addressable = set.union(*(members[name] for name in callers))
         unresolvable.update(
-            f"{value.name}:/{root}" for root in _rooted_path_roots(tree) if root not in addressable
+            f"{value.name}:{name}" for name in _addressed_names(tree) if name not in addressable
         )
     assert swept > 8, "finding-emitting module discovery found too little to be a sweep"
     assert unresolvable == set(), (

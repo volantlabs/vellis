@@ -540,7 +540,9 @@ def _draft_request_findings(connection, request):
                 Finding(
                     FindingCode.INVALID_VALUE,
                     "draft definition cannot supply system metadata",
-                    f"/definitionUpserts/{index}/system",
+                    # The boundary carries no system member on a definition
+                    # upsert, so name the entry the caller did send.
+                    f"/definitionUpserts/{index}",
                 )
             )
         reservation = connection.execute(

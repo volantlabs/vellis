@@ -44,6 +44,7 @@ scope:
     - tests/test_package_smoke.py
     - vellis/domain_validation.py
     - vellis/discovery_operations.py
+    - vellis/draft_operations.py
     - vellis/query_validation.py
     - vellis/read_operations.py
     - vellis/draft_read_operations.py
@@ -224,6 +225,17 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: The branch binding is corrected and nothing asserts that every module the boundary reaches is claimed, so the next derivation error again removes a module from coverage while every existing guard still passes.
     compatibility_effect: Evidence only; no product behavior, wire, or database change.
+  - id: F016
+    summary: The sweep compared only a path's first segment, so a path correct at its root and wrong below it passed, and a draft definition finding named a member the boundary does not carry.
+    classification: implementation defect
+    consequence: Every literal was reduced to its root before comparison, and a relative fragment composed onto a parent was skipped entirely, so no segment below a root was ever checked in eight of the ten tools. Renaming the history range start member survived the whole suite and produced a path naming a member the history schema does not carry, on an ordinary reversed interval. The same gap concealed a real path already in the product, where a draft definition upsert finding named a system member the boundary carries nowhere; that path now names the upsert entry the caller did send.
+    authority_refs: [VellisRequirements::mcpBoundary]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary]
+    disposition: resolved
+    owner_work_item_id: W007
+    implementation_status: conforming
+    nearest_wrong_system: Depth is compared for rooted literals only, leaving every member named by a fragment composed onto a parent unchecked, which is where most of the boundary's deep paths are written.
+    compatibility_effect: One draft definition finding path shortens from the system member to the upsert entry; the finding code and summary are unchanged, and that member is unreachable through the boundary.
 decisions:
   - id: D001
     summary: Publish a merged top-level properties map alongside the existing oneOf in the shared union-schema builder, rather than collapsing the branches or special-casing each tool.
@@ -410,7 +422,7 @@ work_items:
     kind: implementation
     dependencies: [W004, W005]
     planned_baseline: {dimension: implementation, identity: "git:31861ee170c727dace5a6d2cb133f7720bc74f5f"}
-    finding_ids: [F010, F011, F012, F013, F014, F015]
+    finding_ids: [F010, F011, F012, F013, F014, F015, F016]
     decision_ids: []
     authority:
       - refs: [VellisRequirements::mcpBoundary, VellisRequirements::localCardinality, VellisVerification::cardinality, VellisVerification::activeChange]
