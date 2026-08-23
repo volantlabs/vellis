@@ -47,17 +47,8 @@ package-check:
 system-evolution-status:
     @uv run python tools/system_evolution.py status
 
-# Emit one machine-readable manager disposition without changing campaign state.
-implementation-campaign-dispatch identical_failures="0" expected_state_token="":
-    @expected={{quote(expected_state_token)}}; if test -n "$expected"; then uv run python tools/implementation_campaign.py dispatch --identical-failures {{quote(identical_failures)}} --expect-state-token "$expected"; else uv run python tools/implementation_campaign.py dispatch --identical-failures {{quote(identical_failures)}}; fi
 
-# Generate one finding-free, project-bound review prompt for an active slice or for closure.
-implementation-campaign-review-frame work_item lens:
-    @uv run python tools/implementation_campaign.py review-frame --slice {{quote(work_item)}} --lens {{quote(lens)}}
 
-# Validate the candidate result against frozen pre-bookkeeping state.
-implementation-campaign-worker-result-check result state_token checkpoint:
-    @uv run python tools/implementation_campaign.py worker-result-check --result {{quote(result)}} --expect-state-token {{quote(state_token)}} --expect-checkpoint {{quote(checkpoint)}}
 
 # Regenerate managed skill links.
 skills-sync:
