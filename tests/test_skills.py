@@ -46,6 +46,7 @@ def test_implementation_skill_routing_distinguishes_slice_from_evolution() -> No
     assert "one bounded semantic slice" in executor.split("---", 2)[1]
     assert "already implemented" in evolution.split("---", 2)[1]
 
+
 def test_portable_core_validation_is_axis_selected() -> None:
     guidance = (model_layout.ROOT / "AGENTS.md").read_text(encoding="utf-8")
 
