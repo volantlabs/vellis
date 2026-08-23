@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:daed5a087a0974f99d885471f557bdf89f09b3c7
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:467933763e4c5068b6c4242e5e7d49084e3cd049
+    implementation: git:a8f145fc11cb639e941a0e47e59555ea97d2a24b
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:467933763e4c5068b6c4242e5e7d49084e3cd049
+    checkpoint: git:a8f145fc11cb639e941a0e47e59555ea97d2a24b
   observed: *target
 scope:
   authority_scope:
@@ -398,7 +398,7 @@ work_items:
     label: Close the finding-path class and give role scoping evidence that rejects the both-role system
     kind: implementation
     dependencies: [W004, W005]
-    planned_baseline: {dimension: implementation, identity: "git:467933763e4c5068b6c4242e5e7d49084e3cd049"}
+    planned_baseline: {dimension: implementation, identity: "git:a8f145fc11cb639e941a0e47e59555ea97d2a24b"}
     finding_ids: [F010, F011, F012, F013, F014]
     decision_ids: []
     authority:
@@ -424,7 +424,7 @@ work_items:
     label: Verify, independently review, and close the agent-usable boundary fixes
     kind: closure
     dependencies: [W001, W002, W004, W005, W006, W007]
-    planned_baseline: {dimension: implementation, identity: "git:467933763e4c5068b6c4242e5e7d49084e3cd049"}
+    planned_baseline: {dimension: implementation, identity: "git:a8f145fc11cb639e941a0e47e59555ea97d2a24b"}
     finding_ids: []
     decision_ids: []
     authority:
