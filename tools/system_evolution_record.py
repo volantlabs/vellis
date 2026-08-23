@@ -94,8 +94,6 @@ def _identifier_findings(
     result.extend(
         f"ID {value} is reused across the evolution record" for value in _duplicates(all_ids)
     )
-    orders = [str(item["order"]) for item in work_by_id.values()]
-    result.extend(f"duplicate work-item order: {value}" for value in _duplicates(orders))
     return result
 
 
@@ -117,8 +115,6 @@ def _work_reference_findings(
             for value in item["decision_ids"]
             if value not in decisions_by_id
         )
-        for contribution in item["authority"]:
-            result.extend(_authority_contribution_findings(item["id"], contribution, work_by_id))
     result.extend(_cycle_findings(work_by_id))
     return result
 
@@ -128,24 +124,6 @@ def _dependency_findings(item: dict[str, Any], work_by_id: dict[str, dict[str, A
     for dependency in item["dependencies"]:
         if dependency not in work_by_id:
             result.append(f"{item['id']} depends on unknown work item {dependency}")
-        elif work_by_id[dependency]["order"] >= item["order"]:
-            result.append(f"{item['id']} dependency {dependency} must have a lower order")
-    return result
-
-
-def _authority_contribution_findings(
-    item_id: str,
-    contribution: dict[str, Any],
-    work_by_id: dict[str, dict[str, Any]],
-) -> list[str]:
-    result = [
-        f"{item_id} authority names unknown remaining work item {value}"
-        for value in sorted(set(contribution["remaining_work_item_ids"]) - set(work_by_id))
-    ]
-    if contribution["coverage"] == "full" and contribution["remaining_work_item_ids"]:
-        result.append(f"{item_id} claims full authority with remaining work")
-    if contribution["coverage"] == "partial" and not contribution["remaining_work_item_ids"]:
-        result.append(f"{item_id} claims partial authority without remaining work")
     return result
 
 
@@ -161,14 +139,8 @@ def _finding_owner_findings(
     listed_by = [item["id"] for item in work_by_id.values() if finding["id"] in item["finding_ids"]]
     if listed_by != [owner]:
         result.append(f"finding {finding['id']} is listed by {listed_by}, expected [{owner!r}]")
-    if finding["disposition"] == "resolved":
-        if finding["implementation_status"] not in {"conforming", "not applicable"}:
-            result.append(
-                f"resolved finding {finding['id']} has implementation status "
-                f"{finding['implementation_status']}"
-            )
-        if not finding["evidence_refs"]:
-            result.append(f"resolved finding {finding['id']} has no evidence")
+    if finding["disposition"] == "resolved" and not finding["evidence_refs"]:
+        result.append(f"resolved finding {finding['id']} has no evidence")
     if finding["disposition"] == "accepted" and not finding["evidence_refs"]:
         result.append(f"accepted finding {finding['id']} has no acceptance evidence")
     if finding["disposition"] == "out-of-scope" and not finding["evidence_refs"]:
@@ -208,48 +180,6 @@ def _ownership_findings(
     return result
 
 
-def _baseline_findings(record: dict[str, Any], work_by_id: dict[str, dict[str, Any]]) -> list[str]:
-    result: list[str] = []
-    baselines = record["baselines"]
-    expected = baselines["target"] or baselines["source"]
-    fields = ("model", "implementation", "language", "execution_environment", "checkpoint")
-    matches = all(expected[field] == baselines["observed"][field] for field in fields)
-    if baselines["status"] == "current" and not matches:
-        result.append("current baselines must match the observed target or source baseline")
-    if baselines["status"] == "stale" and matches:
-        result.append("stale baselines must differ from the observed target or source baseline")
-    for item in work_by_id.values():
-        result.extend(_planned_baseline_findings(item, baselines))
-    return result
-
-
-def _planned_baseline_findings(item: dict[str, Any], baselines: dict[str, Any]) -> list[str]:
-    binding = item["planned_baseline"]
-    if (
-        item["lifecycle"] in {"ready", "active"}
-        and binding["identity"] != baselines["observed"][binding["dimension"]]
-    ):
-        return [
-            f"{item['lifecycle']} work item {item['id']} has stale planned baseline "
-            f"{binding['dimension']}={binding['identity']}"
-        ]
-    recognized = {
-        baseline[binding["dimension"]]
-        for baseline in (baselines["source"], baselines["target"], baselines["observed"])
-        if baseline is not None
-    }
-    historical_git = binding["dimension"] in {"implementation", "checkpoint"} and binding[
-        "identity"
-    ].startswith("git:")
-    if (
-        item["lifecycle"] == "complete"
-        and binding["identity"] not in recognized
-        and not historical_git
-    ):
-        return [f"complete work item {item['id']} has an unrecognized historical planned baseline"]
-    return []
-
-
 def _dependency_state_findings(
     item: dict[str, Any], work_by_id: dict[str, dict[str, Any]]
 ) -> list[str]:
@@ -282,24 +212,13 @@ def _frontier_findings(record: dict[str, Any], work_by_id: dict[str, dict[str, A
         result.append("a ready work item requires a ready evolution")
     if lifecycle in {"discovery", "planning", "awaiting-approval"} and (active or ready):
         result.append(f"a {lifecycle} evolution cannot contain executable work")
-    pending = [item for item in work_by_id.values() if item["approval"]["status"] == "pending"]
-    if lifecycle == "awaiting-approval" and not pending:
-        result.append("an awaiting-approval evolution requires a pending work-item approval")
+    if lifecycle == "awaiting-approval" and record["evolution"]["approval"]["status"] != "pending":
+        result.append("an awaiting-approval evolution requires a pending approval")
     return result
 
 
-def _approval_findings(item: dict[str, Any]) -> list[str]:
+def _work_blocker_findings(item: dict[str, Any]) -> list[str]:
     result: list[str] = []
-    approval = item["approval"]["status"]
-    if item["lifecycle"] in {"ready", "active", "complete"} and approval not in {
-        "accepted",
-        "not-required",
-    }:
-        result.append(
-            f"{item['lifecycle']} work item {item['id']} has unsatisfied approval {approval}"
-        )
-    if approval == "accepted" and item["approval"]["checkpoint"] is None:
-        result.append(f"accepted approval for {item['id']} has no attributable checkpoint")
     if item["blocker"] is not None and item["lifecycle"] != "blocked":
         result.append(f"work item {item['id']} has a blocker but is not blocked")
     if item["lifecycle"] == "blocked" and item["blocker"] is None:
@@ -338,10 +257,6 @@ def _blocker_findings(
             for finding_id in value["finding_ids"]
             if finding_id not in findings_by_id
         )
-    if lifecycle == "stale" and record["baselines"]["status"] != "stale":
-        result.append("stale lifecycle requires stale baselines")
-    if record["baselines"]["status"] == "stale" and lifecycle not in {"stale", "blocked"}:
-        result.append("stale baselines require stale or blocked lifecycle")
     return result
 
 
@@ -383,23 +298,48 @@ def _completed_work_findings(
     return result
 
 
-def _closure_review_findings(record: dict[str, Any]) -> list[str]:
-    closure = record["closure"]
-    required = set(record["scope"]["review_lenses"])
-    counts = Counter(review["lens"] for review in closure["reviews"])
+def _acceptance_findings(item: dict[str, Any]) -> list[str]:
     result: list[str] = []
-    duplicates = sorted(lens for lens, count in counts.items() if count > 1)
-    if duplicates:
-        result.append(f"complete evolution has duplicate review lenses {duplicates}")
-    undeclared = counts.keys() - required
+    identifiers = [entry["id"] for entry in item["acceptance"]]
+    result.extend(
+        f"duplicate acceptance ID in {item['id']}: {value}" for value in _duplicates(identifiers)
+    )
+    carried = set(item["evidence_refs"])
+    claimed = {entry["evidence_ref"] for entry in item["acceptance"]}
+    result.extend(
+        f"acceptance {item['id']}.{entry['id']} names evidence the work item does not carry: "
+        f"{entry['evidence_ref']}"
+        for entry in item["acceptance"]
+        if entry["evidence_ref"] not in carried
+    )
+    if item["lifecycle"] != "complete":
+        return result
+    result.extend(
+        f"complete work item {item['id']} carries evidence no acceptance entry claims: {value}"
+        for value in sorted(carried - claimed)
+    )
+    return result
+
+
+def _closure_review_findings(record: dict[str, Any]) -> list[str]:
+    """Closure reads the latest review per lens over the append-only log.
+
+    Repeated lenses are legal: a lens that reported findings and later reported
+    clean has been satisfied, and the record must be able to say so rather than
+    forcing every pair to start from a record that cannot express what was
+    already cleared.
+    """
+    required = set(record["scope"]["review_lenses"])
+    closure_reviews = [review for review in record["reviews"] if review["scope"] == "closure"]
+    latest = {review["lens"]: review for review in closure_reviews}
+    result: list[str] = []
+    undeclared = latest.keys() - required
     if undeclared:
         result.append(f"complete evolution has undeclared review lenses {sorted(undeclared)}")
-    unresolved = sorted(
-        review["lens"] for review in closure["reviews"] if review["status"] != "clean"
-    )
+    unresolved = sorted(lens for lens, review in latest.items() if review["status"] != "clean")
     if unresolved:
         result.append(f"complete evolution has unresolved reviews {unresolved}")
-    clean = {review["lens"]: review for review in closure["reviews"] if review["status"] == "clean"}
+    clean = {lens: review for lens, review in latest.items() if review["status"] == "clean"}
     missing = required - clean.keys()
     if missing:
         result.append(f"complete evolution lacks clean required review lenses {sorted(missing)}")
@@ -448,8 +388,6 @@ def _complete_header_findings(
     result: list[str] = []
     if any(item["lifecycle"] != "complete" for item in work_by_id.values()):
         result.append("complete evolution has incomplete work items")
-    if closure["finding_disposition"] != "complete":
-        result.append("complete evolution has open finding disposition")
     if closure["checkpoint"] is None:
         result.append("complete evolution has no closure checkpoint")
     if record["evolution"]["checkpoint"] is None:
@@ -460,8 +398,8 @@ def _complete_header_findings(
         result.append("complete evolution has an unsatisfied approval roll-up")
     if record["evolution"]["blocker"] is not None:
         result.append("complete evolution retains a blocker")
-    if record["baselines"]["status"] != "current" or record["baselines"]["target"] is None:
-        result.append("complete evolution requires a current target baseline")
+    if record["baselines"]["target"] is None:
+        result.append("complete evolution requires a target baseline")
     return result
 
 
@@ -492,14 +430,16 @@ def _complete_content_findings(
 def _closure_dimension_findings(closure: dict[str, Any]) -> list[str]:
     return [
         f"complete evolution requires conforming or not-applicable {dimension}"
-        for dimension in ("implementation_status", "integration_status", "external_status")
+        for dimension in ("implementation_status",)
         if closure[dimension] not in {"conforming", "not applicable"}
     ]
 
 
-def _review_state_findings(record: dict[str, Any]) -> list[str]:
+def _review_state_findings(record: dict[str, Any], work_ids: set[str]) -> list[str]:
     result: list[str] = []
-    for review in record["closure"]["reviews"]:
+    for review in record["reviews"]:
+        if review["scope"] != "closure" and review["scope"] not in work_ids:
+            result.append(f"review {review['lens']!r} names unknown scope {review['scope']}")
         attributed = review["reviewer"] is not None and review["checkpoint"] is not None
         if review["status"] in {"findings", "clean"} and not attributed:
             result.append(f"review {review['lens']!r} lacks reviewer attribution")
@@ -517,13 +457,13 @@ def invariant_findings(record: dict[str, Any]) -> list[str]:
     result = _identifier_findings(findings_by_id, decisions_by_id, work_by_id, record)
     result.extend(_work_reference_findings(work_by_id, findings_by_id, decisions_by_id))
     result.extend(_ownership_findings(findings_by_id, decisions_by_id, work_by_id))
-    result.extend(_baseline_findings(record, work_by_id))
     for item in work_by_id.values():
         result.extend(_dependency_state_findings(item, work_by_id))
-        result.extend(_approval_findings(item))
+        result.extend(_work_blocker_findings(item))
+        result.extend(_acceptance_findings(item))
         result.extend(_completed_work_findings(item, findings_by_id, decisions_by_id))
     result.extend(_frontier_findings(record, work_by_id))
     result.extend(_blocker_findings(record, work_by_id, findings_by_id))
     result.extend(_complete_evolution_findings(record, findings_by_id, decisions_by_id, work_by_id))
-    result.extend(_review_state_findings(record))
+    result.extend(_review_state_findings(record, set(work_by_id)))
     return result

@@ -1,493 +1,747 @@
-schema_version: "1.0"
+schema_version: '1.0'
 evolution:
   id: vellis-2-agent-usable-boundary
-  objective: Make the MCP boundary usable by a conforming client doing real agent work, so that every selected tool can actually receive its arguments and an incremental graph load never fails a cardinality count the change could not affect.
-  observable_distinction: A conforming MCP client can call rtg_validate and rtg_draft_inspect with their fresh and continuation arguments and receive the selected payload instead of an input-validation refusal, and attaching new children to an existing parent under a minimum-one links-per-source type is accepted instead of rejected with a cardinalityViolation naming the untouched parent.
+  mode: autonomous
+  objective: Make the MCP boundary usable by a conforming client doing real agent work, so that every selected tool
+    can actually receive its arguments and an incremental graph load never fails a cardinality count the change
+    could not affect.
+  observable_distinction: A conforming MCP client can call rtg_validate and rtg_draft_inspect with their fresh and
+    continuation arguments and receive the selected payload instead of an input-validation refusal, and attaching
+    new children to an existing parent under a minimum-one links-per-source type is accepted instead of rejected
+    with a cardinalityViolation naming the untouched parent.
   lifecycle: active
   approval:
     status: not-required
-    reason: RTG014 already requires the selected behaviors to be exposed through ordinary typed JSON values, and RTG003 already requires each count to apply to the complete permitted population of that exact one type. Both findings are implementation defects under sufficient accepted authority.
+    reason: RTG014 already requires the selected behaviors to be exposed through ordinary typed JSON values, and
+      RTG003 already requires each count to apply to the complete permitted population of that exact one type. Both
+      findings are implementation defects under sufficient accepted authority.
     checkpoint: null
   blocker: null
   checkpoint: null
 baselines:
-  status: current
-  source: &source
+  source:
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
     implementation: git:daed5a087a0974f99d885471f557bdf89f09b3c7
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
     checkpoint: git:daed5a087a0974f99d885471f557bdf89f09b3c7
-  target: &target
+  target:
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
     implementation: git:4b6aaca7b8eb1ce5afe8b2cc955a089331672198
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
     checkpoint: git:4b6aaca7b8eb1ce5afe8b2cc955a089331672198
-  observed: *target
 scope:
   authority_scope:
-    - VellisRequirements::mcpBoundary
-    - VellisRequirements::localCardinality
-    - VellisRequirements::atomicChange
-    - VellisRequirements::locality
-    - VellisRequirements::querySafety
-    - VellisRequirements::simpleOperation
-    - VellisVerification::mcpLifecycle
-    - VellisVerification::cardinality
-    - VellisVerification::activeChange
+  - VellisRequirements::mcpBoundary
+  - VellisRequirements::localCardinality
+  - VellisRequirements::atomicChange
+  - VellisRequirements::locality
+  - VellisRequirements::querySafety
+  - VellisRequirements::simpleOperation
+  - VellisVerification::mcpLifecycle
+  - VellisVerification::cardinality
+  - VellisVerification::activeChange
   implementation_scope:
-    - system-evolution.yaml
-    - vellis/mcp.py
-    - vellis/cardinality_validation.py
-    - tools/package_smoke.py
-    - tests/test_package_smoke.py
-    - vellis/domain_validation.py
-    - vellis/discovery_operations.py
-    - vellis/draft_operations.py
-    - vellis/query_validation.py
-    - vellis/read_operations.py
-    - vellis/draft_read_operations.py
-    - vellis/change_operations.py
-    - tests/vellis/test_mcp_lifecycle_v2.py
-    - tests/vellis/test_change_draft_v2.py
-    - tests/vellis/test_query_v2_successor.py
-    - CONTRIBUTING.md
-    - justfile
-  review_lenses: [authority and conformance, engineering and evidence]
+  - system-evolution.yaml
+  - vellis/mcp.py
+  - vellis/cardinality_validation.py
+  - tools/package_smoke.py
+  - tests/test_package_smoke.py
+  - vellis/domain_validation.py
+  - vellis/discovery_operations.py
+  - vellis/draft_operations.py
+  - vellis/query_validation.py
+  - vellis/read_operations.py
+  - vellis/draft_read_operations.py
+  - vellis/change_operations.py
+  - tests/vellis/test_mcp_lifecycle_v2.py
+  - tests/vellis/test_change_draft_v2.py
+  - tests/vellis/test_query_v2_successor.py
+  - CONTRIBUTING.md
+  - justfile
+  review_lenses:
+  - authority and conformance
+  - engineering and evidence
   non_goals:
-    - No model authority, tool inventory, wire field, finding code, database schema, or database version change.
-    - No change to which inputs any tool accepts; only the schema advertised for the two union tools.
-    - No change to which graph states are valid; only to which objects a change loads before counting.
+  - No model authority, tool inventory, wire field, finding code, database schema, or database version change.
+  - No change to which inputs any tool accepts; only the schema advertised for the two union tools.
+  - No change to which graph states are valid; only to which objects a change loads before counting.
 findings:
-  - id: F001
-    summary: The two union-input tools advertise no top-level properties, so a conforming client drops every argument and the tools cannot be called at all.
-    classification: implementation defect
-    consequence: rtg_validate and rtg_draft_inspect publish an inputSchema carrying only type object and oneOf. A client that forwards arguments by consulting top-level properties therefore sends an empty object, and both tools refuse every call with an input-validation error regardless of the arguments supplied. Two of the ten selected behaviors are unreachable, so an agent cannot page validation findings or inspect raw draft deltas at all.
-    authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties]
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: The inventory loads, every schema declares type object, the suite is green, and the two union tools are still impossible to call because the advertised schema never names the members a client must forward.
-    compatibility_effect: No accepted input changes. The advertised schema gains a merged top-level properties map and additionalProperties false; the merged map is exactly the union of the branch members and every branch already forbade extras, so requests valid before remain valid and requests invalid before remain invalid.
-  - id: F003
-    summary: The tool-schema assertion unioned the oneOf branch members instead of reading the published top-level members, so it could never observe that the union tools were uncallable.
-    classification: implementation defect
-    consequence: _top_level_properties special-cased a schema carrying oneOf and collected member names from inside the branches. The expected-properties assertion therefore passed for a schema that names its members nowhere a client forwards them from, so the gate stayed green while two of the ten selected behaviors could not be called at all.
-    authority_refs: [VellisVerification::mcpLifecycle]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties]
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: An assertion whose disjunction is satisfied by the very shape that makes the tool unusable, so the suite reports coverage of a member set no client can reach.
-    compatibility_effect: No product effect; the assertion is strictly narrower than before.
-  - id: F002
-    summary: The link cardinality closure loads an endpoint's peer links by only one role, so an endpoint pulled into the closure as a target is counted as a source with its outgoing links missing.
-    classification: implementation defect
-    consequence: _link_count_peers selects existing links whose source is in the source set or whose target is in the target set, while _cardinality_closure_uuids admits an endpoint that appears in either role and the complete-state validator then checks both roles for it. Attaching children to an existing parent under a minimum-one links-per-source type therefore rejects the batch with a cardinalityViolation reporting count 0 for a parent whose committed outgoing link was never loaded. Incremental tier-by-tier loading of any containment hierarchy is impossible.
-    authority_refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange]
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count]
-    disposition: resolved
-    owner_work_item_id: W002
-    implementation_status: conforming
-    nearest_wrong_system: The count is repaired by loading the complete link population for the type, which makes ordinary change depend on unrelated populations and violates the locality requirement instead of the cardinality one.
-    compatibility_effect: No accepted graph state changes. A batch that was wrongly rejected becomes accepted; every batch that genuinely violates a bound is still rejected with the same finding code and subject.
-  - id: F004
-    summary: The cardinality closure loads peers per definition but checks every closure endpoint under every in-scope definition, so an endpoint admitted by one link definition is counted under another with none of that definition's links loaded.
-    classification: implementation defect
-    consequence: Peers are loaded per definition but every closure endpoint is checked under every in-scope definition, so an endpoint admitted through one definition is counted under another with none of that definition's population loaded, and a valid batch is rejected naming an object whose bound is satisfied. This applies to objects-per-anchor as well as to link roles. Reproduced at git:f93e8d0 with two minimum-one link definitions sharing a permitted source type.
-    authority_refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange]
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_an_anchor_under_an_unloaded_data_type, path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another]
-    disposition: resolved
-    owner_work_item_id: W004
-    implementation_status: conforming
-    nearest_wrong_system: Peers are loaded for every closure endpoint under every definition, which repairs the count by making ordinary change depend on unrelated populations and on each endpoint's full degree.
-    compatibility_effect: No accepted graph state changes. A batch wrongly rejected today becomes accepted; genuinely invalid batches still reject.
-  - id: F005
-    summary: Widening peer loading to both roles made closure cost proportional to an endpoint's total degree even when the opposite role's bound can never be violated.
-    classification: implementation defect
-    consequence: Every link incident to a closure endpoint is now loaded in either role with no gate on whether that role's bound is constraining. For the unbounded parent shape no finding can ever result, yet the whole incident population is materialized. A re-pointing operation loaded the hub's entire opposite-role degree, which the committed test pins by asserting no unrelated child is materialized. This is an undeclared scale driver on the ordinary change path.
-    authority_refs: [VellisRequirements::locality, VellisRequirements::atomicChange]
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree]
-    disposition: resolved
-    owner_work_item_id: W004
-    implementation_status: conforming
-    nearest_wrong_system: A cap or sampling is added to bound the load, which silently stops checking a bound the model requires.
-    compatibility_effect: No accepted graph state changes; the effect is on how much state one ordinary change materializes.
-  - id: F006
-    summary: Four finding paths name request members the request does not have, so an agent cannot resolve them against its own document.
-    classification: implementation defect
-    consequence: An over-limit pattern reported /selection/maximumMatches while the accepted member is maxMatches; a regex predicate finding reported the domain name text while the accepted member is value; both selector-name checks reported an index into the concatenation of two separate arrays; and change findings addressed objects by position in the validated closure, which is neither a request member nor the request index. RTG014 requires a finding path to identify the exact request member or affected-state subject.
-    authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, path:tests/vellis/test_mcp_lifecycle_v2.py#test_change_finding_paths_name_a_request_member_or_a_subject, path:tests/vellis/test_query_v2_successor.py#test_out_of_range_match_bound_names_the_accepted_request_member]
-    disposition: resolved
-    owner_work_item_id: W005
-    implementation_status: conforming
-    nearest_wrong_system: The visible maximumMatches path is corrected while a selector-name check derived from the same concatenated tuple keeps naming members no request carries.
-    compatibility_effect: Reported diagnostics only; no accepted input, result, or finding code changes.
-  - id: F007
-    summary: A connected question whose match set exceeds the fixed public item limit cannot be asked, because pattern selection rejects rather than pages.
-    classification: feasibility consequence
-    consequence: RTG006 establishes binding tuples only through maximum plus one and rejects an additional tuple without rows or hydrated values, and RTG014 fixes one public item limit of 1000 across every bounded collection, query maximum, page, and history maximum with no per-feature configurable limit. Narrowing by predicate or selecting by identity is therefore the intended path for a large population, and paging a pattern would be changed system meaning rather than a defect repair.
-    authority_refs: [VellisRequirements::querySafety, VellisRequirements::mcpBoundary]
-    evidence_refs: [command:just model-check]
-    disposition: accepted
-    owner_work_item_id: W005
-    implementation_status: not applicable
-    nearest_wrong_system: A cursor is added to pattern selection, silently replacing an accepted bounded-rejection guarantee with unbounded materialization.
-    compatibility_effect: None; accepted meaning is preserved and no behavior changes.
-  - id: F008
-    summary: The package check builds through an uncleaned build tree and never compares the built artifact against source, so it certifies a stale distribution.
-    classification: implementation defect
-    consequence: The setuptools backend reuses the ignored build directory and never purges files deleted from source, and package_smoke runs its build in the repository root, so the artifact it builds, installs and exercises can predate current source. Its only artifact assertion compares a version string, which a rebuild leaves unchanged. The local build tree had already drifted, carrying modules deleted in git:4612c0d and one file with no version-control history. The documented install builds from a fresh clone and is not exposed; what the check certified, and what a local reinstall produced, was.
-    authority_refs: [VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
-    evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building, path:tests/test_package_smoke.py#test_only_build_distribution_can_run_a_uv_build, command:just package-check]
-    disposition: resolved
-    owner_work_item_id: W006
-    implementation_status: conforming
-    nearest_wrong_system: The build directory is purged while the check still compares only a version string, so a cached or partial artifact continues to pass.
-    compatibility_effect: Build and verification tooling only; no product behavior, wire, or database change.
-  - id: F009
-    summary: An agent that exceeds the query bound is told the limit was exceeded but not how to proceed.
-    classification: implementation defect
-    consequence: RTG014 requires tool descriptions to guide bounded pattern narrowing, but the rtg_query description and the resultLimitExceeded summary state only that the maximum was exceeded. The intended remedy under RTG006 is to narrow by predicate or select by identity, and neither is discoverable from the boundary.
-    authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request]
-    disposition: resolved
-    owner_work_item_id: W005
-    implementation_status: conforming
-    nearest_wrong_system: Guidance is added to prose while the finding an agent actually receives still says only that a limit was exceeded.
-    compatibility_effect: Description and summary text only; no accepted input or result changes.
-  - id: F010
-    summary: The finding-path repair closed the four sites the audit named but not the class; the type summary still reports a response payload collection as a request member.
-    classification: implementation defect
-    consequence: rtg_type_summary accepts exactly one member, state. Its over-limit finding reported /anchorTypes, which is the response payload collection and neither a request member nor an affected-state subject, so an agent cannot resolve it against its own document. RTG014 requires a finding path to identify the exact request member or affected-state subject, and the path is optional, so a refusal with no addressable member carries no path and puts the remedy in the summary instead. Reachable only above the public item limit in anchor types.
-    authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary]
-    disposition: resolved
-    owner_work_item_id: W007
-    implementation_status: conforming
-    nearest_wrong_system: The one named site is corrected and the sweep stays a hand-kept list, so the next tool or member added drifts out of coverage unnoticed.
-    compatibility_effect: Reported diagnostics only; no accepted input, result, or finding code changes.
-  - id: F011
-    summary: Role scoping of the cardinality closure had no discriminating evidence, because no test or oracle shape constrained both link roles with a minimum at once.
-    classification: implementation defect
-    consequence: Role scoping can change an outcome only through a minimum bound, since an unloaded opposite-role population can only make a count too low. The named evidence for D003 left links-per-source at Cardinality(0), which the constraining gate empties before the roles are separated, so it asserted only that an already-empty set does not leak; and every oracle shape left one role unbounded. A system that unioned the two roles, exactly the alternative D003 records rejecting, passed the whole suite. The implementation was correct; the evidence did not reject the plausible wrong system.
-    authority_refs: [VellisRequirements::localCardinality, VellisVerification::cardinality, VellisVerification::activeChange]
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, path:tests/vellis/test_change_draft_v2.py#test_scoped_change_agrees_with_whole_state_validation]
-    disposition: resolved
-    owner_work_item_id: W007
-    implementation_status: conforming
-    nearest_wrong_system: One both-roles case is added while the oracle keeps declaring a two-role model it never generates a deciding state for.
-    compatibility_effect: Evidence only; no product behavior, wire, or database change.
-  - id: F012
-    summary: The derived finding-path sweep read only plain string constants, so every path addressed by position went unread while the test appeared to cover the whole boundary.
-    classification: implementation defect
-    consequence: An indexed path is written as an f-string, and that is the dominant form behind the boundary, so seven modules emitted roots the sweep never saw. Renaming an indexed root to a response payload collection left the whole suite green, reinstating on rtg_type_inspect's duplicate-key, unknown-key and kind-mismatch findings the same unresolvable path F010 removed, and those are reached in ordinary use rather than only above the item limit. The sweep had been derived on the module and constructor axes but not on the form axis.
-    authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary]
-    disposition: resolved
-    owner_work_item_id: W007
-    implementation_status: conforming
-    nearest_wrong_system: The one interpolated form is read while the sweep keeps recognizing forms by enumeration, so the next way a path is composed drifts out of coverage exactly as the module and constructor lists did.
-    compatibility_effect: Evidence only; no product behavior, wire, or database change.
-  - id: F013
-    summary: The finding-path sweep recognized paths by where they were written, so a path bound to a local name, held in a tuple, or set as a parameter default went unread in eight modules.
-    classification: implementation defect
-    consequence: Recognizing a path by the call it is passed to missed whichever wrapper a module used; by its literal form missed the interpolated ones; and by both still missed a path first bound to a name. Renaming the root of a name-bound path in query_validation produced a live unknown-source-node finding reporting a response payload collection as a request member, reached by an ordinary pattern mistake and not by exceeding any limit, with the whole suite green. Each repair had closed one axis of the recognition rule rather than the rule.
-    authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary]
-    disposition: resolved
-    owner_work_item_id: W007
-    implementation_status: conforming
-    nearest_wrong_system: A third syntactic position is recognized and the rule keeps enumerating positions, so the next way a path reaches a finding drifts out of coverage exactly as the module, constructor, and form axes each did.
-    compatibility_effect: Evidence only; no product behavior, wire, or database change.
-  - id: F014
-    summary: The sweep asked whether a path names a member of some request rather than of the request that reaches it, so substituting another tool's member passed.
-    classification: implementation defect
-    consequence: The addressable set was one union across all ten tools, so a path could name any of eighty-one member names regardless of which tool answers it. Renaming the type inspect root to typeKeys, a member of query and draft inspect but not of type inspect, left the whole suite green while an agent sending duplicate anchor type keys received a path it cannot resolve against its own document. Locality of a finding path is per tool, and a member of another tool's request is no more resolvable than a name the boundary never uses.
-    authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary]
-    disposition: resolved
-    owner_work_item_id: W007
-    implementation_status: conforming
-    nearest_wrong_system: Each emitting module is bound to its tools by a hand-kept map, which drifts the first time a module is called from a new tool, exactly as the module, constructor, form, and position lists each drifted.
-    compatibility_effect: Evidence only; no product behavior, wire, or database change.
-  - id: F015
-    summary: The per-tool scope walked each whole branch statement, so the second union tool claimed the first, and the module only the first reaches went unswept while the sweep reported the boundary covered.
-    classification: implementation defect
-    consequence: Deriving each union tool's builder walked the entire if statement rather than its own branch body, and a walk descends into the else, so draft inspect was bound to the validate builder. Draft inspection operations was then claimed by no tool and skipped entirely, and neither added guard caught it because both tools were present and both reach sets non-empty. Substituting an anchor type keys root there survived the whole suite and produced a duplicate inspection filter finding naming a member the draft inspect schema does not carry, on an ordinary request. Both review lenses reproduced it independently.
-    authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary]
-    disposition: resolved
-    owner_work_item_id: W007
-    implementation_status: conforming
-    nearest_wrong_system: The branch binding is corrected and nothing asserts that every module the boundary reaches is claimed, so the next derivation error again removes a module from coverage while every existing guard still passes.
-    compatibility_effect: Evidence only; no product behavior, wire, or database change.
-  - id: F016
-    summary: The sweep compared only a path's first segment, so a path correct at its root and wrong below it passed, and a draft definition finding named a member the boundary does not carry.
-    classification: implementation defect
-    consequence: Every literal was reduced to its root before comparison, and a relative fragment composed onto a parent was skipped entirely, so no segment below a root was ever checked in eight of the ten tools. Renaming the history range start member survived the whole suite and produced a path naming a member the history schema does not carry, on an ordinary reversed interval. The same gap concealed a real path already in the product, where a draft definition upsert finding named a system member the boundary carries nowhere; that path now names the upsert entry the caller did send.
-    authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary]
-    disposition: resolved
-    owner_work_item_id: W007
-    implementation_status: conforming
-    nearest_wrong_system: Depth is compared for rooted literals only, leaving every member named by a fragment composed onto a parent unchecked, which is where most of the boundary's deep paths are written.
-    compatibility_effect: One draft definition finding path shortens from the system member to the upsert entry; the finding code and summary are unchanged, and that member is unreachable through the boundary.
-  - id: F017
-    summary: A review lens reported that segments passed to the pointer builder as arguments escape the finding-path sweep; assessment rejected it, because every module that composes that way addresses affected state rather than a request.
-    classification: out of scope
-    consequence: The three modules that pass segments to the builder emit only affected-state roots, and a segment below such a root names a field of the stored subject rather than a request member, which is why the sweep stops at the root there. Extending the check confirmed this by flagging the canonical system envelope path, which is correct as written. RTG014 is satisfied by naming the affected-state subject, so the reported mutants rename a state field rather than making a request member unresolvable, and no such wrong name exists in the product.
-    authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary, path:tests/vellis/test_mcp_lifecycle_v2.py#test_change_finding_paths_name_a_request_member_or_a_subject]
-    disposition: out-of-scope
-    owner_work_item_id: W007
-    implementation_status: not applicable
-    nearest_wrong_system: The check is extended anyway, and it reports a correct affected-state path as unresolvable while no agent-visible defect exists.
-    compatibility_effect: None; no product, wire, evidence, or database change.
+- id: F001
+  summary: The two union-input tools advertise no top-level properties, so a conforming client drops every argument
+    and the tools cannot be called at all.
+  classification: implementation defect
+  consequence: rtg_validate and rtg_draft_inspect publish an inputSchema carrying only type object and oneOf. A
+    client that forwards arguments by consulting top-level properties therefore sends an empty object, and both
+    tools refuse every call with an input-validation error regardless of the arguments supplied. Two of the ten
+    selected behaviors are unreachable, so an agent cannot page validation findings or inspect raw draft deltas
+    at all.
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties
+  disposition: resolved
+  owner_work_item_id: W001
+- id: F003
+  summary: The tool-schema assertion unioned the oneOf branch members instead of reading the published top-level
+    members, so it could never observe that the union tools were uncallable.
+  classification: implementation defect
+  consequence: _top_level_properties special-cased a schema carrying oneOf and collected member names from inside
+    the branches. The expected-properties assertion therefore passed for a schema that names its members nowhere
+    a client forwards them from, so the gate stayed green while two of the ten selected behaviors could not be called
+    at all.
+  authority_refs:
+  - VellisVerification::mcpLifecycle
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties
+  disposition: resolved
+  owner_work_item_id: W001
+- id: F002
+  summary: The link cardinality closure loads an endpoint's peer links by only one role, so an endpoint pulled into
+    the closure as a target is counted as a source with its outgoing links missing.
+  classification: implementation defect
+  consequence: _link_count_peers selects existing links whose source is in the source set or whose target is in
+    the target set, while _cardinality_closure_uuids admits an endpoint that appears in either role and the complete-state
+    validator then checks both roles for it. Attaching children to an existing parent under a minimum-one links-per-source
+    type therefore rejects the batch with a cardinalityViolation reporting count 0 for a parent whose committed
+    outgoing link was never loaded. Incremental tier-by-tier loading of any containment hierarchy is impossible.
+  authority_refs:
+  - VellisRequirements::localCardinality
+  - VellisRequirements::atomicChange
+  evidence_refs:
+  - path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count
+  disposition: resolved
+  owner_work_item_id: W002
+- id: F004
+  summary: The cardinality closure loads peers per definition but checks every closure endpoint under every in-scope
+    definition, so an endpoint admitted by one link definition is counted under another with none of that definition's
+    links loaded.
+  classification: implementation defect
+  consequence: Peers are loaded per definition but every closure endpoint is checked under every in-scope definition,
+    so an endpoint admitted through one definition is counted under another with none of that definition's population
+    loaded, and a valid batch is rejected naming an object whose bound is satisfied. This applies to objects-per-anchor
+    as well as to link roles. Reproduced at git:f93e8d0 with two minimum-one link definitions sharing a permitted
+    source type.
+  authority_refs:
+  - VellisRequirements::localCardinality
+  - VellisRequirements::atomicChange
+  evidence_refs:
+  - path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition
+  - path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_an_anchor_under_an_unloaded_data_type
+  - path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another
+  disposition: resolved
+  owner_work_item_id: W004
+- id: F005
+  summary: Widening peer loading to both roles made closure cost proportional to an endpoint's total degree even
+    when the opposite role's bound can never be violated.
+  classification: implementation defect
+  consequence: Every link incident to a closure endpoint is now loaded in either role with no gate on whether that
+    role's bound is constraining. For the unbounded parent shape no finding can ever result, yet the whole incident
+    population is materialized. A re-pointing operation loaded the hub's entire opposite-role degree, which the
+    committed test pins by asserting no unrelated child is materialized. This is an undeclared scale driver on the
+    ordinary change path.
+  authority_refs:
+  - VellisRequirements::locality
+  - VellisRequirements::atomicChange
+  evidence_refs:
+  - path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree
+  disposition: resolved
+  owner_work_item_id: W004
+- id: F006
+  summary: Four finding paths name request members the request does not have, so an agent cannot resolve them against
+    its own document.
+  classification: implementation defect
+  consequence: An over-limit pattern reported /selection/maximumMatches while the accepted member is maxMatches;
+    a regex predicate finding reported the domain name text while the accepted member is value; both selector-name
+    checks reported an index into the concatenation of two separate arrays; and change findings addressed objects
+    by position in the validated closure, which is neither a request member nor the request index. RTG014 requires
+    a finding path to identify the exact request member or affected-state subject.
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_change_finding_paths_name_a_request_member_or_a_subject
+  - path:tests/vellis/test_query_v2_successor.py#test_out_of_range_match_bound_names_the_accepted_request_member
+  disposition: resolved
+  owner_work_item_id: W005
+- id: F007
+  summary: A connected question whose match set exceeds the fixed public item limit cannot be asked, because pattern
+    selection rejects rather than pages.
+  classification: feasibility consequence
+  consequence: RTG006 establishes binding tuples only through maximum plus one and rejects an additional tuple without
+    rows or hydrated values, and RTG014 fixes one public item limit of 1000 across every bounded collection, query
+    maximum, page, and history maximum with no per-feature configurable limit. Narrowing by predicate or selecting
+    by identity is therefore the intended path for a large population, and paging a pattern would be changed system
+    meaning rather than a defect repair.
+  authority_refs:
+  - VellisRequirements::querySafety
+  - VellisRequirements::mcpBoundary
+  evidence_refs:
+  - command:just model-check
+  disposition: accepted
+  owner_work_item_id: W005
+- id: F008
+  summary: The package check builds through an uncleaned build tree and never compares the built artifact against
+    source, so it certifies a stale distribution.
+  classification: implementation defect
+  consequence: The setuptools backend reuses the ignored build directory and never purges files deleted from source,
+    and package_smoke runs its build in the repository root, so the artifact it builds, installs and exercises can
+    predate current source. Its only artifact assertion compares a version string, which a rebuild leaves unchanged.
+    The local build tree had already drifted, carrying modules deleted in git:4612c0d and one file with no version-control
+    history. The documented install builds from a fresh clone and is not exposed; what the check certified, and
+    what a local reinstall produced, was.
+  authority_refs:
+  - VellisRequirements::simpleOperation
+  - VellisVerification::mcpLifecycle
+  evidence_refs:
+  - path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source
+  - path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version
+  - path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building
+  - path:tests/test_package_smoke.py#test_only_build_distribution_can_run_a_uv_build
+  - command:just package-check
+  disposition: resolved
+  owner_work_item_id: W006
+- id: F009
+  summary: An agent that exceeds the query bound is told the limit was exceeded but not how to proceed.
+  classification: implementation defect
+  consequence: RTG014 requires tool descriptions to guide bounded pattern narrowing, but the rtg_query description
+    and the resultLimitExceeded summary state only that the maximum was exceeded. The intended remedy under RTG006
+    is to narrow by predicate or select by identity, and neither is discoverable from the boundary.
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request
+  disposition: resolved
+  owner_work_item_id: W005
+- id: F010
+  summary: The finding-path repair closed the four sites the audit named but not the class; the type summary still
+    reports a response payload collection as a request member.
+  classification: implementation defect
+  consequence: rtg_type_summary accepts exactly one member, state. Its over-limit finding reported /anchorTypes,
+    which is the response payload collection and neither a request member nor an affected-state subject, so an agent
+    cannot resolve it against its own document. RTG014 requires a finding path to identify the exact request member
+    or affected-state subject, and the path is optional, so a refusal with no addressable member carries no path
+    and puts the remedy in the summary instead. Reachable only above the public item limit in anchor types.
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary
+  disposition: resolved
+  owner_work_item_id: W007
+- id: F011
+  summary: Role scoping of the cardinality closure had no discriminating evidence, because no test or oracle shape
+    constrained both link roles with a minimum at once.
+  classification: implementation defect
+  consequence: Role scoping can change an outcome only through a minimum bound, since an unloaded opposite-role
+    population can only make a count too low. The named evidence for D003 left links-per-source at Cardinality(0),
+    which the constraining gate empties before the roles are separated, so it asserted only that an already-empty
+    set does not leak; and every oracle shape left one role unbounded. A system that unioned the two roles, exactly
+    the alternative D003 records rejecting, passed the whole suite. The implementation was correct; the evidence
+    did not reject the plausible wrong system.
+  authority_refs:
+  - VellisRequirements::localCardinality
+  - VellisVerification::cardinality
+  - VellisVerification::activeChange
+  evidence_refs:
+  - path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role
+  - path:tests/vellis/test_change_draft_v2.py#test_scoped_change_agrees_with_whole_state_validation
+  disposition: resolved
+  owner_work_item_id: W007
+- id: F012
+  summary: The derived finding-path sweep read only plain string constants, so every path addressed by position
+    went unread while the test appeared to cover the whole boundary.
+  classification: implementation defect
+  consequence: An indexed path is written as an f-string, and that is the dominant form behind the boundary, so
+    seven modules emitted roots the sweep never saw. Renaming an indexed root to a response payload collection left
+    the whole suite green, reinstating on rtg_type_inspect's duplicate-key, unknown-key and kind-mismatch findings
+    the same unresolvable path F010 removed, and those are reached in ordinary use rather than only above the item
+    limit. The sweep had been derived on the module and constructor axes but not on the form axis.
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary
+  disposition: resolved
+  owner_work_item_id: W007
+- id: F013
+  summary: The finding-path sweep recognized paths by where they were written, so a path bound to a local name,
+    held in a tuple, or set as a parameter default went unread in eight modules.
+  classification: implementation defect
+  consequence: Recognizing a path by the call it is passed to missed whichever wrapper a module used; by its literal
+    form missed the interpolated ones; and by both still missed a path first bound to a name. Renaming the root
+    of a name-bound path in query_validation produced a live unknown-source-node finding reporting a response payload
+    collection as a request member, reached by an ordinary pattern mistake and not by exceeding any limit, with
+    the whole suite green. Each repair had closed one axis of the recognition rule rather than the rule.
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary
+  disposition: resolved
+  owner_work_item_id: W007
+- id: F014
+  summary: The sweep asked whether a path names a member of some request rather than of the request that reaches
+    it, so substituting another tool's member passed.
+  classification: implementation defect
+  consequence: The addressable set was one union across all ten tools, so a path could name any of eighty-one member
+    names regardless of which tool answers it. Renaming the type inspect root to typeKeys, a member of query and
+    draft inspect but not of type inspect, left the whole suite green while an agent sending duplicate anchor type
+    keys received a path it cannot resolve against its own document. Locality of a finding path is per tool, and
+    a member of another tool's request is no more resolvable than a name the boundary never uses.
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary
+  disposition: resolved
+  owner_work_item_id: W007
+- id: F015
+  summary: The per-tool scope walked each whole branch statement, so the second union tool claimed the first, and
+    the module only the first reaches went unswept while the sweep reported the boundary covered.
+  classification: implementation defect
+  consequence: Deriving each union tool's builder walked the entire if statement rather than its own branch body,
+    and a walk descends into the else, so draft inspect was bound to the validate builder. Draft inspection operations
+    was then claimed by no tool and skipped entirely, and neither added guard caught it because both tools were
+    present and both reach sets non-empty. Substituting an anchor type keys root there survived the whole suite
+    and produced a duplicate inspection filter finding naming a member the draft inspect schema does not carry,
+    on an ordinary request. Both review lenses reproduced it independently.
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary
+  disposition: resolved
+  owner_work_item_id: W007
+- id: F016
+  summary: The sweep compared only a path's first segment, so a path correct at its root and wrong below it passed,
+    and a draft definition finding named a member the boundary does not carry.
+  classification: implementation defect
+  consequence: Every literal was reduced to its root before comparison, and a relative fragment composed onto a
+    parent was skipped entirely, so no segment below a root was ever checked in eight of the ten tools. Renaming
+    the history range start member survived the whole suite and produced a path naming a member the history schema
+    does not carry, on an ordinary reversed interval. The same gap concealed a real path already in the product,
+    where a draft definition upsert finding named a system member the boundary carries nowhere; that path now names
+    the upsert entry the caller did send.
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary
+  disposition: resolved
+  owner_work_item_id: W007
+- id: F017
+  summary: A review lens reported that segments passed to the pointer builder as arguments escape the finding-path
+    sweep; assessment rejected it, because every module that composes that way addresses affected state rather than
+    a request.
+  classification: out of scope
+  consequence: The three modules that pass segments to the builder emit only affected-state roots, and a segment
+    below such a root names a field of the stored subject rather than a request member, which is why the sweep stops
+    at the root there. Extending the check confirmed this by flagging the canonical system envelope path, which
+    is correct as written. RTG014 is satisfied by naming the affected-state subject, so the reported mutants rename
+    a state field rather than making a request member unresolvable, and no such wrong name exists in the product.
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_change_finding_paths_name_a_request_member_or_a_subject
+  disposition: out-of-scope
+  owner_work_item_id: W007
 decisions:
-  - id: D001
-    summary: Publish a merged top-level properties map alongside the existing oneOf in the shared union-schema builder, rather than collapsing the branches or special-casing each tool.
-    authority_refs: [VellisRequirements::mcpBoundary]
-    alternatives:
-      - Collapse each union into one model with optional fields and lose the mutually exclusive fresh-versus-continuation distinction the oneOf encodes.
-      - Special-case the two tools with hand-written schemas that would drift from their input models.
-      - Leave the schema and require every client to read oneOf branches, which conforming argument-forwarding clients do not do.
-    reversible: true
-    owner_work_item_id: W001
-    evidence_intent:
-      - Every union tool advertises a top-level properties entry for each member any branch accepts.
-      - Both union tools still accept exactly their fresh and continuation shapes and still reject unknown members and cross-branch mixtures.
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties]
-  - id: D002
-    summary: Load peer links incident to any closure endpoint in either role. In effect from git:f486fe6 until git:a807759, then removed by D003, which scopes subjects instead. No longer realized.
-    authority_refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange, VellisRequirements::locality]
-    alternatives:
-      - Track source subjects and target subjects separately and check each endpoint only in the role whose count the batch can change, which is closer to the wording of atomicChange but redistributes role bookkeeping across the pure validator boundary.
-      - Load the complete link population of the affected type, which repairs the count by depending on unrelated populations.
-    reversible: true
-    owner_work_item_id: W002
-    evidence_intent:
-      - Attaching children to a committed parent under a minimum-one links-per-source type is accepted and the parent keeps its existing outgoing link.
-      - A batch that genuinely leaves an endpoint outside its bound is still rejected and still names that endpoint.
-      - The loaded closure stays proportional to the changed neighbourhood and does not grow with unrelated members of the same type.
-    implementation_status: not applicable
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count]
-  - id: D003
-    summary: Carry per-definition, per-role cardinality subjects into the validator and revert the both-role peer union, rather than widening peer loading further.
-    authority_refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange, VellisRequirements::locality]
-    alternatives:
-      - Load peers for every closure endpoint under every in-scope definition, which repairs the count by depending on unrelated populations and on each endpoint's full degree.
-      - Keep the both-role union of D002 and filter only by definition, which leaves the degree-proportional load in place.
-    reversible: true
-    owner_work_item_id: W004
-    evidence_intent:
-      - An endpoint admitted by one definition is not counted under another whose population was never loaded for it.
-      - An endpoint admitted in one role is not counted in the opposite role.
-      - A caller validating a complete state still checks every permitted participant in both roles.
-      - A batch that genuinely leaves a subject outside its bound is still rejected and still names that subject.
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another, path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, path:tests/vellis/test_change_draft_v2.py#test_adding_a_second_inbound_link_still_sees_the_committed_one, path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree]
+- id: D001
+  summary: Publish a merged top-level properties map alongside the existing oneOf in the shared union-schema builder,
+    rather than collapsing the branches or special-casing each tool.
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  alternatives:
+  - Collapse each union into one model with optional fields and lose the mutually exclusive fresh-versus-continuation
+    distinction the oneOf encodes.
+  - Special-case the two tools with hand-written schemas that would drift from their input models.
+  - Leave the schema and require every client to read oneOf branches, which conforming argument-forwarding clients
+    do not do.
+  reversible: true
+  owner_work_item_id: W001
+  implementation_status: conforming
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties
+- id: D002
+  summary: Load peer links incident to any closure endpoint in either role. In effect from git:f486fe6 until git:a807759,
+    then removed by D003, which scopes subjects instead. No longer realized.
+  authority_refs:
+  - VellisRequirements::localCardinality
+  - VellisRequirements::atomicChange
+  - VellisRequirements::locality
+  alternatives:
+  - Track source subjects and target subjects separately and check each endpoint only in the role whose count the
+    batch can change, which is closer to the wording of atomicChange but redistributes role bookkeeping across the
+    pure validator boundary.
+  - Load the complete link population of the affected type, which repairs the count by depending on unrelated populations.
+  reversible: true
+  owner_work_item_id: W002
+  implementation_status: not applicable
+  evidence_refs:
+  - path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count
+- id: D003
+  summary: Carry per-definition, per-role cardinality subjects into the validator and revert the both-role peer
+    union, rather than widening peer loading further.
+  authority_refs:
+  - VellisRequirements::localCardinality
+  - VellisRequirements::atomicChange
+  - VellisRequirements::locality
+  alternatives:
+  - Load peers for every closure endpoint under every in-scope definition, which repairs the count by depending
+    on unrelated populations and on each endpoint's full degree.
+  - Keep the both-role union of D002 and filter only by definition, which leaves the degree-proportional load in
+    place.
+  reversible: true
+  owner_work_item_id: W004
+  implementation_status: conforming
+  evidence_refs:
+  - path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another
+  - path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role
+  - path:tests/vellis/test_change_draft_v2.py#test_adding_a_second_inbound_link_still_sees_the_committed_one
+  - path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree
 work_items:
-  - id: W001
-    order: 1
-    label: Advertise callable top-level properties for the union input tools
-    kind: implementation
-    dependencies: []
-    planned_baseline: {dimension: implementation, identity: "git:4b6aaca7b8eb1ce5afe8b2cc955a089331672198"}
-    finding_ids: [F001, F003]
-    decision_ids: [D001]
-    authority:
-      - refs: [VellisRequirements::mcpBoundary, VellisVerification::mcpLifecycle]
-        coverage: partial
-        remaining_work_item_ids: [W005]
-    approval:
-      status: not-required
-      reason: This corrects an implementation defect under sufficient accepted authority.
-      checkpoint: null
-    nearest_wrong_system: Top-level properties are published but the oneOf is dropped, so a cross-branch mixture such as a limit supplied together with a cursor is silently accepted.
-    compatibility_effect: Advertised schema only. No tool inventory, accepted input, wire field, or database change.
-    non_effects:
-      - Do not inspect .data.
-      - Do not change which inputs either union tool accepts.
-      - Do not alter the tool inventory.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties, command:just check]
-    blocker: null
-    checkpoint: git:f486fe64c466945f2780326616f909bf2ceba4d5
-  - id: W002
-    order: 2
-    label: Complete the link cardinality closure for endpoints admitted in either role
-    kind: implementation
-    dependencies: []
-    planned_baseline: {dimension: implementation, identity: "git:4b6aaca7b8eb1ce5afe8b2cc955a089331672198"}
-    finding_ids: [F002]
-    decision_ids: [D002]
-    authority:
-      - refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange, VellisRequirements::locality, VellisVerification::cardinality, VellisVerification::activeChange]
-        coverage: partial
-        remaining_work_item_ids: [W004]
-    approval:
-      status: not-required
-      reason: This corrects an implementation defect under sufficient accepted authority.
-      checkpoint: null
-    nearest_wrong_system: The closure is widened to the complete population of the affected link type, so the count becomes correct while ordinary change starts depending on unrelated populations.
-    compatibility_effect: A wrongly rejected batch becomes accepted. No genuinely invalid batch becomes acceptable.
-    non_effects:
-      - Do not inspect .data.
-      - Do not change which graph states are valid.
-      - Do not retain a complete graph or definition-set aggregate.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count, command:just check]
-    blocker: null
-    checkpoint: git:f486fe64c466945f2780326616f909bf2ceba4d5
-  - id: W004
-    order: 3
-    label: Scope cardinality checking to the exact definition and role whose count the batch can change
-    kind: implementation
-    dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:4b6aaca7b8eb1ce5afe8b2cc955a089331672198"}
-    finding_ids: [F004, F005]
-    decision_ids: [D003]
-    authority:
-      - refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange, VellisRequirements::locality, VellisVerification::cardinality, VellisVerification::activeChange]
-        coverage: partial
-        remaining_work_item_ids: [W003]
-    approval:
-      status: not-required
-      reason: These correct implementation defects under sufficient accepted authority; RTG007 already limits validation to exact cardinality subjects whose count can change.
-      checkpoint: null
-    nearest_wrong_system: Peers are loaded for every closure endpoint under every in-scope definition, which fixes the false rejection by making ordinary change depend on each endpoint's full degree and on unrelated populations.
-    compatibility_effect: No accepted graph state changes. Batches wrongly rejected become accepted; genuinely invalid batches still reject with the same code and subject.
-    non_effects:
-      - Do not inspect .data.
-      - Do not change which graph states are valid.
-      - Do not cap or sample a bound the model requires to be checked.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another, path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, path:tests/vellis/test_change_draft_v2.py#test_scoped_change_agrees_with_whole_state_validation, path:tests/vellis/test_change_draft_v2.py#test_attaching_a_child_does_not_load_a_hub_whose_target_bound_cannot_fire, path:tests/vellis/test_change_draft_v2.py#test_adding_an_outgoing_link_does_not_load_a_hub_whose_source_bound_cannot_fire, path:tests/vellis/test_change_draft_v2.py#test_adding_a_data_object_does_not_load_an_anchor_whose_bound_cannot_fire, command:just check]
-    blocker: null
-    checkpoint: git:a80775909cd7936e52b2b61fa3070492ebe4e6c9
-  - id: W005
-    order: 4
-    label: Make boundary finding paths resolvable and the query bound navigable
-    kind: implementation
-    dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:4b6aaca7b8eb1ce5afe8b2cc955a089331672198"}
-    finding_ids: [F006, F007, F009]
-    decision_ids: []
-    authority:
-      - refs: [VellisRequirements::mcpBoundary, VellisRequirements::querySafety, VellisVerification::mcpLifecycle]
-        coverage: partial
-        remaining_work_item_ids: [W003]
-    approval:
-      status: not-required
-      reason: RTG014 already requires a finding path to identify the exact request member and tool descriptions to guide bounded pattern narrowing.
-      checkpoint: null
-    nearest_wrong_system: The paths are corrected to match today's aliases with nothing that would notice the next alias drift.
-    compatibility_effect: Reported diagnostics and description text only. No accepted input, result, finding code, or database change.
-    non_effects:
-      - Do not inspect .data.
-      - Do not add paging, a cursor, or a configurable limit to pattern selection.
-      - Do not change which selections are accepted or rejected.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, command:just check]
-    blocker: null
-    checkpoint: git:d5129c664c662a880d57e55fe42b80acae5d239c
-  - id: W006
-    order: 5
-    label: Make the package check reject a stale distribution
-    kind: implementation
-    dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:4b6aaca7b8eb1ce5afe8b2cc955a089331672198"}
-    finding_ids: [F008]
-    decision_ids: []
-    authority:
-      - refs: [VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
-        coverage: partial
-        remaining_work_item_ids: [W003]
-    approval:
-      status: not-required
-      reason: The check already claims to verify the distributable; making that claim true is a defect repair, not changed meaning.
-      checkpoint: null
-    nearest_wrong_system: The build tree is purged so the symptom disappears locally, while the check still cannot tell a stale artifact from a fresh one.
-    compatibility_effect: Build and verification tooling only. No product behavior, wire, or database change.
-    non_effects:
-      - Do not inspect .data.
-      - Do not run broad ignored-file cleanup; remove only the build and dist outputs.
-      - Do not add version-bump automation or change the release process.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building, path:tests/test_package_smoke.py#test_only_build_distribution_can_run_a_uv_build, command:just package-check, command:just check]
-    blocker: null
-    checkpoint: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
-  - id: W007
-    order: 6
-    label: Close the finding-path class and give role scoping evidence that rejects the both-role system
-    kind: implementation
-    dependencies: [W004, W005]
-    planned_baseline: {dimension: implementation, identity: "git:4b6aaca7b8eb1ce5afe8b2cc955a089331672198"}
-    finding_ids: [F010, F011, F012, F013, F014, F015, F016, F017]
-    decision_ids: []
-    authority:
-      - refs: [VellisRequirements::mcpBoundary, VellisRequirements::localCardinality, VellisVerification::cardinality, VellisVerification::activeChange]
-        coverage: partial
-        remaining_work_item_ids: [W003]
-    approval:
-      status: not-required
-      reason: These close a defect and an evidence gap under sufficient accepted authority; no accepted meaning changes.
-      checkpoint: null
-    nearest_wrong_system: Each named site is corrected in place while the sweep and the oracle keep covering the instance that motivated the work rather than the class it belongs to.
-    compatibility_effect: Reported diagnostics and evidence only; no accepted input, result, graph state, or database change.
-    non_effects:
-      - Do not open a model-authority change.
-      - Do not alter owner data.
-    lifecycle: active
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary, path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, command:just check]
-    blocker: null
-    checkpoint: null
-  - id: W003
-    order: 7
-    label: Verify, independently review, and close the agent-usable boundary fixes
-    kind: closure
-    dependencies: [W001, W002, W004, W005, W006, W007]
-    planned_baseline: {dimension: implementation, identity: "git:4b6aaca7b8eb1ce5afe8b2cc955a089331672198"}
-    finding_ids: []
-    decision_ids: []
-    authority:
-      - refs: [VellisRequirements::mcpBoundary, VellisRequirements::localCardinality, VellisRequirements::atomicChange, VellisRequirements::locality, VellisRequirements::querySafety, VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle, VellisVerification::cardinality, VellisVerification::activeChange]
-        coverage: full
-        remaining_work_item_ids: []
-    approval:
-      status: not-required
-      reason: Closure verifies existing accepted meaning and applies deterministic bookkeeping.
-      checkpoint: null
-    nearest_wrong_system: Both fixes pass their focused tests while a real client still cannot complete an ordinary session, because nothing exercised the two behaviors end to end through the selected boundary.
-    compatibility_effect: No additional compatibility effect beyond W001 and W002.
-    non_effects:
-      - Do not open a model-authority change.
-      - Do not alter owner data.
-    lifecycle: pending
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties, path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, command:just check]
-    blocker: null
-    checkpoint: null
+- id: W001
+  label: Advertise callable top-level properties for the union input tools
+  kind: implementation
+  dependencies: []
+  finding_ids:
+  - F001
+  - F003
+  decision_ids:
+  - D001
+  compatibility_effect: Advertised schema only. No tool inventory, accepted input, wire field, or database change.
+  non_effects:
+  - Do not inspect .data.
+  - Do not change which inputs either union tool accepts.
+  - Do not alter the tool inventory.
+  lifecycle: complete
+  implementation_status: conforming
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties
+  - command:just check
+  blocker: null
+  checkpoint: git:f486fe64c466945f2780326616f909bf2ceba4d5
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  - VellisVerification::mcpLifecycle
+  acceptance:
+  - id: A1
+    wrong_behavior: Top-level properties are published but the oneOf is dropped, so a cross-branch mixture such
+      as a limit supplied together with a cursor is silently accepted.
+    evidence_ref: path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties
+  - id: A2
+    wrong_behavior: Top-level properties are published but the oneOf is dropped, so a cross-branch mixture such
+      as a limit supplied together with a cursor is silently accepted.
+    evidence_ref: command:just check
+- id: W002
+  label: Complete the link cardinality closure for endpoints admitted in either role
+  kind: implementation
+  dependencies: []
+  finding_ids:
+  - F002
+  decision_ids:
+  - D002
+  compatibility_effect: A wrongly rejected batch becomes accepted. No genuinely invalid batch becomes acceptable.
+  non_effects:
+  - Do not inspect .data.
+  - Do not change which graph states are valid.
+  - Do not retain a complete graph or definition-set aggregate.
+  lifecycle: complete
+  implementation_status: conforming
+  evidence_refs:
+  - path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count
+  - command:just check
+  blocker: null
+  checkpoint: git:f486fe64c466945f2780326616f909bf2ceba4d5
+  authority_refs:
+  - VellisRequirements::localCardinality
+  - VellisRequirements::atomicChange
+  - VellisRequirements::locality
+  - VellisVerification::cardinality
+  - VellisVerification::activeChange
+  acceptance:
+  - id: A1
+    wrong_behavior: The closure is widened to the complete population of the affected link type, so the count becomes
+      correct while ordinary change starts depending on unrelated populations.
+    evidence_ref: path:tests/vellis/test_change_draft_v2.py#test_attaching_children_preserves_the_committed_parent_source_count
+  - id: A2
+    wrong_behavior: The closure is widened to the complete population of the affected link type, so the count becomes
+      correct while ordinary change starts depending on unrelated populations.
+    evidence_ref: command:just check
+- id: W004
+  label: Scope cardinality checking to the exact definition and role whose count the batch can change
+  kind: implementation
+  dependencies:
+  - W001
+  - W002
+  finding_ids:
+  - F004
+  - F005
+  decision_ids:
+  - D003
+  compatibility_effect: No accepted graph state changes. Batches wrongly rejected become accepted; genuinely invalid
+    batches still reject with the same code and subject.
+  non_effects:
+  - Do not inspect .data.
+  - Do not change which graph states are valid.
+  - Do not cap or sample a bound the model requires to be checked.
+  lifecycle: complete
+  implementation_status: conforming
+  evidence_refs:
+  - path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition
+  - path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another
+  - path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role
+  - path:tests/vellis/test_change_draft_v2.py#test_scoped_change_agrees_with_whole_state_validation
+  - path:tests/vellis/test_change_draft_v2.py#test_attaching_a_child_does_not_load_a_hub_whose_target_bound_cannot_fire
+  - path:tests/vellis/test_change_draft_v2.py#test_adding_an_outgoing_link_does_not_load_a_hub_whose_source_bound_cannot_fire
+  - path:tests/vellis/test_change_draft_v2.py#test_adding_a_data_object_does_not_load_an_anchor_whose_bound_cannot_fire
+  - command:just check
+  blocker: null
+  checkpoint: git:a80775909cd7936e52b2b61fa3070492ebe4e6c9
+  authority_refs:
+  - VellisRequirements::localCardinality
+  - VellisRequirements::atomicChange
+  - VellisRequirements::locality
+  - VellisVerification::cardinality
+  - VellisVerification::activeChange
+  acceptance:
+  - id: A1
+    wrong_behavior: Peers are loaded for every closure endpoint under every in-scope definition, which fixes the
+      false rejection by making ordinary change depend on each endpoint's full degree and on unrelated populations.
+    evidence_ref: path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition
+  - id: A2
+    wrong_behavior: Peers are loaded for every closure endpoint under every in-scope definition, which fixes the
+      false rejection by making ordinary change depend on each endpoint's full degree and on unrelated populations.
+    evidence_ref: path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another
+  - id: A3
+    wrong_behavior: Peers are loaded for every closure endpoint under every in-scope definition, which fixes the
+      false rejection by making ordinary change depend on each endpoint's full degree and on unrelated populations.
+    evidence_ref: path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role
+  - id: A4
+    wrong_behavior: Peers are loaded for every closure endpoint under every in-scope definition, which fixes the
+      false rejection by making ordinary change depend on each endpoint's full degree and on unrelated populations.
+    evidence_ref: path:tests/vellis/test_change_draft_v2.py#test_scoped_change_agrees_with_whole_state_validation
+  - id: A5
+    wrong_behavior: Peers are loaded for every closure endpoint under every in-scope definition, which fixes the
+      false rejection by making ordinary change depend on each endpoint's full degree and on unrelated populations.
+    evidence_ref: path:tests/vellis/test_change_draft_v2.py#test_attaching_a_child_does_not_load_a_hub_whose_target_bound_cannot_fire
+  - id: A6
+    wrong_behavior: Peers are loaded for every closure endpoint under every in-scope definition, which fixes the
+      false rejection by making ordinary change depend on each endpoint's full degree and on unrelated populations.
+    evidence_ref: path:tests/vellis/test_change_draft_v2.py#test_adding_an_outgoing_link_does_not_load_a_hub_whose_source_bound_cannot_fire
+  - id: A7
+    wrong_behavior: Peers are loaded for every closure endpoint under every in-scope definition, which fixes the
+      false rejection by making ordinary change depend on each endpoint's full degree and on unrelated populations.
+    evidence_ref: path:tests/vellis/test_change_draft_v2.py#test_adding_a_data_object_does_not_load_an_anchor_whose_bound_cannot_fire
+  - id: A8
+    wrong_behavior: Peers are loaded for every closure endpoint under every in-scope definition, which fixes the
+      false rejection by making ordinary change depend on each endpoint's full degree and on unrelated populations.
+    evidence_ref: command:just check
+- id: W005
+  label: Make boundary finding paths resolvable and the query bound navigable
+  kind: implementation
+  dependencies:
+  - W001
+  - W002
+  finding_ids:
+  - F006
+  - F007
+  - F009
+  decision_ids: []
+  compatibility_effect: Reported diagnostics and description text only. No accepted input, result, finding code,
+    or database change.
+  non_effects:
+  - Do not inspect .data.
+  - Do not add paging, a cursor, or a configurable limit to pattern selection.
+  - Do not change which selections are accepted or rejected.
+  lifecycle: complete
+  implementation_status: conforming
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request
+  - command:just check
+  blocker: null
+  checkpoint: git:d5129c664c662a880d57e55fe42b80acae5d239c
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  - VellisRequirements::querySafety
+  - VellisVerification::mcpLifecycle
+  acceptance:
+  - id: A1
+    wrong_behavior: The paths are corrected to match today's aliases with nothing that would notice the next alias
+      drift.
+    evidence_ref: path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request
+  - id: A2
+    wrong_behavior: The paths are corrected to match today's aliases with nothing that would notice the next alias
+      drift.
+    evidence_ref: command:just check
+- id: W006
+  label: Make the package check reject a stale distribution
+  kind: implementation
+  dependencies:
+  - W001
+  - W002
+  finding_ids:
+  - F008
+  decision_ids: []
+  compatibility_effect: Build and verification tooling only. No product behavior, wire, or database change.
+  non_effects:
+  - Do not inspect .data.
+  - Do not run broad ignored-file cleanup; remove only the build and dist outputs.
+  - Do not add version-bump automation or change the release process.
+  lifecycle: complete
+  implementation_status: conforming
+  evidence_refs:
+  - path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source
+  - path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version
+  - path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building
+  - path:tests/test_package_smoke.py#test_only_build_distribution_can_run_a_uv_build
+  - command:just package-check
+  - command:just check
+  blocker: null
+  checkpoint: git:a4ff63bf00bd60da6eb1fcce48446113304187b4
+  authority_refs:
+  - VellisRequirements::simpleOperation
+  - VellisVerification::mcpLifecycle
+  acceptance:
+  - id: A1
+    wrong_behavior: The build tree is purged so the symptom disappears locally, while the check still cannot tell
+      a stale artifact from a fresh one.
+    evidence_ref: path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source
+  - id: A2
+    wrong_behavior: The build tree is purged so the symptom disappears locally, while the check still cannot tell
+      a stale artifact from a fresh one.
+    evidence_ref: path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version
+  - id: A3
+    wrong_behavior: The build tree is purged so the symptom disappears locally, while the check still cannot tell
+      a stale artifact from a fresh one.
+    evidence_ref: path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building
+  - id: A4
+    wrong_behavior: The build tree is purged so the symptom disappears locally, while the check still cannot tell
+      a stale artifact from a fresh one.
+    evidence_ref: path:tests/test_package_smoke.py#test_only_build_distribution_can_run_a_uv_build
+  - id: A5
+    wrong_behavior: The build tree is purged so the symptom disappears locally, while the check still cannot tell
+      a stale artifact from a fresh one.
+    evidence_ref: command:just package-check
+  - id: A6
+    wrong_behavior: The build tree is purged so the symptom disappears locally, while the check still cannot tell
+      a stale artifact from a fresh one.
+    evidence_ref: command:just check
+- id: W007
+  label: Close the finding-path class and give role scoping evidence that rejects the both-role system
+  kind: implementation
+  dependencies:
+  - W004
+  - W005
+  finding_ids:
+  - F010
+  - F011
+  - F012
+  - F013
+  - F014
+  - F015
+  - F016
+  - F017
+  decision_ids: []
+  compatibility_effect: Reported diagnostics and evidence only; no accepted input, result, graph state, or database
+    change.
+  non_effects:
+  - Do not open a model-authority change.
+  - Do not alter owner data.
+  lifecycle: active
+  implementation_status: conforming
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary
+  - path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role
+  - command:just check
+  blocker: null
+  checkpoint: null
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  - VellisRequirements::localCardinality
+  - VellisVerification::cardinality
+  - VellisVerification::activeChange
+  acceptance:
+  - id: A1
+    wrong_behavior: Each named site is corrected in place while the sweep and the oracle keep covering the instance
+      that motivated the work rather than the class it belongs to.
+    evidence_ref: path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary
+  - id: A2
+    wrong_behavior: Each named site is corrected in place while the sweep and the oracle keep covering the instance
+      that motivated the work rather than the class it belongs to.
+    evidence_ref: path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role
+  - id: A3
+    wrong_behavior: Each named site is corrected in place while the sweep and the oracle keep covering the instance
+      that motivated the work rather than the class it belongs to.
+    evidence_ref: command:just check
+- id: W003
+  label: Verify, independently review, and close the agent-usable boundary fixes
+  kind: closure
+  dependencies:
+  - W001
+  - W002
+  - W004
+  - W005
+  - W006
+  - W007
+  finding_ids: []
+  decision_ids: []
+  compatibility_effect: No additional compatibility effect beyond W001 and W002.
+  non_effects:
+  - Do not open a model-authority change.
+  - Do not alter owner data.
+  lifecycle: pending
+  implementation_status: conforming
+  evidence_refs:
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties
+  - path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request
+  - command:just check
+  blocker: null
+  checkpoint: null
+  authority_refs:
+  - VellisRequirements::mcpBoundary
+  - VellisRequirements::localCardinality
+  - VellisRequirements::atomicChange
+  - VellisRequirements::locality
+  - VellisRequirements::querySafety
+  - VellisRequirements::simpleOperation
+  - VellisVerification::mcpLifecycle
+  - VellisVerification::cardinality
+  - VellisVerification::activeChange
+  acceptance:
+  - id: A1
+    wrong_behavior: Both fixes pass their focused tests while a real client still cannot complete an ordinary session,
+      because nothing exercised the two behaviors end to end through the selected boundary.
+    evidence_ref: path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties
+  - id: A2
+    wrong_behavior: Both fixes pass their focused tests while a real client still cannot complete an ordinary session,
+      because nothing exercised the two behaviors end to end through the selected boundary.
+    evidence_ref: path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request
+  - id: A3
+    wrong_behavior: Both fixes pass their focused tests while a real client still cannot complete an ordinary session,
+      because nothing exercised the two behaviors end to end through the selected boundary.
+    evidence_ref: command:just check
+reviews:
+- lens: authority and conformance
+  status: findings
+  reviewer: authority-conformance-review-1
+  checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404
+  evidence_refs:
+  - command:just check
+  scope: closure
+- lens: engineering and evidence
+  status: findings
+  reviewer: engineering-evidence-review-1
+  checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404
+  evidence_refs:
+  - command:just check
+  scope: closure
 closure:
-  finding_disposition: open
   model_status: unchanged
   implementation_status: absent
-  integration_status: conforming
-  external_status: not applicable
-  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and version all remain stable. The union tools gain a merged top-level properties map. The cardinality closure materializes no more than the source baseline, since W004 reverted W002's both-role widening and skips any role whose bound cannot fire. Finding paths change at eight refusal sites — six F006 corrections, which include object findings readdressed from closure position to UUID, plus the type summary's over-limit path dropped and an unreachable draft definition guard shortened. The type summary's finding summary also names rtg_type_inspect. Finding codes and outcome summaries are unchanged.
-  reviews:
-    - {lens: authority and conformance, status: findings, reviewer: authority-conformance-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
-    - {lens: engineering and evidence, status: findings, reviewer: engineering-evidence-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
+  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and version all
+    remain stable. The union tools gain a merged top-level properties map. The cardinality closure materializes
+    no more than the source baseline, since W004 reverted W002's both-role widening and skips any role whose bound
+    cannot fire. Finding paths change at eight refusal sites — six F006 corrections, which include object findings
+    readdressed from closure position to UUID, plus the type summary's over-limit path dropped and an unreachable
+    draft definition guard shortened. The type summary's finding summary also names rtg_type_inspect. Finding codes
+    and outcome summaries are unchanged.
   evidence_refs: []
   checkpoint: null

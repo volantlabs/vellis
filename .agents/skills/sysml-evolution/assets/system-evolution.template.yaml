@@ -1,8 +1,9 @@
 schema_version: "1.0"
 evolution:
   id: system-evolution
-  objective: Reconcile one evidence-backed change set across accepted model authority and implementation.
-  observable_distinction: The accepted target behavior and its implementation can be distinguished from the source baseline and nearest plausible wrong system.
+  mode: copilot
+  objective: Reconcile one evidence-backed change set across accepted authority and implementation.
+  observable_distinction: The accepted target behavior and its implementation can be distinguished from the source baseline and the nearest plausible wrong system.
   lifecycle: discovery
   approval:
     status: pending
@@ -11,7 +12,6 @@ evolution:
   blocker: null
   checkpoint: null
 baselines:
-  status: current
   source:
     model: source-model-baseline
     implementation: source-implementation-baseline
@@ -19,12 +19,6 @@ baselines:
     execution_environment: null
     checkpoint: null
   target: null
-  observed:
-    model: source-model-baseline
-    implementation: source-implementation-baseline
-    language: language-baseline
-    execution_environment: null
-    checkpoint: null
 scope:
   authority_scope:
     - accepted-system-authority
@@ -45,56 +39,33 @@ findings:
       - evidence-system-reference
     disposition: model-change
     owner_work_item_id: W001
-    implementation_status: conflicting
-    nearest_wrong_system: The source implementation remains permitted because current authority cannot distinguish the intended consequence.
-    compatibility_effect: Compatibility remains to be evaluated against the accepted target meaning.
 decisions: []
 work_items:
   - id: W001
-    order: 1
     label: Close the affected accepted model meaning
     kind: modeling
     dependencies: []
-    planned_baseline:
-      dimension: model
-      identity: source-model-baseline
     finding_ids:
       - F001
     decision_ids: []
-    authority:
-      - refs:
-          - Model::AffectedAuthority
-        coverage: full
-        remaining_work_item_ids: []
-    approval:
-      status: pending
-      reason: This work item changes accepted system meaning.
-      checkpoint: null
-    nearest_wrong_system: The source behavior remains possible until accepted authority distinguishes it.
+    authority_refs:
+      - Model::AffectedAuthority
+    acceptance:
+      - id: A1
+        wrong_behavior: Accepted authority still permits the observed consequence after the change.
+        evidence_ref: evidence-system-reference
     compatibility_effect: Compatibility remains to be evaluated.
     non_effects: []
     lifecycle: pending
     implementation_status: not evaluated
-    evidence_refs: []
+    evidence_refs:
+      - evidence-system-reference
     blocker: null
     checkpoint: null
+reviews: []
 closure:
-  finding_disposition: open
   model_status: not evaluated
   implementation_status: not evaluated
-  integration_status: not applicable
-  external_status: not applicable
   compatibility: Not yet evaluated.
-  reviews:
-    - lens: authority and conformance
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
-    - lens: engineering and evidence
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
   evidence_refs: []
   checkpoint: null

@@ -76,7 +76,7 @@ def _evidence_references(record: dict[str, Any]) -> list[tuple[str, str]]:
                 for value in item["blocker"]["evidence_refs"]
             )
     result.extend(("closure", value) for value in record["closure"]["evidence_refs"])
-    for review in record["closure"]["reviews"]:
+    for review in record["reviews"]:
         result.extend((f"review {review['lens']}", value) for value in review["evidence_refs"])
     return result
 
@@ -101,8 +101,7 @@ def _authority_references(record: dict[str, Any]) -> list[tuple[str, str]]:
         for entry in collection:
             result.extend((f"{label} {entry['id']}", value) for value in entry["authority_refs"])
     for item in record["work_items"]:
-        for contribution in item["authority"]:
-            result.extend((f"work item {item['id']}", value) for value in contribution["refs"])
+        result.extend((f"work item {item['id']}", value) for value in item["authority_refs"])
     return result
 
 
@@ -137,7 +136,7 @@ def _member_resolves(member: str, source: str) -> bool:
 
 def _git_references(record: dict[str, Any]) -> set[str]:
     result: set[str] = set()
-    for name in ("source", "target", "observed"):
+    for name in ("source", "target"):
         baseline = record["baselines"][name]
         if baseline is not None:
             result.update(
@@ -146,15 +145,11 @@ def _git_references(record: dict[str, Any]) -> set[str]:
                 if isinstance(value, str) and value.startswith("git:")
             )
     for item in record["work_items"]:
-        values = (
-            item["planned_baseline"]["identity"],
-            item["checkpoint"],
-            item["approval"]["checkpoint"],
-        )
+        values = (item["checkpoint"],)
         result.update(
             value for value in values if isinstance(value, str) and value.startswith("git:")
         )
-    for review in record["closure"]["reviews"]:
+    for review in record["reviews"]:
         value = review["checkpoint"]
         if isinstance(value, str) and value.startswith("git:"):
             result.add(value)
@@ -211,45 +206,23 @@ def repository_baseline(root: Path) -> dict[str, str]:
 
 
 def repository_baseline_findings(record: dict[str, Any], *, root: Path) -> list[str]:
+    """Compare the record's own baseline with the repository, computing rather than storing.
+
+    The record used to carry an observed baseline that a check then compared with the
+    repository, so every ordinary commit made the stored copy stale and demanded a record
+    commit to restamp it. The repository is the observation; only the bound baseline is
+    recorded.
+    """
     actual = repository_baseline(root)
-    observed = record["baselines"]["observed"]
+    bound = record["baselines"]["target"] or record["baselines"]["source"]
     result = [
-        f"observed {dimension} baseline does not match the current repository"
+        f"evolution is bound to a stale {dimension} baseline"
         for dimension in ("model", "language", "execution_environment")
-        if observed[dimension] != actual[dimension]
+        if bound[dimension] is not None and bound[dimension] != actual[dimension]
     ]
     if record["evolution"]["lifecycle"] == "complete":
         result.extend(_complete_baseline_findings(record, actual, root))
-    else:
-        result.extend(_active_baseline_findings(record, actual, root))
     return result
-
-
-def _record_only_advance(observed: dict[str, Any], actual: dict[str, str], root: Path) -> bool:
-    if not observed["implementation"].startswith("git:"):
-        return False
-    old = observed["implementation"].removeprefix("git:")
-    new = actual["implementation"].removeprefix("git:")
-    if old == new:
-        return False
-    try:
-        changed = git_text(root, "diff", "--name-only", old, new).splitlines()
-    except RuntimeError:
-        return False
-    return changed == ["system-evolution.yaml"]
-
-
-def _active_baseline_findings(
-    record: dict[str, Any], actual: dict[str, str], root: Path
-) -> list[str]:
-    observed = record["baselines"]["observed"]
-    if _record_only_advance(observed, actual, root):
-        return []
-    return [
-        f"observed {dimension} baseline does not match the current repository"
-        for dimension in ("implementation", "checkpoint")
-        if observed[dimension] != actual[dimension]
-    ]
 
 
 def _complete_baseline_findings(
@@ -284,9 +257,7 @@ def _only_record_changed(old: str, new: str, root: Path) -> bool:
 
 
 def _approvals(record: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
-    return [("evolution", record["evolution"]["approval"])] + [
-        (f"work item {item['id']}", item["approval"]) for item in record["work_items"]
-    ]
+    return [("evolution", record["evolution"]["approval"])]
 
 
 def approval_checkpoint_findings(record: dict[str, Any], *, root: Path) -> list[str]:
@@ -339,21 +310,10 @@ def _approval_projections(
     record: dict[str, Any],
     historical: dict[str, Any],
 ) -> tuple[object, dict[str, Any], dict[str, Any], dict[str, Any]]:
-    if label == "evolution":
-        subject = historical.get("evolution", {})
-        old_approval = historical.get("evolution", {}).get("approval", {})
-        current = _evolution_approval_projection(record)
-        old = _evolution_approval_projection(historical)
-    else:
-        item_id = label.removeprefix("work item ")
-        subject = next(
-            (item for item in historical.get("work_items", []) if item.get("id") == item_id),
-            {},
-        )
-        old_approval = subject.get("approval", {})
-        current_item = next(item for item in record["work_items"] if item["id"] == item_id)
-        current = _work_approval_projection(current_item, record)
-        old = _work_approval_projection(subject, historical)
+    subject = historical.get("evolution", {})
+    old_approval = subject.get("approval", {})
+    current = _evolution_approval_projection(record)
+    old = _evolution_approval_projection(historical)
     current["reason"] = approval["reason"]
     old["reason"] = old_approval.get("reason")
     return subject, old_approval, current, old
@@ -366,62 +326,6 @@ def _evolution_approval_projection(record: dict[str, Any]) -> dict[str, Any]:
         "observable_distinction": evolution.get("observable_distinction"),
         "scope": record.get("scope"),
     }
-
-
-def _work_approval_projection(item: dict[str, Any], record: dict[str, Any]) -> dict[str, Any]:
-    fields = (
-        "label",
-        "kind",
-        "dependencies",
-        "finding_ids",
-        "decision_ids",
-        "authority",
-        "nearest_wrong_system",
-        "compatibility_effect",
-        "non_effects",
-    )
-    finding_ids = set(item.get("finding_ids", []))
-    decision_ids = set(item.get("decision_ids", []))
-    return {
-        **{field: item.get(field) for field in fields},
-        "findings": [
-            _finding_projection(value)
-            for value in record.get("findings", [])
-            if value.get("id") in finding_ids
-        ],
-        "decisions": [
-            _decision_projection(value)
-            for value in record.get("decisions", [])
-            if value.get("id") in decision_ids
-        ],
-    }
-
-
-def _finding_projection(finding: dict[str, Any]) -> dict[str, Any]:
-    fields = (
-        "id",
-        "summary",
-        "classification",
-        "consequence",
-        "authority_refs",
-        "owner_work_item_id",
-        "nearest_wrong_system",
-        "compatibility_effect",
-    )
-    return {field: finding.get(field) for field in fields}
-
-
-def _decision_projection(decision: dict[str, Any]) -> dict[str, Any]:
-    fields = (
-        "id",
-        "summary",
-        "authority_refs",
-        "alternatives",
-        "reversible",
-        "owner_work_item_id",
-        "evidence_intent",
-    )
-    return {field: decision.get(field) for field in fields}
 
 
 def repository_findings(record: dict[str, Any], *, root: Path) -> list[str]:

@@ -12,62 +12,107 @@
     "findings",
     "decisions",
     "work_items",
+    "reviews",
     "closure"
   ],
   "properties": {
-    "schema_version": {"const": "1.0"},
-    "evolution": {"$ref": "#/$defs/evolution"},
-    "baselines": {"$ref": "#/$defs/baselines"},
-    "scope": {"$ref": "#/$defs/scope"},
+    "schema_version": {
+      "const": "1.0"
+    },
+    "evolution": {
+      "$ref": "#/$defs/evolution"
+    },
+    "baselines": {
+      "$ref": "#/$defs/baselines"
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
     "findings": {
       "type": "array",
-      "items": {"$ref": "#/$defs/finding"}
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
     },
     "decisions": {
       "type": "array",
-      "items": {"$ref": "#/$defs/decision"}
+      "items": {
+        "$ref": "#/$defs/decision"
+      }
     },
     "work_items": {
       "type": "array",
       "minItems": 1,
-      "items": {"$ref": "#/$defs/work_item"}
+      "items": {
+        "$ref": "#/$defs/work_item"
+      }
     },
-    "closure": {"$ref": "#/$defs/closure"}
+    "reviews": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/review"
+      }
+    },
+    "closure": {
+      "$ref": "#/$defs/closure"
+    }
   },
   "anyOf": [
-    {"properties": {"findings": {"minItems": 1}}},
-    {"properties": {"decisions": {"minItems": 1}}}
+    {
+      "properties": {
+        "findings": {
+          "minItems": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "decisions": {
+          "minItems": 1
+        }
+      }
+    }
   ],
   "$defs": {
-    "nonempty_string": {"type": "string", "minLength": 1},
-    "short_string": {"type": "string", "minLength": 1, "maxLength": 240},
-    "reference": {"type": "string", "minLength": 1, "maxLength": 400},
-    "reference_list": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {"$ref": "#/$defs/reference"}
+    "nonempty_string": {
+      "type": "string",
+      "minLength": 1
     },
-    "id": {"type": "string", "pattern": "^[A-Z][A-Z0-9_-]{1,31}$"},
-    "id_list": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {"$ref": "#/$defs/id"}
+    "short_string": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240
     },
-    "checkpoint": {
-      "type": ["string", "null"],
+    "reference": {
+      "type": "string",
       "minLength": 1,
       "maxLength": 400
     },
-    "baseline_binding": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["dimension", "identity"],
-      "properties": {
-        "dimension": {
-          "enum": ["model", "implementation", "language", "execution_environment", "checkpoint"]
-        },
-        "identity": {"$ref": "#/$defs/nonempty_string"}
+    "reference_list": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/reference"
       }
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_-]{1,31}$"
+    },
+    "id_list": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "checkpoint": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 400
     },
     "status": {
       "enum": [
@@ -82,46 +127,104 @@
     "baseline": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["model", "implementation", "language", "execution_environment", "checkpoint"],
+      "required": [
+        "model",
+        "implementation",
+        "language",
+        "execution_environment",
+        "checkpoint"
+      ],
       "properties": {
-        "model": {"$ref": "#/$defs/nonempty_string"},
-        "implementation": {"$ref": "#/$defs/nonempty_string"},
-        "language": {"type": ["string", "null"], "minLength": 1},
-        "execution_environment": {"type": ["string", "null"], "minLength": 1},
-        "checkpoint": {"$ref": "#/$defs/checkpoint"}
+        "model": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "implementation": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "language": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "execution_environment": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/checkpoint"
+        }
       }
     },
     "nullable_baseline": {
       "oneOf": [
-        {"type": "null"},
-        {"$ref": "#/$defs/baseline"}
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/baseline"
+        }
       ]
     },
     "baselines": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "source", "target", "observed"],
+      "required": [
+        "source",
+        "target"
+      ],
       "properties": {
-        "status": {"enum": ["current", "stale"]},
-        "source": {"$ref": "#/$defs/baseline"},
-        "target": {"$ref": "#/$defs/nullable_baseline"},
-        "observed": {"$ref": "#/$defs/baseline"}
+        "source": {
+          "$ref": "#/$defs/baseline"
+        },
+        "target": {
+          "$ref": "#/$defs/nullable_baseline"
+        }
       }
     },
     "approval": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "reason", "checkpoint"],
+      "required": [
+        "status",
+        "reason",
+        "checkpoint"
+      ],
       "properties": {
-        "status": {"enum": ["not-required", "pending", "accepted", "changes-required"]},
-        "reason": {"type": ["string", "null"], "minLength": 1, "maxLength": 500},
-        "checkpoint": {"$ref": "#/$defs/checkpoint"}
+        "status": {
+          "enum": [
+            "not-required",
+            "pending",
+            "accepted",
+            "changes-required"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/checkpoint"
+        }
       }
     },
     "blocker": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["classification", "summary", "finding_ids", "evidence_refs"],
+      "required": [
+        "classification",
+        "summary",
+        "finding_ids",
+        "evidence_refs"
+      ],
       "properties": {
         "classification": {
           "enum": [
@@ -133,15 +236,27 @@
             "external dependency"
           ]
         },
-        "summary": {"type": "string", "minLength": 1, "maxLength": 500},
-        "finding_ids": {"$ref": "#/$defs/id_list"},
-        "evidence_refs": {"$ref": "#/$defs/reference_list"}
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "finding_ids": {
+          "$ref": "#/$defs/id_list"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/reference_list"
+        }
       }
     },
     "nullable_blocker": {
       "oneOf": [
-        {"type": "null"},
-        {"$ref": "#/$defs/blocker"}
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/blocker"
+        }
       ]
     },
     "evolution": {
@@ -149,6 +264,7 @@
       "additionalProperties": false,
       "required": [
         "id",
+        "mode",
         "objective",
         "observable_distinction",
         "lifecycle",
@@ -157,9 +273,24 @@
         "checkpoint"
       ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
-        "objective": {"$ref": "#/$defs/short_string"},
-        "observable_distinction": {"type": "string", "minLength": 1, "maxLength": 500},
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,63}$"
+        },
+        "mode": {
+          "enum": [
+            "copilot",
+            "autonomous"
+          ]
+        },
+        "objective": {
+          "$ref": "#/$defs/short_string"
+        },
+        "observable_distinction": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
         "lifecycle": {
           "enum": [
             "discovery",
@@ -172,20 +303,39 @@
             "complete"
           ]
         },
-        "approval": {"$ref": "#/$defs/approval"},
-        "blocker": {"$ref": "#/$defs/nullable_blocker"},
-        "checkpoint": {"$ref": "#/$defs/checkpoint"}
+        "approval": {
+          "$ref": "#/$defs/approval"
+        },
+        "blocker": {
+          "$ref": "#/$defs/nullable_blocker"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/checkpoint"
+        }
       }
     },
     "scope": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["authority_scope", "implementation_scope", "review_lenses", "non_goals"],
+      "required": [
+        "authority_scope",
+        "implementation_scope",
+        "review_lenses",
+        "non_goals"
+      ],
       "properties": {
-        "authority_scope": {"$ref": "#/$defs/reference_list"},
-        "implementation_scope": {"$ref": "#/$defs/reference_list"},
-        "review_lenses": {"$ref": "#/$defs/reference_list"},
-        "non_goals": {"$ref": "#/$defs/reference_list"}
+        "authority_scope": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "implementation_scope": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "review_lenses": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "non_goals": {
+          "$ref": "#/$defs/reference_list"
+        }
       }
     },
     "finding": {
@@ -199,14 +349,15 @@
         "authority_refs",
         "evidence_refs",
         "disposition",
-        "owner_work_item_id",
-        "implementation_status",
-        "nearest_wrong_system",
-        "compatibility_effect"
+        "owner_work_item_id"
       ],
       "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "summary": {"$ref": "#/$defs/short_string"},
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "summary": {
+          "$ref": "#/$defs/short_string"
+        },
         "classification": {
           "enum": [
             "language question",
@@ -220,9 +371,17 @@
             "out of scope"
           ]
         },
-        "consequence": {"type": "string", "minLength": 1, "maxLength": 700},
-        "authority_refs": {"$ref": "#/$defs/reference_list"},
-        "evidence_refs": {"$ref": "#/$defs/reference_list"},
+        "consequence": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700
+        },
+        "authority_refs": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/reference_list"
+        },
         "disposition": {
           "enum": [
             "open",
@@ -234,10 +393,9 @@
             "resolved"
           ]
         },
-        "owner_work_item_id": {"$ref": "#/$defs/id"},
-        "implementation_status": {"$ref": "#/$defs/status"},
-        "nearest_wrong_system": {"type": "string", "minLength": 1, "maxLength": 700},
-        "compatibility_effect": {"type": "string", "minLength": 1, "maxLength": 700}
+        "owner_work_item_id": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "decision": {
@@ -250,30 +408,34 @@
         "alternatives",
         "reversible",
         "owner_work_item_id",
-        "evidence_intent",
         "implementation_status",
         "evidence_refs"
       ],
       "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "summary": {"$ref": "#/$defs/short_string"},
-        "authority_refs": {"$ref": "#/$defs/reference_list"},
-        "alternatives": {"$ref": "#/$defs/reference_list"},
-        "reversible": {"type": "boolean"},
-        "owner_work_item_id": {"$ref": "#/$defs/id"},
-        "evidence_intent": {"$ref": "#/$defs/reference_list"},
-        "implementation_status": {"$ref": "#/$defs/status"},
-        "evidence_refs": {"$ref": "#/$defs/reference_list"}
-      }
-    },
-    "authority_contribution": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["refs", "coverage", "remaining_work_item_ids"],
-      "properties": {
-        "refs": {"$ref": "#/$defs/reference_list"},
-        "coverage": {"enum": ["full", "partial"]},
-        "remaining_work_item_ids": {"$ref": "#/$defs/id_list"}
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "summary": {
+          "$ref": "#/$defs/short_string"
+        },
+        "authority_refs": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "alternatives": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "reversible": {
+          "type": "boolean"
+        },
+        "owner_work_item_id": {
+          "$ref": "#/$defs/id"
+        },
+        "implementation_status": {
+          "$ref": "#/$defs/status"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/reference_list"
+        }
       }
     },
     "work_item": {
@@ -281,16 +443,13 @@
       "additionalProperties": false,
       "required": [
         "id",
-        "order",
         "label",
         "kind",
         "dependencies",
-        "planned_baseline",
         "finding_ids",
         "decision_ids",
-        "authority",
-        "approval",
-        "nearest_wrong_system",
+        "authority_refs",
+        "acceptance",
         "compatibility_effect",
         "non_effects",
         "lifecycle",
@@ -300,68 +459,168 @@
         "checkpoint"
       ],
       "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "order": {"type": "integer", "minimum": 1},
-        "label": {"$ref": "#/$defs/short_string"},
-        "kind": {"enum": ["modeling", "implementation", "integration", "closure"]},
-        "dependencies": {"$ref": "#/$defs/id_list"},
-        "planned_baseline": {"$ref": "#/$defs/baseline_binding"},
-        "finding_ids": {"$ref": "#/$defs/id_list"},
-        "decision_ids": {"$ref": "#/$defs/id_list"},
-        "authority": {
-          "type": "array",
-          "items": {"$ref": "#/$defs/authority_contribution"}
+        "id": {
+          "$ref": "#/$defs/id"
         },
-        "approval": {"$ref": "#/$defs/approval"},
-        "nearest_wrong_system": {"type": "string", "minLength": 1, "maxLength": 700},
-        "compatibility_effect": {"type": "string", "minLength": 1, "maxLength": 700},
-        "non_effects": {"$ref": "#/$defs/reference_list"},
-        "lifecycle": {"enum": ["pending", "ready", "active", "blocked", "stale", "complete"]},
-        "implementation_status": {"$ref": "#/$defs/status"},
-        "evidence_refs": {"$ref": "#/$defs/reference_list"},
-        "blocker": {"$ref": "#/$defs/nullable_blocker"},
-        "checkpoint": {"$ref": "#/$defs/checkpoint"}
+        "label": {
+          "$ref": "#/$defs/short_string"
+        },
+        "kind": {
+          "enum": [
+            "modeling",
+            "implementation",
+            "integration",
+            "closure"
+          ]
+        },
+        "dependencies": {
+          "$ref": "#/$defs/id_list"
+        },
+        "finding_ids": {
+          "$ref": "#/$defs/id_list"
+        },
+        "decision_ids": {
+          "$ref": "#/$defs/id_list"
+        },
+        "authority_refs": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "acceptance": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/acceptance_entry"
+          }
+        },
+        "compatibility_effect": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700
+        },
+        "non_effects": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "lifecycle": {
+          "enum": [
+            "pending",
+            "ready",
+            "active",
+            "blocked",
+            "stale",
+            "complete"
+          ]
+        },
+        "implementation_status": {
+          "$ref": "#/$defs/status"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "blocker": {
+          "$ref": "#/$defs/nullable_blocker"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/checkpoint"
+        }
       }
     },
     "review": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["lens", "status", "reviewer", "checkpoint", "evidence_refs"],
+      "required": [
+        "lens",
+        "reviewer",
+        "checkpoint",
+        "scope",
+        "status",
+        "evidence_refs"
+      ],
       "properties": {
-        "lens": {"$ref": "#/$defs/short_string"},
-        "status": {"enum": ["pending", "findings", "clean"]},
-        "reviewer": {"type": ["string", "null"], "minLength": 1, "maxLength": 240},
-        "checkpoint": {"$ref": "#/$defs/checkpoint"},
-        "evidence_refs": {"$ref": "#/$defs/reference_list"}
+        "lens": {
+          "$ref": "#/$defs/short_string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "findings",
+            "clean"
+          ]
+        },
+        "reviewer": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/checkpoint"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "scope": {
+          "$ref": "#/$defs/short_string"
+        }
       }
     },
     "closure": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "finding_disposition",
         "model_status",
         "implementation_status",
-        "integration_status",
-        "external_status",
         "compatibility",
-        "reviews",
         "evidence_refs",
         "checkpoint"
       ],
       "properties": {
-        "finding_disposition": {"enum": ["open", "complete"]},
-        "model_status": {"enum": ["not evaluated", "unchanged", "accepted", "conflicting"]},
-        "implementation_status": {"$ref": "#/$defs/status"},
-        "integration_status": {"$ref": "#/$defs/status"},
-        "external_status": {"$ref": "#/$defs/status"},
-        "compatibility": {"type": "string", "minLength": 1, "maxLength": 700},
-        "reviews": {
-          "type": "array",
-          "items": {"$ref": "#/$defs/review"}
+        "model_status": {
+          "enum": [
+            "not evaluated",
+            "unchanged",
+            "accepted",
+            "conflicting"
+          ]
         },
-        "evidence_refs": {"$ref": "#/$defs/reference_list"},
-        "checkpoint": {"$ref": "#/$defs/checkpoint"}
+        "implementation_status": {
+          "$ref": "#/$defs/status"
+        },
+        "compatibility": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/checkpoint"
+        }
+      }
+    },
+    "acceptance_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "wrong_behavior",
+        "evidence_ref"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^A[0-9]{1,3}$"
+        },
+        "wrong_behavior": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700
+        },
+        "evidence_ref": {
+          "$ref": "#/$defs/reference"
+        }
       }
     }
   }

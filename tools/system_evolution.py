@@ -40,7 +40,7 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
 
 
 def status(record: dict[str, Any]) -> str:
-    ordered = sorted(record["work_items"], key=lambda item: item["order"])
+    ordered = record["work_items"]
     active = next((item["id"] for item in ordered if item["lifecycle"] == "active"), None)
     complete = {item["id"] for item in ordered if item["lifecycle"] == "complete"}
     ready = [
