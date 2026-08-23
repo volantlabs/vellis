@@ -17,7 +17,10 @@ just check
 `just build` produces the wheel and source distribution into `dist/` for local inspection; it is
 independent of `just package-check`, which builds and smoke-tests its own disposable copies and
 also proves the documented `uv tool install git+...` path against this checkout's committed HEAD
-(see [`docs/install.md`](docs/install.md)).
+(see [`docs/install.md`](docs/install.md)). `just package-check` first deletes this checkout's
+ignored `build/` directory, because the build backend reuses that tree and never removes files
+deleted from source; it then compares every installed module against source by content, so a stale
+artifact fails the check instead of passing it.
 
 ### Version bump
 

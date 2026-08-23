@@ -3329,6 +3329,24 @@ async def test_query_finding_paths_resolve_against_the_request(starter_database:
             (selection, await client.call_tool("rtg_query", {"selection": selection}))
             for selection in (over_limit, bad_regex, empty_name, duplicate_name)
         ]
+        # The draft-state pattern query is a separate code path an agent reaches
+        # with state draft, and it emits its own over-limit finding.
+        await client.call_tool(
+            "rtg_draft_change",
+            {
+                "objectUpserts": [
+                    {
+                        "kind": "anchor",
+                        "uuid": "00000000-0000-4000-8000-000000000003",
+                        "typeKey": "life.person",
+                        "displayName": "C",
+                    }
+                ]
+            },
+        )
+        drafted = await client.call_tool(
+            "rtg_query", {"selection": over_limit, "state": {"kind": "draft"}}
+        )
 
     for selection, result in results:
         content = result.structured_content
@@ -3346,6 +3364,13 @@ async def test_query_finding_paths_resolve_against_the_request(starter_database:
     duplicate_paths = {finding["path"] for finding in duplicate_content["findings"]}
     assert "/selection/nodes/1/name" in duplicate_paths
     assert "/selection/links/0/name" in duplicate_paths
+
+    draft_content = drafted.structured_content
+    assert draft_content is not None
+    assert draft_content["status"] == "rejected"
+    draft_finding = draft_content["findings"][0]
+    assert draft_finding["path"] == "/selection/maxMatches"
+    _resolve_request_pointer({"selection": over_limit}, draft_finding["path"])
 
     # RTG014 requires the description itself to guide bounded pattern narrowing,
     # not only the finding an agent receives after exceeding the bound.

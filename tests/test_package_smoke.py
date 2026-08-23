@@ -4,10 +4,12 @@ from pathlib import Path
 
 import pytest
 
+import tools.package_smoke as package_smoke
 from tools.package_smoke import (
     ROOT,
     _assert_installed_import,
     _assert_installed_matches_source,
+    _build_distribution,
     _purge_build_tree,
     _run_isolated_tool,
 )
@@ -147,3 +149,26 @@ def test_installed_import_check_compares_content_not_only_the_version(tmp_path: 
 
     with pytest.raises(AssertionError, match="does not match the source tree"):
         _assert_installed_import(Path(sys.executable), environment, environment, "wheel")
+
+
+def test_build_distribution_purges_the_intermediate_tree_before_building(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The purge must be part of the build, not merely defined next to it.
+
+    A purge helper that no build path invokes leaves a stale tree shipping
+    modules that no longer exist in source.
+    """
+    stale = tmp_path / "build" / "lib" / "vellis"
+    stale.mkdir(parents=True)
+    (stale / "ghost.py").write_text("# deleted from source, still in build/\n")
+    observed: list[bool] = []
+
+    def recording_run(*arguments: str, cwd: Path, env: dict[str, str] | None = None):
+        observed.append((tmp_path / "build").exists())
+        return None
+
+    monkeypatch.setattr(package_smoke, "_run", recording_run)
+    _build_distribution(tmp_path, tmp_path / "dist", {})
+
+    assert observed == [False], "the build ran against a tree that was not purged"

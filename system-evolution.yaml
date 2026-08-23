@@ -110,11 +110,11 @@ findings:
     nearest_wrong_system: A cap or sampling is added to bound the load, which silently stops checking a bound the model requires.
     compatibility_effect: No accepted graph state changes; the effect is on how much state one ordinary change materializes.
   - id: F006
-    summary: Three finding paths name request members the request does not have, so an agent cannot resolve them against its own document.
+    summary: Four finding paths name request members the request does not have, so an agent cannot resolve them against its own document.
     classification: implementation defect
     consequence: An over-limit pattern reported /selection/maximumMatches while the accepted member is maxMatches; a regex predicate finding reported the domain name text while the accepted member is value; and both the empty-name and duplicate-name selector checks reported an index into the concatenation of the separate node and link name arrays, which is a member no request carries. RTG014 requires an optional finding path to identify the exact request member.
     authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, path:tests/vellis/test_query_v2_successor.py#test_out_of_range_match_bound_names_the_accepted_request_member]
     disposition: resolved
     owner_work_item_id: W005
     implementation_status: conforming
@@ -135,8 +135,8 @@ findings:
     summary: The package check builds through an uncleaned build tree and never compares the built artifact against source, so it certifies a stale distribution.
     classification: implementation defect
     consequence: The setuptools backend reuses the ignored build directory and never purges files deleted from source, and package_smoke runs its build in the repository root, so the artifact it builds, installs and exercises can predate current source. Its only artifact assertion compares a version string, which a rebuild leaves unchanged. The local build tree had already drifted, carrying modules deleted in git:4612c0d and one file with no version-control history. The documented install builds from a fresh clone and is not exposed; what the check certified, and what a local reinstall produced, was.
-    authority_refs: [VellisRequirements::simpleOperation]
-    evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_purge_build_tree_removes_the_intermediate_build_directory, command:just package-check]
+    authority_refs: [VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
+    evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building, command:just package-check]
     disposition: resolved
     owner_work_item_id: W006
     implementation_status: conforming
@@ -169,7 +169,7 @@ decisions:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties]
   - id: D002
-    summary: Load peer links incident to any closure endpoint in either role. Superseded by D003, which scopes subjects and reverts this role union.
+    summary: Load peer links incident to any closure endpoint in either role. In effect from git:f486fe6 until git:a807759, then removed by D003, which scopes subjects instead. No longer realized.
     authority_refs: [VellisRequirements::localCardinality, VellisRequirements::atomicChange, VellisRequirements::locality]
     alternatives:
       - Track source subjects and target subjects separately and check each endpoint only in the role whose count the batch can change, which is closer to the wording of atomicChange but redistributes role bookkeeping across the pure validator boundary.
@@ -315,7 +315,7 @@ work_items:
     finding_ids: [F008]
     decision_ids: []
     authority:
-      - refs: [VellisRequirements::simpleOperation]
+      - refs: [VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
         coverage: partial
         remaining_work_item_ids: [W003]
     approval:
@@ -330,7 +330,7 @@ work_items:
       - Do not add version-bump automation or change the release process.
     lifecycle: complete
     implementation_status: conforming
-    evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_purge_build_tree_removes_the_intermediate_build_directory, command:just package-check, command:just check]
+    evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building, command:just package-check, command:just check]
     blocker: null
     checkpoint: git:25d8c96503216fba64175fb12e99e379b7f4cb35
   - id: W003
@@ -356,7 +356,7 @@ work_items:
       - Do not alter owner data.
     lifecycle: active
     implementation_status: conforming
-    evidence_refs: [command:just check]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties, path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, command:just check]
     blocker: null
     checkpoint: null
 closure:

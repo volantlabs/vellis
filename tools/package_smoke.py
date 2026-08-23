@@ -321,6 +321,16 @@ def _assert_installed_import(python: Path, environment: Path, root: Path, label:
     _assert_installed_matches_source(Path(source).resolve().parent, label)
 
 
+def _build_distribution(root: Path, out_dir: Path, environment: dict[str, str]) -> None:
+    """Purge the intermediate tree, then build.
+
+    The purge belongs to the build rather than beside it, so a build cannot be
+    invoked without it.
+    """
+    _purge_build_tree(root)
+    _run("uv", "build", "--wheel", "--sdist", "--out-dir", str(out_dir), cwd=root, env=environment)
+
+
 def _purge_build_tree(root: Path) -> None:
     """Remove the backend's intermediate build tree before building.
 
@@ -788,17 +798,7 @@ def main() -> int:
         documented_install_root = temporary / "documented-install"
         documented_install_root.mkdir()
         _verify_documented_install(ROOT, documented_install_root, environment)
-        _purge_build_tree(ROOT)
-        _run(
-            "uv",
-            "build",
-            "--wheel",
-            "--sdist",
-            "--out-dir",
-            str(distribution),
-            cwd=ROOT,
-            env=environment,
-        )
+        _build_distribution(ROOT, distribution, environment)
         wheel = next(distribution.glob(f"vellis-{VERSION}-py3-none-any.whl"))
         source = next(distribution.glob(f"vellis-{VERSION}.tar.gz"))
         _smoke(wheel, temporary, "wheel")

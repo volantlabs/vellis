@@ -1163,3 +1163,24 @@ def _graph():
         Link(L4, "test.relates", D1, A),
         Link(L5, "test.relates", A, P),
     )
+
+
+def test_out_of_range_match_bound_names_the_accepted_request_member(tmp_path: Path) -> None:
+    """The bound rejection must name maxMatches, the member a request carries.
+
+    The wire layer bounds this member first, so an agent reaches this finding
+    only through a client that bypasses the published schema. The path still has
+    to identify a real member, because an agent cannot correct one it does not
+    have.
+    """
+    database = _database(tmp_path)
+
+    result = query_graph(
+        database,
+        GraphQuery(
+            PatternSelection(0, (PatternNode("a", PatternNodeKind.ANCHOR),)),
+        ),
+    )
+
+    assert result.status is OperationStatus.REJECTED
+    assert [finding.path for finding in result.findings] == ["/selection/maxMatches"]
