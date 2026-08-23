@@ -3,13 +3,13 @@ evolution:
   id: vellis-2-agent-usable-boundary
   objective: Make the MCP boundary usable by a conforming client doing real agent work, so that every selected tool can actually receive its arguments and an incremental graph load never fails a cardinality count the change could not affect.
   observable_distinction: A conforming MCP client can call rtg_validate and rtg_draft_inspect with their fresh and continuation arguments and receive the selected payload instead of an input-validation refusal, and attaching new children to an existing parent under a minimum-one links-per-source type is accepted instead of rejected with a cardinalityViolation naming the untouched parent.
-  lifecycle: complete
+  lifecycle: active
   approval:
     status: not-required
     reason: RTG014 already requires the selected behaviors to be exposed through ordinary typed JSON values, and RTG003 already requires each count to apply to the complete permitted population of that exact one type. Both findings are implementation defects under sufficient accepted authority.
     checkpoint: null
   blocker: null
-  checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
+  checkpoint: null
 baselines:
   status: current
   source: &source
@@ -448,11 +448,11 @@ work_items:
     non_effects:
       - Do not open a model-authority change.
       - Do not alter owner data.
-    lifecycle: complete
+    lifecycle: active
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary, path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, command:just check]
     blocker: null
-    checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
+    checkpoint: null
   - id: W003
     order: 7
     label: Verify, independently review, and close the agent-usable boundary fixes
@@ -474,20 +474,20 @@ work_items:
     non_effects:
       - Do not open a model-authority change.
       - Do not alter owner data.
-    lifecycle: complete
+    lifecycle: pending
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties, path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, command:just check]
     blocker: null
-    checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
+    checkpoint: null
 closure:
-  finding_disposition: complete
+  finding_disposition: open
   model_status: unchanged
-  implementation_status: conforming
+  implementation_status: absent
   integration_status: conforming
   external_status: not applicable
   compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and version all remain stable. The union tools gain a merged top-level properties map. The cardinality closure materializes no more than the source baseline, since W004 reverted W002's both-role widening and skips any role whose bound cannot fire. Finding paths change at eight refusal sites — six F006 corrections, which include object findings readdressed from closure position to UUID, plus the type summary's over-limit path dropped and an unreachable draft definition guard shortened. The type summary's finding summary also names rtg_type_inspect. Finding codes and outcome summaries are unchanged.
   reviews:
-    - {lens: authority and conformance, status: clean, reviewer: authority-final, checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623, evidence_refs: [command:just check]}
-    - {lens: engineering and evidence, status: clean, reviewer: engineering-closure, checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623, evidence_refs: [command:just check]}
-  evidence_refs: [command:just check]
-  checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
+    - {lens: authority and conformance, status: findings, reviewer: authority-conformance-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
+    - {lens: engineering and evidence, status: findings, reviewer: engineering-evidence-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
+  evidence_refs: []
+  checkpoint: null
