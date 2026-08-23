@@ -98,6 +98,9 @@ def test_managed_skill_exposure_matches_source_inventory() -> None:
     claude_root = model_layout.ROOT / ".claude" / "skills"
     links = {path.name: path for path in claude_root.iterdir()}
 
+    # Two empty inventories compare equal, so the set comparison alone would pass
+    # having checked nothing. The core is four skills plus the project extensions.
+    assert len(source_skills) >= 5, f"skill discovery found only {sorted(source_skills)}"
     assert set(links) == source_skills
     assert all(path.is_symlink() for path in links.values())
     assert sync_agent_skills.sync_agent_skills(check=True) == []
