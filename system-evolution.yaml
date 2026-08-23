@@ -202,6 +202,17 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: A third syntactic position is recognized and the rule keeps enumerating positions, so the next way a path reaches a finding drifts out of coverage exactly as the module, constructor, and form axes each did.
     compatibility_effect: Evidence only; no product behavior, wire, or database change.
+  - id: F014
+    summary: The sweep asked whether a path names a member of some request rather than of the request that reaches it, so substituting another tool's member passed.
+    classification: implementation defect
+    consequence: The addressable set was one union across all ten tools, so a path could name any of eighty-one member names regardless of which tool answers it. Renaming the type inspect root to typeKeys, a member of query and draft inspect but not of type inspect, left the whole suite green while an agent sending duplicate anchor type keys received a path it cannot resolve against its own document. Locality of a finding path is per tool, and a member of another tool's request is no more resolvable than a name the boundary never uses.
+    authority_refs: [VellisRequirements::mcpBoundary]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary]
+    disposition: resolved
+    owner_work_item_id: W007
+    implementation_status: conforming
+    nearest_wrong_system: Each emitting module is bound to its tools by a hand-kept map, which drifts the first time a module is called from a new tool, exactly as the module, constructor, form, and position lists each drifted.
+    compatibility_effect: Evidence only; no product behavior, wire, or database change.
 decisions:
   - id: D001
     summary: Publish a merged top-level properties map alongside the existing oneOf in the shared union-schema builder, rather than collapsing the branches or special-casing each tool.
@@ -388,7 +399,7 @@ work_items:
     kind: implementation
     dependencies: [W004, W005]
     planned_baseline: {dimension: implementation, identity: "git:467933763e4c5068b6c4242e5e7d49084e3cd049"}
-    finding_ids: [F010, F011, F012, F013]
+    finding_ids: [F010, F011, F012, F013, F014]
     decision_ids: []
     authority:
       - refs: [VellisRequirements::mcpBoundary, VellisRequirements::localCardinality, VellisVerification::cardinality, VellisVerification::activeChange]

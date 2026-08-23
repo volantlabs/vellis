@@ -3506,41 +3506,126 @@ def _rooted_path_roots(tree: ast.Module) -> set[str]:
     return roots
 
 
+def _module_imports(directory: Path) -> dict[str, set[str]]:
+    """Which vellis modules each vellis module imports from."""
+    edges: dict[str, set[str]] = {}
+    for value in directory.glob("*.py"):
+        found: set[str] = set()
+        for node in ast.walk(ast.parse(value.read_text())):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith("vellis."):
+                    found.add(f"{node.module.split('.', 1)[1]}.py")
+        edges[value.name] = found
+    return edges
+
+
+def _tool_reach(directory: Path) -> dict[str, set[str]]:
+    """Which modules each published tool can reach, derived from the boundary.
+
+    Local cardinality of a finding path is per tool -- a member of some other
+    tool's request is no more resolvable than a name the boundary never uses --
+    so the addressable set has to be the one this module's callers accept, not
+    the union over all ten.
+    """
+    tree = ast.parse((directory / "mcp.py").read_text())
+    imported = {
+        alias.asname or alias.name: f"{node.module.split('.', 1)[1]}.py"
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("vellis.")
+        for alias in node.names
+    }
+    functions = {node.name: node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
+
+    def entry_modules(name: str) -> set[str]:
+        target = functions.get(name)
+        if target is None:
+            return set()
+        return {
+            imported[node.func.id]
+            for node in ast.walk(target)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in imported
+        }
+
+    builders: dict[str, str] = {}
+    for node in ast.walk(tree):
+        # The two union tools are added by a named builder rather than a factory
+        # entry, and build_server pairs each with its tool name in a comparison.
+        if not isinstance(node, ast.If) or not isinstance(node.test, ast.Compare):
+            continue
+        right = node.test.comparators[0]
+        if not isinstance(right, ast.Constant) or not isinstance(right.value, str):
+            continue
+        for inner in ast.walk(node):
+            if isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name):
+                if inner.func.id in functions:
+                    builders[right.value] = inner.func.id
+
+    reach: dict[str, set[str]] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Tuple) or len(node.elts) != 3:
+            continue
+        name, factory = node.elts[0], node.elts[2]
+        if not isinstance(name, ast.Constant) or not isinstance(name.value, str):
+            continue
+        chosen = factory.id if isinstance(factory, ast.Name) else builders.get(name.value)
+        found = entry_modules(chosen) if chosen else set()
+        pending = list(found)
+        edges = _module_imports(directory)
+        while pending:
+            for value in edges.get(pending.pop(), ()):
+                if value not in found:
+                    found.add(value)
+                    pending.append(value)
+        reach[name.value] = found
+    return reach
+
+
 @pytest.mark.anyio
 async def test_no_finding_path_names_something_absent_from_the_boundary(
     database: Path,
 ) -> None:
     # A finding path an agent cannot resolve against its own request is worse
     # than no path at all. Every axis here is derived: which modules emit, where
-    # a path may be written, and which names are addressable. Enumerating any
-    # one of them left a blind spot that a one-line change walked straight
-    # through while this test still reported the boundary covered.
+    # a path may be written, which names are addressable, and which tools those
+    # names belong to. Enumerating any one of them left a blind spot that a
+    # one-line change walked through while this test reported the boundary
+    # covered.
     async with Client(build_server(database)) as client:
         tools = await client.list_tools()
-    addressable = _AFFECTED_STATE_ROOTS.union(
-        *(_request_member_names(value.inputSchema, set()) for value in tools)
-    )
+    members = {
+        value.name: _request_member_names(value.inputSchema, set()) | _AFFECTED_STATE_ROOTS
+        for value in tools
+    }
+    directory = Path(vellis.__file__).parent
+    reach = _tool_reach(directory)
+    assert set(reach) == set(members), "tool discovery disagrees with the published inventory"
+    assert all(reach.values()), "a tool reached no module, so its scope would be vacuous"
+
     modules = [
         value
-        for value in sorted(Path(vellis.__file__).parent.glob("*.py"))
+        for value in sorted(directory.glob("*.py"))
         # The v1 import is not reachable through the selected boundary and
         # addresses a v1 document, not one of these ten requests.
         if not value.name.startswith("v1_")
     ]
     assert len(modules) > 20, "module discovery found too little to be a sweep"
-    swept: dict[str, set[str]] = {}
+    unresolvable: set[str] = set()
+    swept = 0
     for value in modules:
         tree = ast.parse(value.read_text())
-        if _emits_findings(tree):
-            swept[value.name] = _rooted_path_roots(tree)
-    assert len(swept) > 8, "finding-emitting module discovery found too little to be a sweep"
-    unresolvable = {
-        f"{name}:/{root}"
-        for name, roots in swept.items()
-        for root in roots
-        if root not in addressable
-    }
+        callers = [name for name, found in reach.items() if value.name in found]
+        # A module no tool reaches answers no request of this boundary.
+        if not _emits_findings(tree) or not callers:
+            continue
+        swept += 1
+        addressable = set.union(*(members[name] for name in callers))
+        unresolvable.update(
+            f"{value.name}:/{root}" for root in _rooted_path_roots(tree) if root not in addressable
+        )
+    assert swept > 8, "finding-emitting module discovery found too little to be a sweep"
     assert unresolvable == set(), (
-        "finding paths naming neither a request member nor an affected-state subject: "
-        f"{sorted(unresolvable)}"
+        "finding paths naming neither a member of the requests that reach them nor an "
+        f"affected-state subject: {sorted(unresolvable)}"
     )
