@@ -59,7 +59,8 @@ without any one domain extension.
    through nested ownership and reference. Check cardinality, collection, control, data, state,
    temporal, concurrent, quantitative, resource, and interaction semantics wherever the claim uses
    them. Stop when the changed claim is discriminated, governed, and verifiable and further detail
-   would only predict a realization or unrelated feature.
+   would only predict a realization or unrelated feature, unless the project intentionally selects
+   that realization boundary.
 8. Settle uncertain syntax with the project's configured snippet probe before editing rather than
    after a failed run. Then run the configured official validation, inspect the model change as
    executable authority, and perform separate plan-conformance,

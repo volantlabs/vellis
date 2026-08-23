@@ -37,7 +37,7 @@ The steps below are conditional gates, not a demand to elaborate every modeling 
 calculation change need not invent a state machine. A user-interaction change need not select
 deployment. A timing requirement need not create a service boundary. Stop when the changed
 stakeholder outcome is semantically closed and further detail would only anticipate a realization or
-hypothetical future use case.
+hypothetical future use case, unless the project intentionally selects that realization boundary.
 
 Semantic closure is not artifact completion. A use-case change does not automatically need a new
 action, requirement, verification case, interface, result type, or part. Reuse or strengthen
@@ -146,17 +146,17 @@ commitment requires it:
 - governed state or invariant ownership;
 - failure, safety, security, or resource responsibility;
 - an external interaction or physical boundary;
-- independent realization currently selected or under explicit trade study.
+- independent realization currently selected or under explicit trade study;
+- an internal boundary the project selects to keep coherent across independent implementation work.
 
-Code maintainability alone does not justify a system part. Use performed behavior when a part carries
-out referenced behavior. Use allocations only when distinct source and target hierarchies need an
-explicit responsibility mapping. Add ports, interfaces, connections, flows, or messages only for
-intentional connected interactions.
-
-Do not turn validation concerns, algorithms, caches, handlers, pipelines, persistence helpers,
-adapters, or user-interface groupings into subsystems merely because a natural software
-implementation isolates them. First establish an independently meaningful system distinction. A
-finer code decomposition can remain a many-to-many realization of coarser system authority.
+Selecting binding internal structure is a stakeholder decision, not an agent's convenience: present
+it as an architectural selection and record what it forbids. Code maintainability alone does not
+make that decision, and neither does the existence of a class, module, service, cache, handler,
+pipeline, adapter, or user-interface grouping. Do not turn structure you found in an implementation
+into structure the model commands; model the decomposition you intend to be obeyed and leave the
+rest to the implementer. Use performed behavior when a part carries out referenced behavior. Use
+allocations only when distinct source and target hierarchies need an explicit responsibility
+mapping.
 
 ## 6. Close requirements and verification
 

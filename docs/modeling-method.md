@@ -49,7 +49,8 @@ Elaborate conditionally:
 Not every slice needs every dimension or a new artifact at every layer. Refine behavior when it adds
 ordering, transformation, reuse, state, failure, interaction, timing, or evidence meaning. Group
 capabilities before considering parts. Stop when the changed claim is governed and verifiable and
-further detail would only anticipate implementation or unrelated features.
+further detail would only anticipate implementation or unrelated features, unless the project
+intentionally selects that realization boundary.
 
 An undecided realization is not optional system behavior. Keep it open in the project's decision
 record rather than modeling interchangeable parts, variants, interfaces, or configuration. Tool,

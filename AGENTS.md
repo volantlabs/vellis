@@ -94,9 +94,11 @@ source layout, framework examples, familiar names, or incidental tests.
   verification semantics. Comments and names cannot repair incorrect semantics.
 - Review permitted instances recursively, including nested ownership, joint tuples, projections,
   duplicates, absence, null, state effects, failure non-effects, and recovery where applicable.
-- Keep persistence, transport, runtime, language, deployment, algorithms, migration, and internal
-  decomposition open until intentionally selected. A useful class or module is not by itself a
-  modeled subsystem.
+- Model at any depth the project means to govern, including software structure and internal
+  interfaces. What is modeled binds implementation and what is unmodeled is the implementer's to
+  choose, so leave persistence, transport, runtime, language, deployment, algorithms, migration, and
+  internal decomposition unmodeled until the project means to govern them. A class or module found
+  in code is not thereby a modeled part.
 - Preserve explicit owner decisions and accepted model meaning. Treat implementation feedback as a
   language question, model gap, realization decision, feasibility consequence, implementation
   defect, stale baseline, or out-of-scope request before mutation.
