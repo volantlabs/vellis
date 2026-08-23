@@ -124,8 +124,10 @@ def graph_structure_findings(
     definition_map = {definition.type_key: definition for definition in definitions}
     object_map: dict[str, GraphObject] = {}
     findings: list[Finding] = []
-    for index, value in enumerate(graph):
-        path = _path("/objects", index)
+    for value in graph:
+        # Address the affected-state subject, as every other object finding does.
+        # A position in the validated closure is not a member of any request.
+        path = _path("/objects", value.uuid)
         _validate_object_header(value, definition_map, path, require_system, findings)
         try:
             canonical = canonical_uuid(value.uuid)
@@ -136,9 +138,9 @@ def graph_structure_findings(
             findings.append(_finding(FindingCode.DUPLICATE, _path(path, "uuid"), "duplicate UUID"))
         else:
             object_map[canonical] = value
-    for index, value in enumerate(graph):
+    for value in graph:
         _validate_object_content(
-            value, definition_map, object_map, _path("/objects", index), findings
+            value, definition_map, object_map, _path("/objects", value.uuid), findings
         )
     return _ordered(findings)
 

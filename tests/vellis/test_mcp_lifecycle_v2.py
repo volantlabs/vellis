@@ -13,6 +13,7 @@ from dataclasses import fields, is_dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast, get_args, get_type_hints
+from uuid import UUID as UUIDValue
 
 import httpx
 import pytest
@@ -3383,3 +3384,45 @@ async def test_query_finding_paths_resolve_against_the_request(starter_database:
     limit_finding = limit_content["findings"][0]
     assert limit_finding["path"] == "/selection/maxMatches"
     assert "narrow it with predicates" in limit_finding["summary"]
+
+
+@pytest.mark.anyio
+async def test_change_finding_paths_name_a_request_member_or_a_subject(
+    starter_database: Path,
+) -> None:
+    """A change finding must name a request member or an affected-state subject.
+
+    A position in the validated closure is neither. It is not the request index
+    either, so it shifts with unrelated objects and points an agent at nothing.
+    """
+    request = {
+        "expectedRevision": 0,
+        "upserts": [
+            {"kind": "anchor", "uuid": UUID, "typeKey": "missing.type", "displayName": "A"},
+            {
+                "kind": "link",
+                "uuid": "00000000-0000-4000-8000-00000000000b",
+                "typeKey": "life.involves",
+                "sourceUuid": "00000000-0000-4000-8000-00000000000c",
+                "targetUuid": UUID,
+            },
+        ],
+    }
+
+    async with Client(build_server(starter_database)) as client:
+        result = await client.call_tool("rtg_change", request)
+
+    content = result.structured_content
+    assert content is not None
+    assert content["status"] == "rejected"
+    assert content["findings"]
+    for finding in content["findings"]:
+        path = finding.get("path")
+        assert path is not None, finding
+        segments = path.lstrip("/").split("/")
+        if segments[0] == "objects":
+            # An affected-state subject is addressed by identity, never position.
+            assert not segments[1].isdigit(), f"{path} names a closure position"
+            UUIDValue(segments[1])
+            continue
+        _resolve_request_pointer(request, path)

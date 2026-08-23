@@ -42,6 +42,7 @@ scope:
     - vellis/cardinality_validation.py
     - tools/package_smoke.py
     - tests/test_package_smoke.py
+    - vellis/domain_validation.py
     - vellis/query_validation.py
     - vellis/read_operations.py
     - vellis/draft_read_operations.py
@@ -115,9 +116,9 @@ findings:
   - id: F006
     summary: Four finding paths name request members the request does not have, so an agent cannot resolve them against its own document.
     classification: implementation defect
-    consequence: An over-limit pattern reported /selection/maximumMatches while the accepted member is maxMatches; a regex predicate finding reported the domain name text while the accepted member is value; and both the empty-name and duplicate-name selector checks reported an index into the concatenation of the separate node and link name arrays, which is a member no request carries. RTG014 requires an optional finding path to identify the exact request member.
+    consequence: An over-limit pattern reported /selection/maximumMatches while the accepted member is maxMatches; a regex predicate finding reported the domain name text while the accepted member is value; both selector-name checks reported an index into the concatenation of two separate arrays; and change findings addressed objects by position in the validated closure, which is neither a request member nor the request index. RTG014 requires a finding path to identify the exact request member or affected-state subject.
     authority_refs: [VellisRequirements::mcpBoundary]
-    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, path:tests/vellis/test_query_v2_successor.py#test_out_of_range_match_bound_names_the_accepted_request_member]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, path:tests/vellis/test_mcp_lifecycle_v2.py#test_change_finding_paths_name_a_request_member_or_a_subject, path:tests/vellis/test_query_v2_successor.py#test_out_of_range_match_bound_names_the_accepted_request_member]
     disposition: resolved
     owner_work_item_id: W005
     implementation_status: conforming
@@ -279,7 +280,7 @@ work_items:
       - Do not cap or sample a bound the model requires to be checked.
     lifecycle: complete
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another, path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, path:tests/vellis/test_change_draft_v2.py#test_accepted_changes_never_commit_a_state_whole_validation_rejects, path:tests/vellis/test_change_draft_v2.py#test_attaching_a_child_does_not_load_a_hub_whose_bound_cannot_be_violated, command:just check]
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another, path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, path:tests/vellis/test_change_draft_v2.py#test_scoped_change_agrees_with_whole_state_validation, path:tests/vellis/test_change_draft_v2.py#test_attaching_a_child_does_not_load_a_hub_whose_target_bound_cannot_fire, path:tests/vellis/test_change_draft_v2.py#test_adding_an_outgoing_link_does_not_load_a_hub_whose_source_bound_cannot_fire, path:tests/vellis/test_change_draft_v2.py#test_adding_a_data_object_does_not_load_an_anchor_whose_bound_cannot_fire, command:just check]
     blocker: null
     checkpoint: git:3e6f93500308e3b47abeab40cfa0860eece17056
   - id: W005
@@ -368,7 +369,7 @@ closure:
   implementation_status: absent
   integration_status: not evaluated
   external_status: not evaluated
-  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools gain a merged top-level properties map while their oneOf branches continue to decide acceptance. The cardinality closure loads the same objects it loaded at the source baseline, because W002 widened peer selection to both roles and W004 reverted that widening, so the net effect on what one change materializes is neutral against git:daed5a08 and a reduction against git:f486fe6. No additional graph state becomes valid.
+  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools gain a merged top-level properties map while their oneOf branches continue to decide acceptance. The cardinality closure materializes strictly less than the source baseline. W002 widened peer selection to both roles, W004 reverted that widening, and W006 further skips any role whose bound cannot produce a finding, so an ordinary change no longer loads an endpoint's degree to satisfy an unbounded bound. No additional graph state becomes valid in either direction.
   reviews:
     - {lens: authority and conformance, status: findings, reviewer: authority-conformance-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
     - {lens: engineering and evidence, status: findings, reviewer: engineering-evidence-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
