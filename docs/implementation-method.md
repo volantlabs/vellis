@@ -219,12 +219,11 @@ Review, wherever applicable:
 - realization machinery unsupported by the current slice.
 
 Collect complete authority/conformance and engineering/evidence findings, then batch all in-scope
-corrections and sweep the same root cause once. Run one final independent review pair against the
-resulting slice. Repeat only if that pair identifies a plausible failure under the project's declared
-assumptions. Reviewers receive fixed lens prompts without earlier findings or expected conclusions;
-they do not invent new mutants, fuzz spaces, attack models, or speculative input boundaries solely
-to prolong discovery. After three consecutive non-clean final pairs, perform one bounded root-cause
-audit before another pair. The count never excuses a material defect.
+corrections and sweep the same root cause once. Run the second review pair against the
+resulting slice. Reviewers receive fixed lens prompts without earlier findings or expected
+conclusions; they do not invent new mutants, fuzz spaces, attack models, or speculative input
+boundaries solely to prolong discovery. The two-pair budget and its stop conditions are normative in
+`$sysml-evolution`.
 
 Reviewers stay on the selected slice and its evidence unless that slice intentionally changes the
 campaign process. A slice is complete only when the final pair finds no material modeled-behavior,

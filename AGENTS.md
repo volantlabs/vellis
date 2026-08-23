@@ -125,46 +125,33 @@ throughput, startup, or storage targets until representative runtime, hardware, 
 
 ## Review and checkpoint rules
 
-Use one writer and two fresh, context-isolated read-only reviewers for a review pair: one
-authority/conformance lens and one engineering/evidence lens. Pause mutation while both inspect the
-same state token. Before freezing it, put all evidence references and intended completion statuses in
-the review frame. A pair closes review when both lenses report no material finding and substantive
-tracked or evidence state remains unchanged afterward. The compact result must name both distinct
-reviewer identifiers and lenses, their clean dispositions, and the exact shared token; validate it against the
-frozen token, recomputed current durable state, current campaign/work item, intended checkpoint, and
-reported passed checks before bookkeeping. Fresh-agent independence remains an operational manager
-obligation, and the manager independently runs required project gates rather than treating reported
-check rows as proof of execution or completeness. The only permitted post-review mutation is
-the deterministic atomic bookkeeping transition that applies those already-reviewed statuses and
-checkpoint identifiers. Any implementation, test, documentation, evidence-reference, decision-
-content, or plan-bearing mutation invalidates the clean pair; batch corrections, sweep the root
-cause, rerun affected evidence, and obtain another clean pair. After three consecutive non-clean
-pairs, perform one bounded root-cause audit before another pair.
+Default to autonomous mode when a harness launched this session with no human turn. Otherwise use
+copilot mode. The mode is fixed for the session and recorded as `evolution.mode`.
 
-For a complete implementation campaign, require a current validated human-approved plan, one active
-slice, one fresh worker per slice, and atomic checkpoints containing implementation, evidence,
-documentation truth, and campaign state. The manager consumes compact validated results and never
-implements or reads reviewer transcripts. Model or plan gaps, stale baselines, and stakeholder-
-visible feasibility consequences stop execution; implementation defects and model-preserving
-realization decisions remain campaign work. Detailed checkpoint and harness rules are in
-`CONTRIBUTING.md` and the campaign skill.
-Candidate-result validation occurs before deterministic bookkeeping. After the commit changes the
-state token, the manager validates the checkpoint independently rather than rerunning that check.
+The normative review rules — lens split, materiality, the two-pair budget, and the stop conditions —
+live in `$sysml-evolution`. This section binds them to Vellis only.
 
-For post-build evolution, validate `system-evolution.yaml`. It is an execution and evidence index,
-never product authority. Changed system meaning requires acceptance before implementation relies on
-it; a defect already decided by accepted authority is ordinary implementation work.
+- A checkpoint is one ordinary Git commit carrying implementation, tests, evidence, documentation
+  truth, and the record update together.
+- Gates: `just check` before completion, and `just system-evolution-check` for every record change.
+- Evidence uses `path:<repo-relative-path>#<test-or-section>` or `command:<exact reproducible
+  command>`. A path fragment resolves to a Markdown heading anchor or a Python test node in the
+  current committed state and may not escape the repository through a symlink.
+- `system-evolution.yaml` is an execution and evidence index, never product authority. Changed
+  system meaning requires acceptance before implementation relies on it; a defect already decided by
+  accepted authority is ordinary implementation work.
 
 ## Portable-core validation
 
-Choose validation by the consequence of a portable-core change:
+Choose validation by the axis a portable-core change sits on:
 
-- Editorial, link, or metadata-only: repository and skill checks.
-- Bounded orchestration, context, or review-method behavior: fresh-agent forward tests on two
-  contrasting archetypes selected for the affected concern.
-- Cross-domain semantic, construct-selection, readiness, or evidence-method behavior: fresh-agent
-  forward tests on a stateless transformation, interactive stateful workflow, distributed message-
-  driven system, embedded or real-time controller, and numerical or safety/security-relevant system.
+- Wording, links, or metadata: repository and skill checks only. No agent test.
+- A rule an agent must follow: one fresh agent on a task that must trigger it and one on a task that
+  must not. Validated when the rule fires exactly where intended and nowhere else.
+- A record contract: one record that must be accepted and one rejected for exactly the new reason.
+  Deterministic, no agent.
+- A routing boundary: one fresh agent on a request sitting on the boundary.
+- A claim about SysML or KerML meaning: an official citation from the pinned baseline. No agent test.
 
 Run required forward tests without disclosing expected conclusions or prior diagnoses. Keep prompts,
 transcripts, and expected-answer fixtures out of the repository; summarize scenarios, material

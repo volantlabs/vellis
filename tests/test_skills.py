@@ -70,12 +70,14 @@ def test_campaign_skill_separates_thin_manager_from_one_item_workers() -> None:
     assert "three consecutive non-clean pairs" in execution
 
 
-def test_portable_core_validation_is_risk_tiered() -> None:
+def test_portable_core_validation_is_axis_selected() -> None:
     guidance = (model_layout.ROOT / "AGENTS.md").read_text(encoding="utf-8")
 
-    assert "Editorial, link, or metadata-only" in guidance
-    assert "two\n  contrasting archetypes" in guidance
-    assert "Cross-domain semantic, construct-selection, readiness" in guidance
+    assert "Wording, links, or metadata" in guidance
+    assert "A rule an agent must follow" in guidance
+    assert "A record contract" in guidance
+    assert "A routing boundary" in guidance
+    assert "A claim about SysML or KerML meaning" in guidance
 
 
 def test_new_portable_skills_do_not_embed_project_bindings() -> None:

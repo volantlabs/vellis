@@ -38,10 +38,9 @@ The version is a static literal in four places, cross-checked by
 `$sysml-implementation`, `$sysml-implementation-campaign`, and `$sysml-evolution` are maintained as
 a portable SysML v2 MBSwE core. Keep Vellis paths, commands, RTG and MCP semantics, implementation language, and
 repository-specific review rules in local guidance or optional extensions. When changing the core,
-apply the risk tier in `AGENTS.md`: repository checks for editorial changes, two contrasting fresh-
-agent archetypes for bounded orchestration or review-method changes, and all five archetypes for
-cross-domain semantic or readiness changes. Do not use Vellis as the only semantic test case or claim
-that a standalone plugin already exists.
+validate along the axis the change sits on; the axis list is in `AGENTS.md` under
+`## Portable-core validation`. Do not use Vellis as the only semantic test case or claim that a
+standalone plugin already exists.
 
 ## Change workflow
 
@@ -144,9 +143,9 @@ sit between that checkpoint and closure.
    reviewed statuses and checkpoint identifiers. Any implementation, test, documentation, evidence-
    reference, decision-content, or plan-bearing mutation invalidates the pair. If either lens finds
    a material issue, one writer batches corrections, sweeps the root cause, reruns affected evidence,
-   and obtains a new clean pair. After three consecutive non-clean pairs, perform one bounded root-
-   cause audit before another pair; do not ask reviewers to invent mutants or speculative inputs
-   merely to continue discovery. Commit the slice's
+   and obtains a new clean pair. The two-pair budget and its stop conditions are normative in
+   `$sysml-evolution`; do not ask reviewers to invent mutants or speculative inputs merely to
+   continue discovery. Commit the slice's
    implementation, tests, evidence, documentation truth, and campaign update together; return the
    compact worker result and stop without selecting the next slice.
 7. In the PR, distinguish modeled, selected, implemented, verified, and runnable. Do not claim an
