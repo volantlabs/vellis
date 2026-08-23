@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:daed5a087a0974f99d885471f557bdf89f09b3c7
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:42c9ee0048aed6c9fe34303eb2b1ba755c045c35
+    implementation: git:22db79fb935c17bfc01b69f82ee912926fda1c7a
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:42c9ee0048aed6c9fe34303eb2b1ba755c045c35
+    checkpoint: git:22db79fb935c17bfc01b69f82ee912926fda1c7a
   observed: *target
 scope:
   authority_scope:
@@ -241,7 +241,7 @@ work_items:
     label: Advertise callable top-level properties for the union input tools
     kind: implementation
     dependencies: []
-    planned_baseline: {dimension: implementation, identity: "git:42c9ee0048aed6c9fe34303eb2b1ba755c045c35"}
+    planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
     finding_ids: [F001, F003]
     decision_ids: [D001]
     authority:
@@ -268,7 +268,7 @@ work_items:
     label: Complete the link cardinality closure for endpoints admitted in either role
     kind: implementation
     dependencies: []
-    planned_baseline: {dimension: implementation, identity: "git:42c9ee0048aed6c9fe34303eb2b1ba755c045c35"}
+    planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
     finding_ids: [F002]
     decision_ids: [D002]
     authority:
@@ -295,7 +295,7 @@ work_items:
     label: Scope cardinality checking to the exact definition and role whose count the batch can change
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:42c9ee0048aed6c9fe34303eb2b1ba755c045c35"}
+    planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
     finding_ids: [F004, F005]
     decision_ids: [D003]
     authority:
@@ -322,7 +322,7 @@ work_items:
     label: Make boundary finding paths resolvable and the query bound navigable
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:42c9ee0048aed6c9fe34303eb2b1ba755c045c35"}
+    planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
     finding_ids: [F006, F007, F009]
     decision_ids: []
     authority:
@@ -349,7 +349,7 @@ work_items:
     label: Make the package check reject a stale distribution
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:42c9ee0048aed6c9fe34303eb2b1ba755c045c35"}
+    planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
     finding_ids: [F008]
     decision_ids: []
     authority:
@@ -376,7 +376,7 @@ work_items:
     label: Close the finding-path class and give role scoping evidence that rejects the both-role system
     kind: implementation
     dependencies: [W004, W005]
-    planned_baseline: {dimension: implementation, identity: "git:42c9ee0048aed6c9fe34303eb2b1ba755c045c35"}
+    planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
     finding_ids: [F010, F011, F012]
     decision_ids: []
     authority:
@@ -402,7 +402,7 @@ work_items:
     label: Verify, independently review, and close the agent-usable boundary fixes
     kind: closure
     dependencies: [W001, W002, W004, W005, W006, W007]
-    planned_baseline: {dimension: implementation, identity: "git:42c9ee0048aed6c9fe34303eb2b1ba755c045c35"}
+    planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
     finding_ids: []
     decision_ids: []
     authority:
