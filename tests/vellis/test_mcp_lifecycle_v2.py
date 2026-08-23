@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import os
 import socket
@@ -22,6 +23,7 @@ from fastmcp.client.transports import StdioTransport, StreamableHttpTransport
 from fastmcp.exceptions import ToolError
 from pydantic import ValidationError as PydanticValidationError
 
+import vellis
 import vellis.__main__ as main_module
 import vellis.change_domain as change_domain
 import vellis.domain as domain
@@ -3426,3 +3428,71 @@ async def test_change_finding_paths_name_a_request_member_or_a_subject(
             UUIDValue(segments[1])
             continue
         _resolve_request_pointer(request, path)
+
+
+# Every operation module that can emit a finding through the selected boundary.
+_FINDING_PATH_MODULES = (
+    "change_operations.py",
+    "discovery_operations.py",
+    "draft_inspection_operations.py",
+    "draft_operations.py",
+    "draft_read_operations.py",
+    "history_operations.py",
+    "query_repository.py",
+    "query_validation.py",
+    "read_operations.py",
+)
+# RTG014 admits an affected-state subject as well as a request member, and these
+# are the roots the boundary addresses state by.
+_AFFECTED_STATE_ROOTS = frozenset({"objects", "definitions", "draft"})
+
+
+def _finding_path_roots(source: str) -> set[str]:
+    """The first segment of every absolute path a finding is constructed with.
+
+    Only a literal that starts at the document root is an emitted path; a
+    relative fragment is composed onto a parent and is checked by whatever
+    supplies that parent, so reading every pointer-shaped string in the module
+    would flag suffixes that name a real member of their own parent.
+    """
+    roots: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        name = node.func.id if isinstance(node.func, ast.Name) else None
+        if name not in {"_finding", "Finding", "append_pointer"}:
+            continue
+        for argument in (*node.args, *(value.value for value in node.keywords)):
+            if not isinstance(argument, ast.Constant) or not isinstance(argument.value, str):
+                continue
+            if not argument.value.startswith("/"):
+                continue
+            segment = argument.value[1:].split("/")[0]
+            if segment:
+                roots.add(segment)
+    return roots
+
+
+@pytest.mark.anyio
+async def test_no_finding_path_names_something_absent_from_the_boundary(
+    database: Path,
+) -> None:
+    # A finding path an agent cannot resolve against its own request is worse
+    # than no path at all. Derive what is addressable from the published schemas
+    # rather than a hand-kept list, so a new member or a new tool is covered the
+    # day it ships and no site can drift out of the sweep unnoticed.
+    async with Client(build_server(database)) as client:
+        tools = await client.list_tools()
+    addressable = _AFFECTED_STATE_ROOTS.union(
+        *(_top_level_properties(value.inputSchema) for value in tools)
+    )
+    unresolvable = {
+        f"{name}:/{root}"
+        for name in _FINDING_PATH_MODULES
+        for root in _finding_path_roots((Path(vellis.__file__).parent / name).read_text())
+        if root not in addressable
+    }
+    assert unresolvable == set(), (
+        "finding paths naming neither a request member nor an affected-state subject: "
+        f"{sorted(unresolvable)}"
+    )

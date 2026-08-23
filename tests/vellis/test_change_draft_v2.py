@@ -2617,6 +2617,11 @@ def test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role(
     Re-pointing an endpoint's outgoing link cannot change how many links point at
     it. Counting it in the target role anyway reports it at zero, because peers
     load per role and its incoming population was never fetched.
+
+    Both bounds have to constrain for this to discriminate. A role left at
+    Cardinality(0) is dropped from the subjects before the roles are ever
+    separated, so the test would assert only that an already-empty set does not
+    leak, and a system that unioned the two roles would pass it.
     """
     path = tmp_path / "targetrole" / "vellis.db"
     initialize_with_definitions(
@@ -2630,7 +2635,7 @@ def test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role(
                 "Every top and mid is held by at least one child",
                 ("test.mid", "test.leaf"),
                 ("test.top", "test.mid"),
-                Cardinality(0),
+                Cardinality(1),
                 Cardinality(1),
             ),
         ),
@@ -2782,6 +2787,11 @@ ORACLE_SHAPES = (
     (Cardinality(0), Cardinality(0), Cardinality(1, 1)),
     (Cardinality(1), Cardinality(0), Cardinality(0)),
     (Cardinality(0), Cardinality(1), Cardinality(1)),
+    # Both link roles constrained by a minimum at once. Role scoping can only
+    # change an outcome through a minimum, since an unloaded opposite-role
+    # population can only make a count too low, so no shape that leaves either
+    # role unbounded can tell a role-scoped system from a both-role one.
+    (Cardinality(1, 2), Cardinality(1, 2), Cardinality(1, 1)),
 )
 
 
@@ -2996,12 +3006,7 @@ def test_scoped_change_agrees_with_whole_state_validation(tmp_path: Path, shape:
             continue
         if any(value.code is not FindingCode.CARDINALITY_VIOLATION for value in outcome.findings):
             continue
-        try:
-            projected = _project(before.graph, unique, pruned)
-        except ValueError:
-            # A patch against an object that does not exist yet composes to
-            # nothing; the system rejects that structurally, not for a bound.
-            continue
+        projected = _project(before.graph, unique, pruned)
         expected = graph_cardinality_findings(projected, before.definitions)
         rejected += 1
         assert expected != (), (

@@ -48,8 +48,12 @@ def type_summary(
             if over_limit:
                 finding = _finding(
                     FindingCode.RESULT_LIMIT_EXCEEDED,
-                    "/anchorTypes",
-                    "complete anchor summary exceeds the public item limit",
+                    # A summary takes no member that could narrow it, and
+                    # anchorTypes is the response payload rather than anything
+                    # the caller sent, so no request member names this refusal.
+                    None,
+                    "complete anchor summary exceeds the public item limit;"
+                    " inspect known anchor type keys with rtg_type_inspect instead",
                 )
                 result = TypeSummaryResult(
                     OperationStatus.REJECTED,

@@ -157,6 +157,28 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Guidance is added to prose while the finding an agent actually receives still says only that a limit was exceeded.
     compatibility_effect: Description and summary text only; no accepted input or result changes.
+  - id: F010
+    summary: The finding-path repair closed the four sites the audit named but not the class; the type summary still reports a response payload collection as a request member.
+    classification: implementation defect
+    consequence: rtg_type_summary accepts exactly one member, state. Its over-limit finding reported /anchorTypes, which is the response payload collection and neither a request member nor an affected-state subject, so an agent cannot resolve it against its own document. RTG014 requires a finding path to identify the exact request member or affected-state subject, and the path is optional, so a refusal with no addressable member carries no path and puts the remedy in the summary instead. Reachable only above the public item limit in anchor types.
+    authority_refs: [VellisRequirements::mcpBoundary]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary]
+    disposition: resolved
+    owner_work_item_id: W007
+    implementation_status: conforming
+    nearest_wrong_system: The one named site is corrected and the sweep stays a hand-kept list, so the next tool or member added drifts out of coverage unnoticed.
+    compatibility_effect: Reported diagnostics only; no accepted input, result, or finding code changes.
+  - id: F011
+    summary: Role scoping of the cardinality closure had no discriminating evidence, because no test or oracle shape constrained both link roles with a minimum at once.
+    classification: implementation defect
+    consequence: Role scoping can change an outcome only through a minimum bound, since an unloaded opposite-role population can only make a count too low. The named evidence for D003 left links-per-source at Cardinality(0), which the constraining gate empties before the roles are separated, so it asserted only that an already-empty set does not leak; and every oracle shape left one role unbounded. A system that unioned the two roles, exactly the alternative D003 records rejecting, passed the whole suite. The implementation was correct; the evidence did not reject the plausible wrong system.
+    authority_refs: [VellisRequirements::localCardinality, VellisVerification::cardinality, VellisVerification::activeChange]
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, path:tests/vellis/test_change_draft_v2.py#test_scoped_change_agrees_with_whole_state_validation]
+    disposition: resolved
+    owner_work_item_id: W007
+    implementation_status: conforming
+    nearest_wrong_system: One both-roles case is added while the oracle keeps declaring a two-role model it never generates a deciding state for.
+    compatibility_effect: Evidence only; no product behavior, wire, or database change.
 decisions:
   - id: D001
     summary: Publish a merged top-level properties map alongside the existing oneOf in the shared union-schema builder, rather than collapsing the branches or special-casing each tool.
@@ -337,11 +359,37 @@ work_items:
     evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building, path:tests/test_package_smoke.py#test_only_build_distribution_can_run_a_uv_build, command:just package-check, command:just check]
     blocker: null
     checkpoint: git:c6351a6df8a4da78e9bfb2c873455a30a9354eda
-  - id: W003
+  - id: W007
     order: 6
+    label: Close the finding-path class and give role scoping evidence that rejects the both-role system
+    kind: implementation
+    dependencies: [W004, W005]
+    planned_baseline: {dimension: implementation, identity: "git:c6351a6df8a4da78e9bfb2c873455a30a9354eda"}
+    finding_ids: [F010, F011]
+    decision_ids: []
+    authority:
+      - refs: [VellisRequirements::mcpBoundary, VellisRequirements::localCardinality, VellisVerification::cardinality, VellisVerification::activeChange]
+        coverage: partial
+        remaining_work_item_ids: [W003]
+    approval:
+      status: not-required
+      reason: These close a defect and an evidence gap under sufficient accepted authority; no accepted meaning changes.
+      checkpoint: null
+    nearest_wrong_system: Each named site is corrected in place while the sweep and the oracle keep covering the instance that motivated the work rather than the class it belongs to.
+    compatibility_effect: Reported diagnostics and evidence only; no accepted input, result, graph state, or database change.
+    non_effects:
+      - Do not open a model-authority change.
+      - Do not alter owner data.
+    lifecycle: active
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary, path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, command:just check]
+    blocker: null
+    checkpoint: null
+  - id: W003
+    order: 7
     label: Verify, independently review, and close the agent-usable boundary fixes
     kind: closure
-    dependencies: [W001, W002]
+    dependencies: [W001, W002, W004, W005, W006, W007]
     planned_baseline: {dimension: implementation, identity: "git:c6351a6df8a4da78e9bfb2c873455a30a9354eda"}
     finding_ids: []
     decision_ids: []
@@ -358,7 +406,7 @@ work_items:
     non_effects:
       - Do not open a model-authority change.
       - Do not alter owner data.
-    lifecycle: active
+    lifecycle: pending
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_union_tool_schemas_expose_callable_top_level_properties, path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, command:just check]
     blocker: null
