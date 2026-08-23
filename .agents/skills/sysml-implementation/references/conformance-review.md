@@ -81,6 +81,8 @@ Check, where applicable:
   consequences;
 - completeness, duplicates, bounds, and absence semantics for collections where behavior depends on
   them;
+- modeled decomposition boundaries, with no code unit spanning two modeled parts and no governed
+  state reassigned across them;
 - exact selected external behavior without invented external surfaces or leaked internal structure.
 
 ### Evidence adequacy
@@ -95,7 +97,8 @@ Remove or defer code that exists only for a familiar architecture, future provid
 seam, duplicate authority, universal envelope, speculative configuration, or unselected operational
 machinery. Preserve software structure that demonstrably improves current invariant enforcement,
 dependency direction, evidence, platform isolation, change isolation, or implementation complexity
-without inventing system meaning.
+without inventing system meaning. Code that exists to realize a modeled boundary is never a
+subtraction candidate; if that boundary is wrong, return model feedback instead of deleting code.
 
 ### Project truth
 
@@ -125,7 +128,7 @@ Do not resolve every discrepancy in code. Classify it first:
 | Language question | Resolve the construct through the reference skill before changing model or code |
 | Implementation defect | Fix code or implementation evidence that contradicts sufficient current authority |
 | Model gap | Return to model work when authority cannot distinguish consequential required system behavior |
-| Realization decision | Decide in the implementation plan when system meaning remains equivalent |
+| Realization decision | Decide in the implementation plan when system meaning remains equivalent and the model is silent about structure; where the model decomposes, structurally different implementations are not equivalent even when behaviorally equivalent, and divergence from a modeled decomposition is an implementation defect |
 | Feasibility consequence | Present demonstrated evidence and review the changed stakeholder-visible outcome or selected boundary |
 | Stale baseline | Refresh the frame, plan, code impact, and evidence before deciding |
 

@@ -37,7 +37,8 @@ Report only the affected semantic closure. Include:
 4. **Implementation obligations:** observable distinctions code must preserve, including only the
    applicable identity, ownership, multiplicity, equality, state, mode, ordering, timing, units,
    precision, concurrency, interaction, safety, security, resource, failure, and compatibility
-   semantics.
+   semantics, and the modeled decomposition the slice touches, which code may subdivide inside but
+   may not span.
 5. **Decisive cases:** smallest nominal, alternate or failed, and plausible-invalid cases for each
    important distinction, including promised non-effects.
 6. **Conformance-evidence intent:** tests, analyses, simulations, inspections, demonstrations,
@@ -80,10 +81,13 @@ see useful cohesion by naming, when applicable:
 - the single modeled lifecycle, state, timing, safety, failure, physical, or external boundary those
   neighborhoods remain inside.
 
-Call these **implementation cohesion cues**, not logical parts, allocations, services, or prescribed
-classes. They may justify a many-to-many software realization projection: one modeled responsibility
-can use several code components, and one code mechanism can realize several model elements. Do not
-invent system structure merely to make that mapping one-to-one.
+Where the model is silent about structure, call these **implementation cohesion cues**, not logical
+parts, allocations, services, or prescribed classes. They may justify a many-to-many software
+realization projection: one modeled responsibility can use several code components, and one code
+mechanism can realize several model elements inside that responsibility. Where the model does
+decompose, its boundaries are implementation obligations rather than cues: code may subdivide inside
+one of them and may not span two. Do not invent system structure merely to make that mapping
+one-to-one.
 
 State the boundary that finer code must not fracture. For example, isolating conformance calculations
 in a class must not create an independent source of authoritative state. Splitting an embedded

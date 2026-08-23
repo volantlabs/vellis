@@ -68,11 +68,16 @@ semantics.
 
 ## Design the software realization projection
 
-SysML system decomposition and software decomposition answer different questions. The model may keep
-one cohesive system or part because it owns one lifecycle, state, invariant, timing, safety, failure,
-physical, or interaction boundary, while a maintainable implementation realizes that responsibility
-through several classes, modules, functions, processes, generated types, tasks, or device-facing
-components. Conversely, several model elements may need one software mechanism.
+The projection applies where the model is silent about structure. There, SysML system decomposition
+and software decomposition answer different questions: the model may keep one cohesive system or
+part because it owns one lifecycle, state, invariant, timing, safety, failure, physical, or
+interaction boundary, while a maintainable implementation realizes that responsibility through
+several classes, modules, functions, processes, generated types, tasks, or device-facing components.
+Conversely, several model elements may need one software mechanism when they sit inside one part.
+
+Where the model does decompose, the map is a conformance obligation rather than an explanatory aid.
+Subdivide freely inside a modeled boundary; never merge, re-cut, or reassign governed state across
+two of them.
 
 Use semantic neighborhoods as cohesion cues without promoting them to system parts. Introduce a
 software boundary when current code benefits from one or more of:
@@ -90,21 +95,25 @@ authoritative state and remaining inside one modeled system responsibility. A nu
 isolate unit-sensitive calculations without becoming a modeled subsystem. A protocol adapter may
 isolate an external encoding without creating a new stakeholder outcome.
 
-Keep a task-local many-to-many realization map when the decomposition is consequential:
+Keep a task-local many-to-many realization map when the decomposition is consequential, and always
+when the model decomposes the area being implemented:
 
 | Software responsibility | Modeled semantic neighborhood | Reason for separation | Modeled boundary that remains unified |
 | --- | --- | --- | --- |
 | Class, module, function group, process, task, generated family, or device-facing component | Qualified elements and obligations | Cohesion, dependency, evidence, platform, or deployment reason | Identity, lifecycle, state, time, safety, failure, physical, or external boundary |
 
-This map explains code design; it does not become model authority and need not be committed by
-default. Do not demand a modeled allocation for every code component. Add or revise model structure
+Where the model is silent, this map explains code design, does not become model authority, and need
+not be committed by default. Where the model decomposes, it is required: each row must name the one
+modeled part it stays inside, and a row spanning two modeled parts is an implementation defect. Do
+not demand a modeled allocation for every code component. Add or revise model structure
 only when the system intentionally acquires a distinct lifecycle, state owner, failure or safety
 responsibility, external interaction, physical boundary, substitutability, or selected realization
 architecture.
 
 Private code interfaces, dependency injection, helper protocols, synchronization primitives,
 buffers, and collaboration objects may be useful realization structure without corresponding SysML
-ports or interfaces. Keep them in the realization unless the system intentionally exposes or selects
+ports or interfaces, unless the model declares that boundary; a declared port or interface must be
+realized as one. Keep the rest in the realization unless the system intentionally exposes or selects
 that interaction boundary.
 
 ## Build the conformance matrix

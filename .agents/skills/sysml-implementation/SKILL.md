@@ -104,11 +104,14 @@ closure.
 - Do not map a package to a code package, a part to a service or class, an item to a DTO or table, an
   action to a method, or a requirement to one test by name alone. Retrieve the construct's semantics
   and preserve its instance-level commitment in whatever implementation structure is simplest.
-- Allow software structure to be finer-grained than the systems model. Use cohesive semantic
-  neighborhoods as evidence for classes or modules when they improve invariant enforcement,
-  dependency direction, testability, or change isolation, but record that many-to-many mapping as a
-  realization projection. Do not turn an implementation component into an independent modeled
-  lifecycle, state authority, failure boundary, or subsystem by accident.
+- Allow software structure to be finer-grained than the systems model wherever the model is silent
+  about structure, and keep it traceable to the model wherever it is not. Inside one modeled
+  boundary, decompose freely: use cohesive semantic neighborhoods as evidence for classes or
+  modules when they improve invariant enforcement, dependency direction, testability, or change
+  isolation. Across modeled boundaries, do not merge, re-cut, or reassign governed state; a code
+  unit spanning two modeled parts is an implementation defect, not a realization decision. Record
+  that many-to-many mapping as a realization projection, and do not let an unmodeled component
+  acquire an independent lifecycle, state authority, or failure boundary by accident.
 - Treat definitions and usages, ownership and reference, specialization, subsetting, redefinition,
   binding, multiplicity, succession, satisfaction, and verification as semantic commitments rather
   than naming conventions. Use `$sysml-reference` when any of them affects the implementation.

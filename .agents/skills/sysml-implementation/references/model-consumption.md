@@ -130,7 +130,10 @@ Classify uncertainty before choosing code:
   safety, security, compatibility, or evidence. Return to model work before implementation.
 - **Realization decision:** the model intentionally permits several semantically equivalent
   implementations. Choose from current evidence in the implementation plan; do not add optional
-  architecture to the model.
+  architecture to the model. Where the model is silent about structure, structural choices remain
+  realization decisions. Where the model decomposes, structurally different implementations are not
+  equivalent even when behaviorally equivalent, and divergence from a modeled decomposition is an
+  implementation defect.
 - **Feasibility consequence:** a demonstrated language, runtime, platform, dependency, hardware, or
   environmental limit changes stakeholder-visible behavior or an intentionally selected realization
   boundary. Route that changed system consequence through model review. If system meaning does not
@@ -157,5 +160,6 @@ restart continuity alone governs committed state, not an unselected acknowledgem
 A model need not decide algorithms, functions, modules, classes, data structures, storage,
 serialization, framework, user-interface structure, deployment, or generated-source layout before
 implementation. It must decide enough system meaning to distinguish conforming behavior from
-nonconforming behavior. Declare the slice ready only when that distinction and its decisive evidence
-are clear.
+nonconforming behavior. Where the model has decided structure, that decomposition is part of enough
+system meaning, and code that re-cuts it is nonconforming. Declare the slice ready only when that
+distinction and its decisive evidence are clear.
