@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:daed5a087a0974f99d885471f557bdf89f09b3c7
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:c658dfd54241cc715f76ba3c8d6ffaeb04e5e6c2
+    implementation: git:7993373cdbe84643358fffd761940fca475b3d35
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:c658dfd54241cc715f76ba3c8d6ffaeb04e5e6c2
+    checkpoint: git:7993373cdbe84643358fffd761940fca475b3d35
   observed: *target
 scope:
   authority_scope:
@@ -138,7 +138,7 @@ findings:
     classification: implementation defect
     consequence: The setuptools backend reuses the ignored build directory and never purges files deleted from source, and package_smoke runs its build in the repository root, so the artifact it builds, installs and exercises can predate current source. Its only artifact assertion compares a version string, which a rebuild leaves unchanged. The local build tree had already drifted, carrying modules deleted in git:4612c0d and one file with no version-control history. The documented install builds from a fresh clone and is not exposed; what the check certified, and what a local reinstall produced, was.
     authority_refs: [VellisRequirements::simpleOperation, VellisVerification::mcpLifecycle]
-    evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building, command:just package-check]
+    evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building, path:tests/test_package_smoke.py#test_only_build_distribution_can_run_a_uv_build, command:just package-check]
     disposition: resolved
     owner_work_item_id: W006
     implementation_status: conforming
@@ -198,7 +198,7 @@ decisions:
       - A caller validating a complete state still checks every permitted participant in both roles.
       - A batch that genuinely leaves a subject outside its bound is still rejected and still names that subject.
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another, path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree]
+    evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another, path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, path:tests/vellis/test_change_draft_v2.py#test_adding_a_second_inbound_link_still_sees_the_committed_one, path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree]
 work_items:
   - id: W001
     order: 1
@@ -259,7 +259,7 @@ work_items:
     label: Scope cardinality checking to the exact definition and role whose count the batch can change
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:c658dfd54241cc715f76ba3c8d6ffaeb04e5e6c2"}
+    planned_baseline: {dimension: implementation, identity: "git:7993373cdbe84643358fffd761940fca475b3d35"}
     finding_ids: [F004, F005]
     decision_ids: [D003]
     authority:
@@ -280,13 +280,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_repointing_one_link_does_not_load_an_untouched_endpoint_degree, path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_an_anchor_under_an_unloaded_data_type, command:just check]
     blocker: null
-    checkpoint: git:c658dfd54241cc715f76ba3c8d6ffaeb04e5e6c2
+    checkpoint: git:7993373cdbe84643358fffd761940fca475b3d35
   - id: W005
     order: 4
     label: Make boundary finding paths resolvable and the query bound navigable
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:c658dfd54241cc715f76ba3c8d6ffaeb04e5e6c2"}
+    planned_baseline: {dimension: implementation, identity: "git:7993373cdbe84643358fffd761940fca475b3d35"}
     finding_ids: [F006, F007, F009]
     decision_ids: []
     authority:
@@ -307,13 +307,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, command:just check]
     blocker: null
-    checkpoint: git:c658dfd54241cc715f76ba3c8d6ffaeb04e5e6c2
+    checkpoint: git:7993373cdbe84643358fffd761940fca475b3d35
   - id: W006
     order: 5
     label: Make the package check reject a stale distribution
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:c658dfd54241cc715f76ba3c8d6ffaeb04e5e6c2"}
+    planned_baseline: {dimension: implementation, identity: "git:7993373cdbe84643358fffd761940fca475b3d35"}
     finding_ids: [F008]
     decision_ids: []
     authority:
@@ -332,15 +332,15 @@ work_items:
       - Do not add version-bump automation or change the release process.
     lifecycle: complete
     implementation_status: conforming
-    evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building, command:just package-check, command:just check]
+    evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building, path:tests/test_package_smoke.py#test_only_build_distribution_can_run_a_uv_build, command:just package-check, command:just check]
     blocker: null
-    checkpoint: git:c658dfd54241cc715f76ba3c8d6ffaeb04e5e6c2
+    checkpoint: git:7993373cdbe84643358fffd761940fca475b3d35
   - id: W003
     order: 6
     label: Verify, independently review, and close the agent-usable boundary fixes
     kind: closure
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:c658dfd54241cc715f76ba3c8d6ffaeb04e5e6c2"}
+    planned_baseline: {dimension: implementation, identity: "git:7993373cdbe84643358fffd761940fca475b3d35"}
     finding_ids: []
     decision_ids: []
     authority:
