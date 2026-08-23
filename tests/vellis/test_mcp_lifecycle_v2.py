@@ -3435,44 +3435,75 @@ async def test_change_finding_paths_name_a_request_member_or_a_subject(
 _AFFECTED_STATE_ROOTS = frozenset({"objects", "definitions", "draft"})
 
 
-def _emitted_finding_roots(source: str) -> set[str]:
-    """The first segment of every absolute path this module hands to a call.
+def _request_member_names(schema: object, found: set[str]) -> set[str]:
+    """Every member name a request can carry, at any depth.
 
-    Deliberately recognizes no constructor and no helper by name. A path is
-    emitted where a literal rooted at the document is passed to something, and
-    naming the constructors instead would drop whichever wrapper a module
-    happens to use. A relative fragment is composed onto a parent and is
-    checked wherever that parent is supplied.
+    A finding may name a nested member, so reading only the top level would
+    call a legitimate path unresolvable. Recursing also reaches through the
+    oneOf branches and any dereferenced definitions without knowing which
+    tools happen to have them.
+    """
+    if isinstance(schema, dict):
+        members = schema.get("properties")
+        if isinstance(members, dict):
+            found.update(members)
+        for value in schema.values():
+            _request_member_names(value, found)
+    elif isinstance(schema, list):
+        for value in schema:
+            _request_member_names(value, found)
+    return found
+
+
+def _emits_findings(tree: ast.Module) -> bool:
+    """Whether this module can produce a finding at all.
+
+    Derived rather than listed, so a new module is swept the day it emits its
+    first finding and a module that merely holds a rooted string -- an HTTP
+    route, say -- is not mistaken for one that addresses a request.
+    """
+    referenced = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+    referenced.update(node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute))
+    return bool(referenced & {"Finding", "FindingCode"})
+
+
+def _rooted_path_roots(tree: ast.Module) -> set[str]:
+    """The first segment of every document-rooted path literal in the module.
+
+    Deliberately indifferent to where the literal appears. Recognizing paths by
+    the call they are passed to missed whichever wrapper a module used; by their
+    literal form missed the interpolated ones; and by both still missed a path
+    bound to a local name first. A path is a path wherever it is written, and a
+    relative fragment is composed onto a parent rather than starting at the
+    root.
     """
     roots: set[str] = set()
-    for node in ast.walk(ast.parse(source)):
-        if not isinstance(node, ast.Call):
+    # A constant inside an f-string is a fragment of that path, not a path. The
+    # trailing run of an indexed member reads as rooted on its own otherwise.
+    interpolated = {
+        id(part)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.JoinedStr)
+        for part in node.values
+    }
+    for node in ast.walk(tree):
+        if id(node) in interpolated and not isinstance(node, ast.JoinedStr):
             continue
-        for argument in (*node.args, *(value.value for value in node.keywords)):
-            literal = _leading_literal(argument)
-            if literal is None or not literal.startswith("/"):
-                continue
-            segment = literal[1:].split("/")[0]
-            if segment:
-                roots.add(segment)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            literal = node.value
+        elif (
+            isinstance(node, ast.JoinedStr)
+            and node.values
+            and isinstance(node.values[0], ast.Constant)
+            and isinstance(node.values[0].value, str)
+        ):
+            literal = node.values[0].value
+        else:
+            continue
+        segment = literal[1:].split("/")[0] if literal.startswith("/") else ""
+        if segment:
+            roots.add(segment)
     return roots
-
-
-def _leading_literal(argument: ast.expr) -> str | None:
-    """The text an argument begins with, whether or not it interpolates.
-
-    An indexed path is an f-string, and every member addressed by position is
-    written that way, so reading only plain constants would leave the dominant
-    form of finding path unread while appearing to sweep the whole boundary.
-    Only the leading run matters: the root is what has to be addressable.
-    """
-    if isinstance(argument, ast.Constant):
-        return argument.value if isinstance(argument.value, str) else None
-    if isinstance(argument, ast.JoinedStr) and argument.values:
-        first = argument.values[0]
-        if isinstance(first, ast.Constant) and isinstance(first.value, str):
-            return first.value
-    return None
 
 
 @pytest.mark.anyio
@@ -3480,14 +3511,14 @@ async def test_no_finding_path_names_something_absent_from_the_boundary(
     database: Path,
 ) -> None:
     # A finding path an agent cannot resolve against its own request is worse
-    # than no path at all. Both sides are derived: what is addressable comes
-    # from the published schemas, and what is emitted comes from every module
-    # behind the boundary, so a new member, tool, module, or helper is covered
-    # the day it ships rather than when someone remembers to extend a list.
+    # than no path at all. Every axis here is derived: which modules emit, where
+    # a path may be written, and which names are addressable. Enumerating any
+    # one of them left a blind spot that a one-line change walked straight
+    # through while this test still reported the boundary covered.
     async with Client(build_server(database)) as client:
         tools = await client.list_tools()
     addressable = _AFFECTED_STATE_ROOTS.union(
-        *(_top_level_properties(value.inputSchema) for value in tools)
+        *(_request_member_names(value.inputSchema, set()) for value in tools)
     )
     modules = [
         value
@@ -3497,10 +3528,16 @@ async def test_no_finding_path_names_something_absent_from_the_boundary(
         if not value.name.startswith("v1_")
     ]
     assert len(modules) > 20, "module discovery found too little to be a sweep"
+    swept: dict[str, set[str]] = {}
+    for value in modules:
+        tree = ast.parse(value.read_text())
+        if _emits_findings(tree):
+            swept[value.name] = _rooted_path_roots(tree)
+    assert len(swept) > 8, "finding-emitting module discovery found too little to be a sweep"
     unresolvable = {
-        f"{value.name}:/{root}"
-        for value in modules
-        for root in _emitted_finding_roots(value.read_text())
+        f"{name}:/{root}"
+        for name, roots in swept.items()
+        for root in roots
         if root not in addressable
     }
     assert unresolvable == set(), (

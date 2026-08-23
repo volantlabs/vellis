@@ -191,6 +191,17 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: The one interpolated form is read while the sweep keeps recognizing forms by enumeration, so the next way a path is composed drifts out of coverage exactly as the module and constructor lists did.
     compatibility_effect: Evidence only; no product behavior, wire, or database change.
+  - id: F013
+    summary: The finding-path sweep recognized paths by where they were written, so a path bound to a local name, held in a tuple, or set as a parameter default went unread in eight modules.
+    classification: implementation defect
+    consequence: Recognizing a path by the call it is passed to missed whichever wrapper a module used; by its literal form missed the interpolated ones; and by both still missed a path first bound to a name. Renaming the root of a name-bound path in query_validation produced a live unknown-source-node finding reporting a response payload collection as a request member, reached by an ordinary pattern mistake and not by exceeding any limit, with the whole suite green. Each repair had closed one axis of the recognition rule rather than the rule.
+    authority_refs: [VellisRequirements::mcpBoundary]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary]
+    disposition: resolved
+    owner_work_item_id: W007
+    implementation_status: conforming
+    nearest_wrong_system: A third syntactic position is recognized and the rule keeps enumerating positions, so the next way a path reaches a finding drifts out of coverage exactly as the module, constructor, and form axes each did.
+    compatibility_effect: Evidence only; no product behavior, wire, or database change.
 decisions:
   - id: D001
     summary: Publish a merged top-level properties map alongside the existing oneOf in the shared union-schema builder, rather than collapsing the branches or special-casing each tool.
@@ -241,7 +252,7 @@ work_items:
     label: Advertise callable top-level properties for the union input tools
     kind: implementation
     dependencies: []
-    planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
+    planned_baseline: {dimension: implementation, identity: "git:daed5a087a0974f99d885471f557bdf89f09b3c7"}
     finding_ids: [F001, F003]
     decision_ids: [D001]
     authority:
@@ -268,7 +279,7 @@ work_items:
     label: Complete the link cardinality closure for endpoints admitted in either role
     kind: implementation
     dependencies: []
-    planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
+    planned_baseline: {dimension: implementation, identity: "git:daed5a087a0974f99d885471f557bdf89f09b3c7"}
     finding_ids: [F002]
     decision_ids: [D002]
     authority:
@@ -295,7 +306,7 @@ work_items:
     label: Scope cardinality checking to the exact definition and role whose count the batch can change
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
+    planned_baseline: {dimension: implementation, identity: "git:f486fe64c466945f2780326616f909bf2ceba4d5"}
     finding_ids: [F004, F005]
     decision_ids: [D003]
     authority:
@@ -322,7 +333,7 @@ work_items:
     label: Make boundary finding paths resolvable and the query bound navigable
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
+    planned_baseline: {dimension: implementation, identity: "git:a80775909cd7936e52b2b61fa3070492ebe4e6c9"}
     finding_ids: [F006, F007, F009]
     decision_ids: []
     authority:
@@ -349,7 +360,7 @@ work_items:
     label: Make the package check reject a stale distribution
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
+    planned_baseline: {dimension: implementation, identity: "git:d5129c664c662a880d57e55fe42b80acae5d239c"}
     finding_ids: [F008]
     decision_ids: []
     authority:
@@ -377,7 +388,7 @@ work_items:
     kind: implementation
     dependencies: [W004, W005]
     planned_baseline: {dimension: implementation, identity: "git:22db79fb935c17bfc01b69f82ee912926fda1c7a"}
-    finding_ids: [F010, F011, F012]
+    finding_ids: [F010, F011, F012, F013]
     decision_ids: []
     authority:
       - refs: [VellisRequirements::mcpBoundary, VellisRequirements::localCardinality, VellisVerification::cardinality, VellisVerification::activeChange]
@@ -429,7 +440,7 @@ closure:
   implementation_status: absent
   integration_status: not evaluated
   external_status: not evaluated
-  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools gain a merged top-level properties map while their oneOf branches continue to decide acceptance. The cardinality closure materializes strictly less than the source baseline, because W004 reverted W002's both-role peer widening and skips any role whose bound cannot produce a finding. The type summary's over-limit refusal now carries no finding path, having previously named a response payload collection; its code and summary are unchanged and no other refusal loses a path. No additional graph state becomes valid in either direction.
+  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools gain a merged top-level properties map while their oneOf branches still decide acceptance. The cardinality closure materializes strictly less than the source baseline, because W004 reverted W002's both-role peer widening and skips any role whose bound cannot fire. The type summary's over-limit refusal drops its finding path, which had named a response payload collection, and its summary now names rtg_type_inspect as the remedy; the finding code, the rejected outcome summary, and every other refusal's path are unchanged.
   reviews:
     - {lens: authority and conformance, status: findings, reviewer: authority-conformance-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
     - {lens: engineering and evidence, status: findings, reviewer: engineering-evidence-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
