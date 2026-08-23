@@ -104,9 +104,12 @@ sit between that checkpoint and closure.
 4. Plan one end-to-end semantic slice. For every cited authority, record the in-scope obligation,
    full or partial coverage, any remaining obligations, decisive conformance evidence, and required
    non-effects. Keep implementation status—`not evaluated`, `absent`, `partial`, `conforming`, or
-   `conflicting`—separate from authority coverage. When software needs finer structure than the
-   systems model, record a many-to-many realization against semantic neighborhoods and preserve the
-   modeled lifecycle, state, transaction, failure, and external boundaries.
+   `conflicting`—separate from authority coverage. Where the systems model is silent about
+   structure and software needs finer structure, record a many-to-many realization against semantic
+   neighborhoods and preserve the modeled lifecycle, state, transaction, failure, and external
+   boundaries. Where the model decomposes, subdivide inside a modeled boundary but never merge,
+   re-cut, or reassign governed state across two: a code unit spanning two modeled parts is an
+   implementation defect, not a realization decision.
    For consequential stateful operations, also record permitted scale drivers, forbidden unrelated-
    population dependencies, retained and transient materialization shape, and any operation whose
    meaning legitimately requires state-wide work. This qualitative resource-shape check does not
@@ -264,7 +267,10 @@ inspect or write `.data/`.
 Automated tests may observe language tooling, repository safety, and future implementations. They do
 not choose or freeze the living model's constructs, names, counts, topology, package layout, or prose.
 A future implementation contract check may compare implemented behavior with the current model: the
-implementation is constrained by the model, not the model by a duplicate test inventory.
+implementation is constrained by the model, not the model by a duplicate test inventory. Such a
+check may also compare implemented structure with a modeled decomposition—asserting that no code
+unit spans two modeled parts—because it reads the current model rather than restating it as a
+second inventory.
 
 When tests and model structure were introduced together, review the model independently from owner
 purpose, accepted and refused examples, state effects, and decisive evidence. Passing tests or parser

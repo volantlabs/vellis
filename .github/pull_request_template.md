@@ -45,8 +45,10 @@ non-goal and confirm the final full review cycle found no new material issue.
 - [ ] Official model validation and `just check` pass.
 - [ ] When this is post-build evolution, `system-evolution.yaml` classifies each finding, preserves
       approval boundaries, assigns one completion owner, and passes `just system-evolution-check`.
-- [ ] Adequacy and subtraction reviews found no responsibility stranded in prose and no unsupported
-      service, runtime, storage, migration, transport, deployment, or inventory-driven architecture.
+- [ ] Adequacy and subtraction reviews found no responsibility stranded in prose, no architecture
+      that forbids nothing, and no structure transcribed from an implementation.
+- [ ] Structure the model newly commits to states what it forbids, and the implementation conforms
+      to every modeled boundary it touches without spanning two modeled parts.
 - [ ] Natural identity, derived meaning, bounded responses, and existing authority were preferred
       before new IDs, stored flags, parallel rules, envelopes, or operational machinery.
 - [ ] Deferred realization choices and external tool surfaces were not modeled as optional product

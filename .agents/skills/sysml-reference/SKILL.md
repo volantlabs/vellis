@@ -195,7 +195,8 @@ Also state the nearest tempting mapping the construct does not establish. A pack
 itself select a code package or deployable layer; a part does not select a service or class; an item
 does not select a record, transfer object, or table; an action does not select a method; a port does
 not select a private code interface; and a verification case does not require one same-named
-automated test.
+automated test. A project may still select such a mapping intentionally; that is project authority
+rather than language entailment, and must be recorded as such.
 
 Judge a code representation by semantic equivalence at the modeled instance level. Several code
 structures may realize the same SysML commitment. Conversely, matching names or generated shapes do

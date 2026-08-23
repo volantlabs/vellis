@@ -46,9 +46,11 @@ Do not create placeholders to satisfy an imagined workflow. When product generat
    When a portable core skill changes, also check that it has not acquired a hard dependency on
    Vellis, RTG, MCP, local paths, local commands, a programming language, or a particular software
    architecture. Keep concrete bindings in repository guidance and domain extensions. Confirm that
-   modeling, domain, and implementation skills use the same handoff fields and divergence taxonomy;
-   documentation and PR claims must not present partial authority coverage as complete requirement
-   satisfaction or verification.
+   modeling, domain, and implementation skills use the same handoff fields and divergence taxonomy,
+   and that they state the same modeled-decomposition rule: free subdivision inside a modeled
+   boundary, no code unit spanning two modeled parts, and no bottom-up structural proposal by
+   default. Documentation and PR claims must not present partial authority coverage as complete
+   requirement satisfaction or verification.
 9. If explanatory guidance compares candidate realizations, label it non-normative and keep the model's selected semantics distinct from unselected technology examples.
    For an intentionally selected agent workflow, explain the smallest invocation path without copying
    the full model contract or implying the future framework is already installed.

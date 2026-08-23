@@ -57,16 +57,24 @@ record rather than modeling interchangeable parts, variants, interfaces, or conf
 framework, protocol, and device affordances are feasibility constraints, not an automatic inventory
 of use cases, actions, or subsystems.
 
-## Systems structure is not code structure
+## Conformance depth follows model depth
 
 A logical part needs independent system meaning: lifecycle, identity, governed state, invariant,
 failure, safety, security, resource, physical, external-interaction, substitution, or selected
 realization responsibility. Code maintainability alone does not establish one.
 
-Implementation may still isolate semantic neighborhoods into classes, modules, functions, processes,
-tasks, or generated types. One modeled responsibility may use several software components, and one
-software mechanism may realize several model elements. Modeling work should expose those cohesion
-cues and the system boundaries they must preserve, not manufacture a one-to-one architecture.
+Decide depth with one question: if a competent fresh implementer decomposed this area differently,
+would that be a defect or a legitimate choice? A defect means the decomposition carries system
+meaning, so model it and state what it forbids. A legitimate choice means it does not, so leave it
+unmodeled.
+
+What the model decomposes, the implementation conforms to: code may subdivide inside a modeled
+boundary and may not merge, re-cut, or reassign governed state across two. Where the model is
+silent, implementation may still isolate semantic neighborhoods into classes, modules, functions,
+processes, tasks, or generated types. One modeled responsibility may use several software
+components, and one software mechanism may realize several model elements inside one modeled part.
+Modeling work should expose those cohesion cues and the system boundaries they must preserve, not
+manufacture a one-to-one architecture.
 
 ## Proportionality and continuity
 

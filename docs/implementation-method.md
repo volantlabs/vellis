@@ -65,9 +65,15 @@ choice.
 SysML is systems-flavored authority. A logical part exists for independently meaningful lifecycle,
 state, invariant, failure, safety, physical, external-interaction, substitution, or selected
 realization responsibility—not merely because maintainable software benefits from another class.
-Software design may therefore be much finer-grained than the modeled system decomposition.
+What the model does decompose is authority; what it leaves unmodeled is free.
 
-Implementation agents use semantic neighborhoods as cohesion cues. Values and units, calculations,
+The asymmetry is directional. Inside a modeled boundary, software design may be much finer-grained
+than the modeled system decomposition and needs no permission to be. Across modeled boundaries, code
+may not merge, re-cut, or reassign governed state: a code unit spanning two modeled parts is an
+implementation defect, not a realization decision.
+
+Implementation agents use semantic neighborhoods as cohesion cues wherever the model is silent about
+structure. Values and units, calculations,
 validation rules, transformations, state transitions, interactions, numerical kernels, timing,
 protocol adaptation, and evidence support may each motivate focused software components while
 remaining inside one modeled system responsibility.
@@ -75,14 +81,16 @@ remaining inside one modeled system responsibility.
 That relationship is a task-local, many-to-many **software realization projection**:
 
 - one modeled responsibility may use several software components;
-- one software mechanism may realize several model elements;
+- one software mechanism may realize several model elements inside one modeled part; across two
+  modeled parts it is an implementation defect;
 - a software boundary may improve invariant enforcement, dependency direction, testability, platform
   isolation, or change isolation without becoming system authority;
 - finer software structure must preserve the modeled identity, lifecycle, state, timing, safety,
   failure, physical, and external boundaries that remain unified.
 
 A useful code component is not evidence for a SysML subsystem. Conversely, a modeled part does not
-require one same-named class, service, process, or deployable.
+require one same-named class, service, process, or deployable—but it does require that no code
+unit straddle it and its neighbor, and that its governed state stay where the model put it.
 
 ## Semantic handoff
 

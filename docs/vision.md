@@ -32,8 +32,10 @@ from owner outcome through a human-approved whole-model plan, implementation sou
 easy to inspect, resume, understand, and trust. The future is model-first, agent-assisted, and plain.
 
 That path is bidirectional without making its authorities symmetrical. Model agents expose
-implementation-ready semantic neighborhoods and the system boundaries they must preserve. Software
-agents may realize those concerns through finer-grained classes and modules, then return failing cases
+implementation-ready semantic neighborhoods and the system boundaries they must preserve. The model
+may also commit to internal structure, and where it does, code conforms to that decomposition
+instead of re-cutting it. Software agents may realize those concerns through finer-grained classes
+and modules, then return failing cases
 or feasibility evidence translated back into stakeholder-visible systems meaning. Code structure informs
 engineering judgment but does not become the model by transcription.
 
