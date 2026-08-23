@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:daed5a087a0974f99d885471f557bdf89f09b3c7
   target: &target
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:7993373cdbe84643358fffd761940fca475b3d35
+    implementation: git:3e6f93500308e3b47abeab40cfa0860eece17056
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:a486c22174806217cbf30c4c5b2a088421e4e9c5633fd507506e3711c88b57b8
-    checkpoint: git:7993373cdbe84643358fffd761940fca475b3d35
+    checkpoint: git:3e6f93500308e3b47abeab40cfa0860eece17056
   observed: *target
 scope:
   authority_scope:
@@ -260,7 +260,7 @@ work_items:
     label: Scope cardinality checking to the exact definition and role whose count the batch can change
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:7993373cdbe84643358fffd761940fca475b3d35"}
+    planned_baseline: {dimension: implementation, identity: "git:3e6f93500308e3b47abeab40cfa0860eece17056"}
     finding_ids: [F004, F005]
     decision_ids: [D003]
     authority:
@@ -281,13 +281,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_change_draft_v2.py#test_attaching_children_does_not_count_a_parent_under_another_definition, path:tests/vellis/test_change_draft_v2.py#test_repointing_under_one_definition_does_not_make_a_subject_of_another, path:tests/vellis/test_change_draft_v2.py#test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role, path:tests/vellis/test_change_draft_v2.py#test_accepted_changes_never_commit_a_state_whole_validation_rejects, path:tests/vellis/test_change_draft_v2.py#test_attaching_a_child_does_not_load_a_hub_whose_bound_cannot_be_violated, command:just check]
     blocker: null
-    checkpoint: git:7993373cdbe84643358fffd761940fca475b3d35
+    checkpoint: git:3e6f93500308e3b47abeab40cfa0860eece17056
   - id: W005
     order: 4
     label: Make boundary finding paths resolvable and the query bound navigable
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:7993373cdbe84643358fffd761940fca475b3d35"}
+    planned_baseline: {dimension: implementation, identity: "git:3e6f93500308e3b47abeab40cfa0860eece17056"}
     finding_ids: [F006, F007, F009]
     decision_ids: []
     authority:
@@ -308,13 +308,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_query_finding_paths_resolve_against_the_request, command:just check]
     blocker: null
-    checkpoint: git:7993373cdbe84643358fffd761940fca475b3d35
+    checkpoint: git:3e6f93500308e3b47abeab40cfa0860eece17056
   - id: W006
     order: 5
     label: Make the package check reject a stale distribution
     kind: implementation
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:7993373cdbe84643358fffd761940fca475b3d35"}
+    planned_baseline: {dimension: implementation, identity: "git:3e6f93500308e3b47abeab40cfa0860eece17056"}
     finding_ids: [F008]
     decision_ids: []
     authority:
@@ -335,13 +335,13 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/test_package_smoke.py#test_installed_match_rejects_a_module_that_drifted_from_source, path:tests/test_package_smoke.py#test_installed_import_check_compares_content_not_only_the_version, path:tests/test_package_smoke.py#test_build_distribution_purges_the_intermediate_tree_before_building, path:tests/test_package_smoke.py#test_only_build_distribution_can_run_a_uv_build, command:just package-check, command:just check]
     blocker: null
-    checkpoint: git:7993373cdbe84643358fffd761940fca475b3d35
+    checkpoint: git:3e6f93500308e3b47abeab40cfa0860eece17056
   - id: W003
     order: 6
     label: Verify, independently review, and close the agent-usable boundary fixes
     kind: closure
     dependencies: [W001, W002]
-    planned_baseline: {dimension: implementation, identity: "git:7993373cdbe84643358fffd761940fca475b3d35"}
+    planned_baseline: {dimension: implementation, identity: "git:3e6f93500308e3b47abeab40cfa0860eece17056"}
     finding_ids: []
     decision_ids: []
     authority:
