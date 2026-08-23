@@ -2552,3 +2552,40 @@ def test_attaching_children_does_not_count_an_anchor_under_an_unloaded_data_type
     assert attached.status is OperationStatus.ACCEPTED
     assert attached.findings == ()
     assert attached.resulting_revision == 2
+
+
+def test_repointing_under_one_definition_does_not_make_a_subject_of_another(
+    tmp_path: Path,
+) -> None:
+    """Subjects stay separated by definition, not merged across the closure.
+
+    The parent is a source subject of test.held_by because the batch re-points its
+    outgoing link. Sharing one subject set across definitions would also make it a
+    source subject of test.tagged, whose population was never loaded for it, and
+    reject a batch in which its tag is untouched and correct.
+    """
+    path = _dual_bound_database(tmp_path)
+
+    changed = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            1,
+            (
+                LinkUpsert(HELD_BY_MID, target_uuid=ROOT_B),
+                AnchorUpsert(DUAL_LEAF, "test.leaf", "Leaf"),
+                LinkUpsert(HELD_BY_LEAF, "test.held_by", DUAL_LEAF, DUAL_MID),
+                LinkUpsert(TAGGED_LEAF, "test.tagged", DUAL_LEAF, ROOT_B),
+            ),
+        ),
+    )
+
+    assert changed.status is OperationStatus.ACCEPTED
+    assert changed.findings == ()
+    assert changed.resulting_revision == 2
+    objects = _objects(path)
+    held = objects[HELD_BY_MID]
+    tag = objects[TAGGED_MID]
+    assert isinstance(held, Link)
+    assert isinstance(tag, Link)
+    assert held.target_uuid == ROOT_B
+    assert tag.target_uuid == ROOT_A

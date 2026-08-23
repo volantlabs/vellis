@@ -1,9 +1,16 @@
 import ast
+import sys
 from pathlib import Path
 
 import pytest
 
-from tools.package_smoke import ROOT, _assert_installed_matches_source, _run_isolated_tool
+from tools.package_smoke import (
+    ROOT,
+    _assert_installed_import,
+    _assert_installed_matches_source,
+    _purge_build_tree,
+    _run_isolated_tool,
+)
 
 
 def test_run_isolated_tool_rejects_environment_outside_temp_root(tmp_path: Path) -> None:
@@ -110,3 +117,33 @@ def test_installed_match_rejects_a_missing_module(tmp_path: Path) -> None:
 
     with pytest.raises(AssertionError, match="missing=..mcp.py"):
         _assert_installed_matches_source(package, "wheel")
+
+
+def test_purge_build_tree_removes_the_intermediate_build_directory(tmp_path: Path) -> None:
+    stale = tmp_path / "build" / "lib" / "vellis"
+    stale.mkdir(parents=True)
+    (stale / "ghost.py").write_text("# deleted from source, still in build/\n")
+
+    _purge_build_tree(tmp_path)
+
+    assert not (tmp_path / "build").exists()
+
+
+def test_purge_build_tree_accepts_a_tree_that_was_never_built(tmp_path: Path) -> None:
+    _purge_build_tree(tmp_path)
+
+    assert not (tmp_path / "build").exists()
+
+
+def test_installed_import_check_compares_content_not_only_the_version(tmp_path: Path) -> None:
+    """The comparison has to be wired into the import check, not merely defined.
+
+    A perfect comparator that no caller invokes leaves the original defect in
+    place while every check stays green.
+    """
+    environment = tmp_path / "env"
+    package = _mirror_source(environment)
+    (package / "mcp.py").write_text("# stale copy left by an uncleaned build tree\n")
+
+    with pytest.raises(AssertionError, match="does not match the source tree"):
+        _assert_installed_import(Path(sys.executable), environment, environment, "wheel")

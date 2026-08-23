@@ -321,6 +321,16 @@ def _assert_installed_import(python: Path, environment: Path, root: Path, label:
     _assert_installed_matches_source(Path(source).resolve().parent, label)
 
 
+def _purge_build_tree(root: Path) -> None:
+    """Remove the backend's intermediate build tree before building.
+
+    The setuptools backend copies sources into build/ and never removes files
+    that no longer exist in the source tree, so an uncleaned tree ships modules
+    deleted from source and modules never committed to it.
+    """
+    shutil.rmtree(root / "build", ignore_errors=True)
+
+
 def _module_digests(package: Path) -> dict[str, str]:
     return {
         str(path.relative_to(package)): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -778,10 +788,7 @@ def main() -> int:
         documented_install_root = temporary / "documented-install"
         documented_install_root.mkdir()
         _verify_documented_install(ROOT, documented_install_root, environment)
-        # The setuptools backend copies into build/ and never purges files that
-        # no longer exist in source, so an uncleaned tree ships modules deleted
-        # from the working tree and modules never committed to it.
-        shutil.rmtree(ROOT / "build", ignore_errors=True)
+        _purge_build_tree(ROOT)
         _run(
             "uv",
             "build",

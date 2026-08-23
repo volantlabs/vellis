@@ -3301,8 +3301,15 @@ async def test_query_finding_paths_resolve_against_the_request(starter_database:
         "maxMatches": 10,
         "nodes": [{"name": "", "kind": "anchor"}],
     }
+    duplicate_name = {
+        "kind": "pattern",
+        "maxMatches": 10,
+        "nodes": [{"name": "x", "kind": "anchor"}, {"name": "x", "kind": "anchor"}],
+        "links": [{"name": "x", "source": "x", "target": "x"}],
+    }
 
     async with Client(build_server(starter_database)) as client:
+        described = {value.name: value.description or "" for value in await client.list_tools()}
         await client.call_tool(
             "rtg_change",
             {
@@ -3320,7 +3327,7 @@ async def test_query_finding_paths_resolve_against_the_request(starter_database:
         )
         results = [
             (selection, await client.call_tool("rtg_query", {"selection": selection}))
-            for selection in (over_limit, bad_regex, empty_name)
+            for selection in (over_limit, bad_regex, empty_name, duplicate_name)
         ]
 
     for selection, result in results:
@@ -3333,6 +3340,17 @@ async def test_query_finding_paths_resolve_against_the_request(starter_database:
             path = finding.get("path")
             assert path is not None, finding
             _resolve_request_pointer({"selection": selection}, path)
+
+    duplicate_content = results[3][1].structured_content
+    assert duplicate_content is not None
+    duplicate_paths = {finding["path"] for finding in duplicate_content["findings"]}
+    assert "/selection/nodes/1/name" in duplicate_paths
+    assert "/selection/links/0/name" in duplicate_paths
+
+    # RTG014 requires the description itself to guide bounded pattern narrowing,
+    # not only the finding an agent receives after exceeding the bound.
+    assert "narrow it with node predicates" in described["rtg_query"]
+    assert "identity" in described["rtg_query"]
 
     limit_content = results[0][1].structured_content
     assert limit_content is not None

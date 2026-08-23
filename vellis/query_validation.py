@@ -146,12 +146,8 @@ def _pattern_findings(
                 f"combined pattern items exceed {PUBLIC_ITEM_LIMIT}",
             )
         )
-    names = tuple(node.name for node in selection.nodes) + tuple(
-        link.name for link in selection.links
-    )
-    _duplicates(names, "/selection", findings)
     _duplicate_values(selection.direct_associations, "/selection/directAssociations", findings)
-    findings.extend(_empty_selector_name_findings(selection))
+    findings.extend(_selector_name_findings(selection))
     definition_map = {definition.type_key: definition for definition in definitions}
     nodes = {node.name: node for node in selection.nodes}
     for index, node in enumerate(selection.nodes):
@@ -465,23 +461,24 @@ def _text_payload_findings(
             )
 
 
-def _empty_selector_name_findings(selection: PatternSelection) -> tuple[Finding, ...]:
-    """Point at the array the name actually lives in.
+def _selector_name_findings(selection: PatternSelection) -> tuple[Finding, ...]:
+    """Point at the array each selector name actually lives in.
 
-    Node and link names occupy separate request arrays, so an index into their
-    concatenation identifies no member of the request.
+    Node and link names share one namespace but occupy separate request arrays,
+    so an index into their concatenation identifies no member of the request.
+    Emptiness and duplication are reported together because both are properties
+    of the same name and must be attributed to the same member.
     """
     findings: list[Finding] = []
+    seen: set[str] = set()
     for collection, values in (("nodes", selection.nodes), ("links", selection.links)):
         for index, value in enumerate(values):
+            path = f"/selection/{collection}/{index}/name"
             if value.name == "":
-                findings.append(
-                    _finding(
-                        FindingCode.MISSING,
-                        f"/selection/{collection}/{index}/name",
-                        "query name is empty",
-                    )
-                )
+                findings.append(_finding(FindingCode.MISSING, path, "query name is empty"))
+            elif value.name in seen:
+                findings.append(_finding(FindingCode.DUPLICATE, path, "duplicate value"))
+            seen.add(value.name)
     return tuple(findings)
 
 
