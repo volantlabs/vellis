@@ -483,9 +483,9 @@ closure:
   finding_disposition: open
   model_status: unchanged
   implementation_status: absent
-  integration_status: not evaluated
-  external_status: not evaluated
-  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools gain a merged top-level properties map while their oneOf branches still decide acceptance. The cardinality closure materializes strictly less than the source baseline, because W004 reverted W002's both-role peer widening and skips any role whose bound cannot fire. Two refusals change their finding path only. The type summary's over-limit refusal drops a path that had named a response payload, and an unreachable draft definition guard now names the upsert entry. Finding codes and outcome summaries are unchanged.
+  integration_status: conforming
+  external_status: not applicable
+  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and version all remain stable. The union tools gain a merged top-level properties map. The cardinality closure materializes no more than the source baseline, since W004 reverted W002's both-role widening and skips any role whose bound cannot fire. Finding paths change at eight refusal sites — six F006 corrections, which include object findings readdressed from closure position to UUID, plus the type summary's over-limit path dropped and an unreachable draft definition guard shortened. The type summary's finding summary also names rtg_type_inspect. Finding codes and outcome summaries are unchanged.
   reviews:
     - {lens: authority and conformance, status: findings, reviewer: authority-conformance-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
     - {lens: engineering and evidence, status: findings, reviewer: engineering-evidence-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
