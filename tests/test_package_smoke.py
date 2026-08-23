@@ -172,3 +172,48 @@ def test_build_distribution_purges_the_intermediate_tree_before_building(
     _build_distribution(tmp_path, tmp_path / "dist", {})
 
     assert observed == [False], "the build ran against a tree that was not purged"
+
+
+def test_only_build_distribution_can_run_a_uv_build() -> None:
+    """The purge must be unavoidable, not merely available.
+
+    Restoring a bare _run("uv", "build", ...) in main would rebuild through the
+    uncleaned tree again, and every other test here would stay green.
+    """
+    source = (ROOT / "tools" / "package_smoke.py").read_text(encoding="utf-8")
+    module = ast.parse(source)
+    permitted = {
+        node
+        for definition in ast.walk(module)
+        if isinstance(definition, ast.FunctionDef) and definition.name == "_build_distribution"
+        for node in ast.walk(definition)
+    }
+
+    offenders: list[str] = []
+    for node in ast.walk(module):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+            continue
+        if node.func.id not in {"_run", "run"} or node in permitted:
+            continue
+        literals = [
+            argument.value
+            for argument in node.args
+            if isinstance(argument, ast.Constant) and isinstance(argument.value, str)
+        ]
+        if literals[:2] == ["uv", "build"]:
+            offenders.append(f"line {node.lineno}")
+
+    assert offenders == [], (
+        f"uv build invoked outside _build_distribution at {offenders}; "
+        "such a build skips the purge of the stale intermediate tree"
+    )
+
+
+def test_module_digests_ignore_a_directory_setuptools_does_not_package(tmp_path: Path) -> None:
+    """A scratch directory without __init__.py is not a missing module."""
+    package = _mirror_source(tmp_path)
+    scratch = package / "scratchdir"
+    scratch.mkdir()
+    (scratch / "note.py").write_text("# developer scratch, not packaged\n")
+
+    _assert_installed_matches_source(package, "wheel")

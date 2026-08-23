@@ -48,6 +48,8 @@ scope:
     - vellis/change_operations.py
     - tests/vellis/test_mcp_lifecycle_v2.py
     - tests/vellis/test_change_draft_v2.py
+    - tests/vellis/test_query_v2_successor.py
+    - CONTRIBUTING.md
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
     - No model authority, tool inventory, wire field, finding code, database schema, or database version change.

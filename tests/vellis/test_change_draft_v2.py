@@ -2589,3 +2589,181 @@ def test_repointing_under_one_definition_does_not_make_a_subject_of_another(
     assert isinstance(tag, Link)
     assert held.target_uuid == ROOT_B
     assert tag.target_uuid == ROOT_A
+
+
+TARGET_TOP = "abababab-0000-4000-8000-000000000001"
+TARGET_TOP_2 = "abababab-0000-4000-8000-000000000002"
+TARGET_MID = "abababab-0000-4000-8000-000000000003"
+TARGET_MID_2 = "abababab-0000-4000-8000-000000000004"
+TARGET_MID_3 = "abababab-0000-4000-8000-000000000005"
+TARGET_LEAF = "abababab-0000-4000-8000-000000000006"
+TARGET_LEAF_2 = "abababab-0000-4000-8000-000000000007"
+TARGET_LEAF_3 = "abababab-0000-4000-8000-000000000008"
+HOLDS_MID = "acacacac-0000-4000-8000-000000000001"
+HOLDS_MID_2 = "acacacac-0000-4000-8000-000000000002"
+HOLDS_MID_3 = "acacacac-0000-4000-8000-000000000003"
+HOLDS_LEAF = "acacacac-0000-4000-8000-000000000004"
+HOLDS_LEAF_2 = "acacacac-0000-4000-8000-000000000005"
+HOLDS_LEAF_3 = "acacacac-0000-4000-8000-000000000006"
+
+
+def test_repointing_a_source_does_not_count_that_endpoint_in_the_target_role(
+    tmp_path: Path,
+) -> None:
+    """Role scoping has two sides, and the target side needs its own evidence.
+
+    Re-pointing an endpoint's outgoing link cannot change how many links point at
+    it. Counting it in the target role anyway reports it at zero, because peers
+    load per role and its incoming population was never fetched.
+    """
+    path = tmp_path / "targetrole" / "vellis.db"
+    initialize_with_definitions(
+        path,
+        (
+            AnchorTypeDefinition("test.top", "Top"),
+            AnchorTypeDefinition("test.mid", "Mid"),
+            AnchorTypeDefinition("test.leaf", "Leaf"),
+            LinkTypeDefinition(
+                "test.holds",
+                "Every top and mid is held by at least one child",
+                ("test.mid", "test.leaf"),
+                ("test.top", "test.mid"),
+                Cardinality(0),
+                Cardinality(1),
+            ),
+        ),
+        recorded_at="2026-08-20T00:00:00Z",
+    )
+    seeded = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            0,
+            (
+                AnchorUpsert(TARGET_TOP, "test.top", "Top"),
+                AnchorUpsert(TARGET_TOP_2, "test.top", "Top 2"),
+                AnchorUpsert(TARGET_MID, "test.mid", "Mid"),
+                AnchorUpsert(TARGET_MID_2, "test.mid", "Mid 2"),
+                AnchorUpsert(TARGET_MID_3, "test.mid", "Mid 3"),
+                AnchorUpsert(TARGET_LEAF, "test.leaf", "Leaf"),
+                AnchorUpsert(TARGET_LEAF_2, "test.leaf", "Leaf 2"),
+                AnchorUpsert(TARGET_LEAF_3, "test.leaf", "Leaf 3"),
+                LinkUpsert(HOLDS_MID, "test.holds", TARGET_MID, TARGET_TOP),
+                LinkUpsert(HOLDS_MID_3, "test.holds", TARGET_MID_3, TARGET_TOP),
+                LinkUpsert(HOLDS_MID_2, "test.holds", TARGET_MID_2, TARGET_TOP_2),
+                LinkUpsert(HOLDS_LEAF, "test.holds", TARGET_LEAF, TARGET_MID),
+                LinkUpsert(HOLDS_LEAF_2, "test.holds", TARGET_LEAF_2, TARGET_MID_2),
+                LinkUpsert(HOLDS_LEAF_3, "test.holds", TARGET_LEAF_3, TARGET_MID_3),
+            ),
+        ),
+    )
+    assert seeded.resulting_revision == 1
+
+    repointed = apply_graph_change(
+        path, GraphChangeRequest(1, (LinkUpsert(HOLDS_MID, target_uuid=TARGET_TOP_2),))
+    )
+
+    assert repointed.status is OperationStatus.ACCEPTED
+    assert repointed.findings == ()
+    assert repointed.resulting_revision == 2
+
+
+def test_adding_a_second_inbound_link_still_sees_the_committed_one(tmp_path: Path) -> None:
+    """Peer loading is what makes an over-maximum count visible at all.
+
+    Only the new link is in the batch, so without its already-committed peers the
+    target counts one instead of two and an over-bound state commits.
+    """
+    path = tmp_path / "linkpeers" / "vellis.db"
+    initialize_with_definitions(
+        path,
+        (
+            AnchorTypeDefinition("test.top", "Top"),
+            AnchorTypeDefinition("test.leaf", "Leaf"),
+            LinkTypeDefinition(
+                "test.holds",
+                "At most one child per parent",
+                ("test.leaf",),
+                ("test.top",),
+                Cardinality(0),
+                Cardinality(0, 1),
+            ),
+        ),
+        recorded_at="2026-08-20T00:00:00Z",
+    )
+    seeded = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            0,
+            (
+                AnchorUpsert(TARGET_TOP, "test.top", "Top"),
+                AnchorUpsert(TARGET_LEAF, "test.leaf", "Leaf"),
+                AnchorUpsert(TARGET_LEAF_2, "test.leaf", "Leaf 2"),
+                LinkUpsert(HOLDS_LEAF, "test.holds", TARGET_LEAF, TARGET_TOP),
+            ),
+        ),
+    )
+    assert seeded.resulting_revision == 1
+
+    second = apply_graph_change(
+        path,
+        GraphChangeRequest(1, (LinkUpsert(HOLDS_LEAF_2, "test.holds", TARGET_LEAF_2, TARGET_TOP),)),
+    )
+
+    assert second.status is OperationStatus.REJECTED
+    assert [value.code for value in second.findings] == [FindingCode.CARDINALITY_VIOLATION]
+    assert second.findings[0].uuids == (TARGET_TOP,)
+
+
+def test_adding_a_second_data_object_still_sees_the_committed_one(tmp_path: Path) -> None:
+    """The same peer dependency holds for objects per anchor."""
+    path = tmp_path / "datapeers" / "vellis.db"
+    initialize_with_definitions(
+        path,
+        (
+            AnchorTypeDefinition("test.top", "Top"),
+            AssociatedDataTypeDefinition(
+                "test.detail",
+                "At most one detail per anchor",
+                ("test.top",),
+                (PropertyDefinition("note", "Note", ValueKind.TEXT),),
+                Cardinality(1, 1),
+                Cardinality(0, 1),
+            ),
+        ),
+        recorded_at="2026-08-20T00:00:00Z",
+    )
+    seeded = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            0,
+            (
+                AnchorUpsert(TARGET_TOP, "test.top", "Top"),
+                AssociatedDataUpsert(
+                    HOLDS_LEAF,
+                    "test.detail",
+                    (TARGET_TOP,),
+                    set_properties=(("note", ScalarValue.text("first")),),
+                ),
+            ),
+        ),
+    )
+    assert seeded.resulting_revision == 1
+
+    second = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            1,
+            (
+                AssociatedDataUpsert(
+                    HOLDS_LEAF_2,
+                    "test.detail",
+                    (TARGET_TOP,),
+                    set_properties=(("note", ScalarValue.text("second")),),
+                ),
+            ),
+        ),
+    )
+
+    assert second.status is OperationStatus.REJECTED
+    assert [value.code for value in second.findings] == [FindingCode.CARDINALITY_VIOLATION]
+    assert second.findings[0].uuids == (TARGET_TOP,)

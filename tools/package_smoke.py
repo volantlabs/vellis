@@ -342,10 +342,25 @@ def _purge_build_tree(root: Path) -> None:
 
 
 def _module_digests(package: Path) -> dict[str, str]:
-    return {
-        str(path.relative_to(package)): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in sorted(package.rglob("*.py"))
-    }
+    """Digest the modules setuptools actually packages.
+
+    Package discovery excludes any directory without __init__.py, so comparing
+    every .py file underneath would report a developer's scratch directory as a
+    missing module.
+    """
+    digests: dict[str, str] = {}
+    directories = [package]
+    while directories:
+        current = directories.pop()
+        for path in sorted(current.iterdir()):
+            if path.is_dir():
+                if (path / "__init__.py").exists():
+                    directories.append(path)
+            elif path.suffix == ".py":
+                digests[str(path.relative_to(package))] = hashlib.sha256(
+                    path.read_bytes()
+                ).hexdigest()
+    return digests
 
 
 def _assert_installed_matches_source(installed: Path, label: str) -> None:

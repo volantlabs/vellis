@@ -3370,6 +3370,7 @@ async def test_query_finding_paths_resolve_against_the_request(starter_database:
     assert draft_content["status"] == "rejected"
     draft_finding = draft_content["findings"][0]
     assert draft_finding["path"] == "/selection/maxMatches"
+    assert "narrow it with predicates" in draft_finding["summary"]
     _resolve_request_pointer({"selection": over_limit}, draft_finding["path"])
 
     # RTG014 requires the description itself to guide bounded pattern narrowing,
