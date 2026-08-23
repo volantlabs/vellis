@@ -236,6 +236,17 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Depth is compared for rooted literals only, leaving every member named by a fragment composed onto a parent unchecked, which is where most of the boundary's deep paths are written.
     compatibility_effect: One draft definition finding path shortens from the system member to the upsert entry; the finding code and summary are unchanged, and that member is unreachable through the boundary.
+  - id: F017
+    summary: A review lens reported that segments passed to the pointer builder as arguments escape the finding-path sweep; assessment rejected it, because every module that composes that way addresses affected state rather than a request.
+    classification: out of scope
+    consequence: The three modules that pass segments to the builder emit only affected-state roots, and a segment below such a root names a field of the stored subject rather than a request member, which is why the sweep stops at the root there. Extending the check confirmed this by flagging the canonical system envelope path, which is correct as written. RTG014 is satisfied by naming the affected-state subject, so the reported mutants rename a state field rather than making a request member unresolvable, and no such wrong name exists in the product.
+    authority_refs: [VellisRequirements::mcpBoundary]
+    evidence_refs: [path:tests/vellis/test_mcp_lifecycle_v2.py#test_no_finding_path_names_something_absent_from_the_boundary, path:tests/vellis/test_mcp_lifecycle_v2.py#test_change_finding_paths_name_a_request_member_or_a_subject]
+    disposition: out-of-scope
+    owner_work_item_id: W007
+    implementation_status: not applicable
+    nearest_wrong_system: The check is extended anyway, and it reports a correct affected-state path as unresolvable while no agent-visible defect exists.
+    compatibility_effect: None; no product, wire, evidence, or database change.
 decisions:
   - id: D001
     summary: Publish a merged top-level properties map alongside the existing oneOf in the shared union-schema builder, rather than collapsing the branches or special-casing each tool.
@@ -422,7 +433,7 @@ work_items:
     kind: implementation
     dependencies: [W004, W005]
     planned_baseline: {dimension: implementation, identity: "git:9c90ae02742052d19e28ce6633311c1d865d1623"}
-    finding_ids: [F010, F011, F012, F013, F014, F015, F016]
+    finding_ids: [F010, F011, F012, F013, F014, F015, F016, F017]
     decision_ids: []
     authority:
       - refs: [VellisRequirements::mcpBoundary, VellisRequirements::localCardinality, VellisVerification::cardinality, VellisVerification::activeChange]
@@ -474,7 +485,7 @@ closure:
   implementation_status: absent
   integration_status: not evaluated
   external_status: not evaluated
-  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools gain a merged top-level properties map while their oneOf branches still decide acceptance. The cardinality closure materializes strictly less than the source baseline, because W004 reverted W002's both-role peer widening and skips any role whose bound cannot fire. The type summary's over-limit refusal drops its finding path, which had named a response payload collection, and its summary now names rtg_type_inspect as the remedy; the finding code, the rejected outcome summary, and every other refusal's path are unchanged.
+  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools gain a merged top-level properties map while their oneOf branches still decide acceptance. The cardinality closure materializes strictly less than the source baseline, because W004 reverted W002's both-role peer widening and skips any role whose bound cannot fire. Two refusals change their finding path only. The type summary's over-limit refusal drops a path that had named a response payload, and an unreachable draft definition guard now names the upsert entry. Finding codes and outcome summaries are unchanged.
   reviews:
     - {lens: authority and conformance, status: findings, reviewer: authority-conformance-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
     - {lens: engineering and evidence, status: findings, reviewer: engineering-evidence-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
