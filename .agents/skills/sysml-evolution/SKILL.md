@@ -65,8 +65,8 @@ file, issue, change request, or equivalent system of record.
    specialist skill, run focused evidence, review authority/conformance separately from
    engineering/evidence, batch corrections, and checkpoint implementation, tests, documentation
    truth, and record state together when the project supports atomic checkpoints.
-9. Reassess the complete active finding set after every material change. Sweep the same root cause,
-   detect newly stale work, and add a finding rather than silently widening an existing work item.
+9. Reassess only the findings this change could have affected. Sweep the same root cause and add a
+   new finding rather than widening an existing work item.
 10. Close with [Evolution execution](references/evolution-execution.md): every finding has a supported
     disposition, target authority is accepted and current, implementation and integration conform,
     selected external behavior is exercised where applicable, public claims are truthful, and a cold

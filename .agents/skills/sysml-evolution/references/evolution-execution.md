@@ -2,11 +2,33 @@
 
 ## Contents
 
+- [Operating mode](#operating-mode)
 - [Approval gates](#approval-gates)
 - [Planning and execution](#planning-and-execution)
 - [Review and remediation](#review-and-remediation)
 - [Interruption and change](#interruption-and-change)
 - [Closure and rebaseline](#closure-and-rebaseline)
+
+## Operating mode
+
+Fix the mode at the start and record it. It decides how much has to be written down.
+
+**Copilot.** The correction loop is seconds long, so ask rather than assume. The human confirms the
+acceptance set at dispatch. Stop and report after each work item. Use one fresh reviewer and let the
+human be the second lens. Use ordinary project checkpoints; do not mint state tokens and do not
+re-stamp reviewed state.
+
+**Autonomous.** Write the objective, the observable distinction, the non-goals, the acceptance sets,
+and the stop conditions before dispatch, and do not let the working agent amend them. Use two fresh,
+context-isolated reviewers. Stop mechanically on any of:
+
+- changed accepted system meaning;
+- a finding whose consequence falls outside the declared scope;
+- an acceptance entry still without evidence after two review pairs;
+- two review pairs that were not clean;
+- an unexplained dirty working state.
+
+Spend budgets rather than escalating. Never widen scope alone.
 
 ## Approval gates
 
@@ -58,10 +80,17 @@ Review two lenses independently:
   maintainability, evidence discrimination, explicit units, numerical error, timing basis, actual
   physical effects, execution-environment identity, and public/project truth where consequential.
 
+A finding is material only if it names a behavior the current artifact exhibits, with the input that
+produces it. "The evidence would not catch X" is not a finding unless X is present. Do not propose
+additional evidence for behaviors outside the work item's acceptance set.
+
 Collect complete findings from both lenses against the same state. Batch in-scope corrections, sweep
-the same root cause, rerun relevant evidence, then obtain one clean final pass. Do not prolong review
-by inventing inputs, threat models, performance targets, or architecture outside declared authority
-and ordinary project assumptions.
+the same root cause, rerun relevant evidence, then run the second pair. Two review pairs is the
+budget for one work item. If the second pair is not clean, stop: in copilot mode hand the findings to
+the human; in autonomous mode pause the work item with its findings recorded and take the next
+dependency-ready item. Never run a third pair. Do not prolong review by inventing inputs, threat
+models, performance targets, or architecture outside declared authority and ordinary project
+assumptions.
 
 Bind each review result to its independent reviewer, exact reviewed-state checkpoint, lens, final
 disposition, and reproducible evidence. Every lens declared in the evolution scope participates in

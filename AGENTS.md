@@ -102,8 +102,18 @@ source layout, framework examples, familiar names, or incidental tests.
 - Preserve explicit owner decisions and accepted model meaning. Treat implementation feedback as a
   language question, model gap, realization decision, feasibility consequence, implementation
   defect, stale baseline, or out-of-scope request before mutation.
-- Tests must reject a plausible wrong system, selected realization, compatibility failure, or
-  workflow invariant. They do not freeze model vocabulary, structure, inventory, or prose.
+- Fix an **acceptance set** before dispatching a work item: a numbered list of specific wrong
+  behaviors the change must make impossible, each stated as an observable outcome, plus the
+  non-effects it must leave untouched. The set closes at dispatch. The agent doing the work does
+  not extend it.
+- A work item is **done** when every acceptance entry names one piece of evidence that fails if
+  that wrong behavior is present, the declared non-effects hold, and the project gate passes.
+  Nothing further is required for done.
+- A reviewer extends a closed acceptance set only by reporting a defect the artifact actually
+  exhibits, with a reproduction. A merely conceivable wrong behavior is a recorded, non-blocking
+  observation and a candidate for a new finding and a new dispatch. Growing the acceptance set is
+  never a reason to run another review pair.
+- Tests do not freeze model vocabulary, structure, inventory, or prose.
 - Never hand-edit generated product source when generation exists; regenerate and check freshness.
 - Distinguish modeled, selected, implemented, verified, and runnable. Partial authority coverage
   never establishes whole-requirement satisfaction or whole-verification completion.
