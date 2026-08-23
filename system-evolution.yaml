@@ -369,7 +369,7 @@ closure:
   implementation_status: absent
   integration_status: not evaluated
   external_status: not evaluated
-  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools gain a merged top-level properties map while their oneOf branches continue to decide acceptance. The cardinality closure materializes strictly less than the source baseline. W002 widened peer selection to both roles, W004 reverted that widening, and W006 further skips any role whose bound cannot produce a finding, so an ordinary change no longer loads an endpoint's degree to satisfy an unbounded bound. No additional graph state becomes valid in either direction.
+  compatibility: Tool inventory, accepted inputs, wire fields, finding taxonomy, database schema, and database version all remain stable. The two union tools gain a merged top-level properties map while their oneOf branches continue to decide acceptance. The cardinality closure materializes strictly less than the source baseline. W002 widened peer selection to both roles, and W004 both reverted that widening and skipped any role whose bound cannot produce a finding, so an ordinary change no longer loads an endpoint's degree to satisfy an unbounded bound. No additional graph state becomes valid in either direction.
   reviews:
     - {lens: authority and conformance, status: findings, reviewer: authority-conformance-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}
     - {lens: engineering and evidence, status: findings, reviewer: engineering-evidence-review-1, checkpoint: git:f93e8d07750015f6270e46776b5f8cfdae1ec404, evidence_refs: [command:just check]}

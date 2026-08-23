@@ -2796,6 +2796,9 @@ def _oracle_definitions(per_source: Cardinality, per_target: Cardinality, per_an
     return (
         AnchorTypeDefinition("test.top", "Top"),
         AnchorTypeDefinition("test.mid", "Mid"),
+        # An anchor type no data type permits and no link accepts, so a rule that
+        # forgets to check permitted types will count it and reject it wrongly.
+        AnchorTypeDefinition("test.other", "Other"),
         LinkTypeDefinition(
             "test.holds", "Holds", ORACLE_ANCHORS, ORACLE_ANCHORS, per_source, per_target
         ),
@@ -2804,8 +2807,8 @@ def _oracle_definitions(per_source: Cardinality, per_target: Cardinality, per_an
             "Notes",
             ("test.top", "test.mid", "test.d1"),
             ("test.top",),
-            Cardinality(0),
-            Cardinality(0, 2),
+            Cardinality(0, 1),
+            Cardinality(0, 3),
         ),
         AssociatedDataTypeDefinition(
             "test.d1",
@@ -2827,23 +2830,46 @@ def _oracle_definitions(per_source: Cardinality, per_target: Cardinality, per_an
 
 
 def _project(graph, commands, removals):
-    """The state a batch would produce, derived independently of the pipeline."""
+    """The state a batch would produce, derived independently of the pipeline.
+
+    Upserts patch rather than replace, so an omitted member keeps its committed
+    value. Modelling them as replacement would silently drop a link out of every
+    count and make the reference disagree with the system for the wrong reason.
+    """
     projected = {value.uuid: value for value in graph}
     for command in commands:
+        existing = projected.get(command.uuid)
         if isinstance(command, AnchorUpsert):
-            projected[command.uuid] = Anchor(command.uuid, command.type_key or "", "x")
+            previous = existing if isinstance(existing, Anchor) else None
+            projected[command.uuid] = Anchor(
+                command.uuid,
+                command.type_key or (previous.type_key if previous else ""),
+                "x",
+            )
         elif isinstance(command, LinkUpsert):
+            previous = existing if isinstance(existing, Link) else None
             projected[command.uuid] = Link(
                 command.uuid,
-                command.type_key or "",
-                command.source_uuid or "",
-                command.target_uuid or "",
+                command.type_key or (previous.type_key if previous else ""),
+                command.source_uuid or (previous.source_uuid if previous else ""),
+                command.target_uuid or (previous.target_uuid if previous else ""),
             )
         else:
+            previous = existing if isinstance(existing, AssociatedData) else None
+            if command.anchor_uuids is not None:
+                anchors = tuple(command.anchor_uuids)
+            else:
+                anchors = tuple(previous.anchor_uuids) if previous else ()
+                anchors = tuple(
+                    value for value in anchors if value not in command.remove_anchor_uuids
+                )
+                anchors += tuple(
+                    value for value in command.add_anchor_uuids if value not in anchors
+                )
             projected[command.uuid] = AssociatedData(
                 command.uuid,
-                command.type_key or "",
-                tuple(command.anchor_uuids or ()),
+                command.type_key or (previous.type_key if previous else ""),
+                anchors,
                 (("note", ScalarValue.text("x")),),
             )
     for uuid in removals:
@@ -2901,9 +2927,24 @@ def test_scoped_change_agrees_with_whole_state_validation(tmp_path: Path, shape:
         removals: list[str] = []
         for _ in range(random.randint(1, 3)):
             choice = random.random()
-            if choice < 0.15:
+            if choice < 0.12:
                 commands.append(
                     AnchorUpsert(random.choice(anchors + spare), random.choice(ORACLE_ANCHORS), "a")
+                )
+            elif choice < 0.18:
+                commands.append(AnchorUpsert(random.choice(spare), "test.other", "o"))
+            elif choice < 0.30:
+                # An associated-data object is a permitted source of test.notes,
+                # a legal endpoint kind an anchor-only generator never reaches.
+                # data[0] keeps its seeded test.d1 type, so it stays a permitted
+                # source; reusing it makes the at-most-one bound reachable.
+                commands.append(
+                    LinkUpsert(
+                        random.choice(links[:3]),
+                        "test.notes",
+                        data[0],
+                        random.choice(anchors),
+                    )
                 )
             elif choice < 0.45:
                 commands.append(
@@ -2917,14 +2958,26 @@ def test_scoped_change_agrees_with_whole_state_validation(tmp_path: Path, shape:
             elif choice < 0.8:
                 commands.append(
                     AssociatedDataUpsert(
-                        random.choice(data),
+                        random.choice(data[1:]),
                         random.choice(("test.d1", "test.d2")),
                         (random.choice(anchors + spare),),
                         set_properties=(("note", ScalarValue.text("x")),),
                     )
                 )
+            elif choice < 0.86:
+                # Partial upserts are the ordinary shape of a real change, and
+                # they exercise composition rather than replacement.
+                commands.append(
+                    LinkUpsert(random.choice(links), target_uuid=random.choice(anchors))
+                )
+            elif choice < 0.92:
+                commands.append(
+                    AssociatedDataUpsert(
+                        random.choice(data[1:]), add_anchor_uuids=(random.choice(anchors),)
+                    )
+                )
             else:
-                removals.append(random.choice(links + data))
+                removals.append(random.choice(links + data[1:]))
         seen: set[str] = set()
         unique = [value for value in commands if not (value.uuid in seen or seen.add(value.uuid))]
         pruned = [value for value in dict.fromkeys(removals) if value not in seen]
@@ -2933,9 +2986,6 @@ def test_scoped_change_agrees_with_whole_state_validation(tmp_path: Path, shape:
         outcome = apply_graph_change(
             path, GraphChangeRequest(revision, tuple(unique), tuple(pruned))
         )
-        projected = _project(before.graph, unique, pruned)
-        expected = graph_cardinality_findings(projected, before.definitions)
-
         if outcome.status is OperationStatus.ACCEPTED:
             if outcome.resulting_revision is not None:
                 revision = outcome.resulting_revision
@@ -2946,11 +2996,23 @@ def test_scoped_change_agrees_with_whole_state_validation(tmp_path: Path, shape:
             continue
         if any(value.code is not FindingCode.CARDINALITY_VIOLATION for value in outcome.findings):
             continue
+        try:
+            projected = _project(before.graph, unique, pruned)
+        except ValueError:
+            # A patch against an object that does not exist yet composes to
+            # nothing; the system rejects that structurally, not for a bound.
+            continue
+        expected = graph_cardinality_findings(projected, before.definitions)
         rejected += 1
         assert expected != (), (
             "rejected a batch whose projected state whole validation calls clean: "
             f"{[value.summary for value in outcome.findings]}"
         )
+        # The rejection must name the same subjects for the same reasons, not
+        # merely coincide with some violation somewhere in the projected state.
+        assert {(value.uuids, value.summary) for value in outcome.findings} == {
+            (value.uuids, value.summary) for value in expected
+        }, "rejected for different subjects than the projected state violates"
 
     assert accepted >= 5, "too few accepted changes to be meaningful"
     assert rejected >= 3, "too few cardinality rejections to check the other direction"
@@ -3148,3 +3210,63 @@ def test_attaching_a_child_does_not_load_a_hub_whose_target_bound_cannot_fire(
     assert attached.status is OperationStatus.ACCEPTED
     assert not set(loaded).intersection(children)
     assert not set(loaded).intersection(child_links)
+
+
+def test_an_associated_data_source_is_counted_like_any_other_endpoint(tmp_path: Path) -> None:
+    """A permitted link endpoint may be an associated-data object, not only an anchor.
+
+    Counting only anchors silently exempts every data endpoint from its bound.
+    """
+    path = tmp_path / "dataendpoint" / "vellis.db"
+    initialize_with_definitions(
+        path,
+        (
+            AnchorTypeDefinition("test.top", "Top"),
+            AssociatedDataTypeDefinition(
+                "test.detail",
+                "Detail",
+                ("test.top",),
+                (PropertyDefinition("note", "Note", ValueKind.TEXT),),
+                Cardinality(1, 1),
+                Cardinality(0),
+            ),
+            LinkTypeDefinition(
+                "test.notes",
+                "At most one note link per detail",
+                ("test.detail",),
+                ("test.top",),
+                Cardinality(0, 1),
+                Cardinality(0),
+            ),
+        ),
+        recorded_at="2026-08-20T00:00:00Z",
+    )
+    seeded = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            0,
+            (
+                AnchorUpsert(TARGET_TOP, "test.top", "Top"),
+                AssociatedDataUpsert(
+                    HOLDS_LEAF,
+                    "test.detail",
+                    (TARGET_TOP,),
+                    set_properties=(("note", ScalarValue.text("x")),),
+                ),
+                LinkUpsert(HOLDS_MID, "test.notes", HOLDS_LEAF, TARGET_TOP),
+            ),
+        ),
+    )
+    assert seeded.status is OperationStatus.ACCEPTED, seeded.findings
+
+    second = apply_graph_change(
+        path,
+        GraphChangeRequest(
+            seeded.resulting_revision or 0,
+            (LinkUpsert(HOLDS_MID_2, "test.notes", HOLDS_LEAF, TARGET_TOP),),
+        ),
+    )
+
+    assert second.status is OperationStatus.REJECTED
+    assert [value.code for value in second.findings] == [FindingCode.CARDINALITY_VIOLATION]
+    assert second.findings[0].uuids == (HOLDS_LEAF,)
