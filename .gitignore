@@ -1,6 +1,5 @@
 .venv/
-.data/*
-!.data/README.md
+.data/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
@@ -14,3 +13,6 @@ build/
 .config/
 .cursor/
 .vscode/
+
+# Transient MCP browser session artifacts
+.playwright-mcp/

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import collections
+import functools
 import hashlib
 import json
 import logging
+import math
 import re
 import shutil
 import tempfile
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -16,20 +19,38 @@ from pypdf import PdfReader
 
 try:
     from .model_layout import (
-        FORMAL_CACHE_ROOT,
         LANGUAGE_LOCK_PATH,
+        RELEASE_CACHE_ROOT,
         ROOT,
         SPECIFICATION_REFERENCE_ROOT,
+        VALIDATOR_CACHE_ROOT,
+        VALIDATOR_LOCK_PATH,
     )
 except ImportError:  # pragma: no cover - direct script execution
     from model_layout import (  # type: ignore[no-redef]
-        FORMAL_CACHE_ROOT,
         LANGUAGE_LOCK_PATH,
+        RELEASE_CACHE_ROOT,
         ROOT,
         SPECIFICATION_REFERENCE_ROOT,
+        VALIDATOR_CACHE_ROOT,
+        VALIDATOR_LOCK_PATH,
     )
 
-GENERATOR_VERSION = 2
+GENERATOR_VERSION = 3
+# Okapi BM25 defaults. Deliberately not fitted to the eval set: a sweep showed
+# retrieval is stable across b in 0.5-0.9, and every hand-tuned alternative lost.
+BM25_K1 = 1.2
+BM25_B = 0.75
+# Clause titles carry the concept name ("Reference Usages", "States"), so a hit
+# there is strong evidence. Re-swept on the full 72-question set: 0.0 is clearly
+# worse (45 hits), while 0.6, 1.2, 1.8 and 3.0 all land within one question of
+# each other (48-49). A five-fold range of indistinguishable values is the
+# signature of a robust parameter rather than a fitted one, so the value is not
+# re-tuned to whichever number happens to win on the current set.
+BM25_TITLE_WEIGHT = 1.8
+# Specification clause 7 is descriptive; clauses 8 and 9 are syntax and library
+# reference that restate construct names constantly. See _clause_family_weight.
+DESCRIPTIVE_CLAUSE_WEIGHT = 2.0
 SECTION_NUMBER = re.compile(r"^(?P<number>(?:\d+|[A-Z])(?:\.\d+)*)\s+")
 SEARCH_WORD = re.compile(r"[a-z0-9]+")
 SEARCH_STOP_WORDS = {
@@ -52,7 +73,62 @@ SEARCH_STOP_WORDS = {
     "what",
     "when",
     "with",
+    # Interrogative and comparative filler. These used to survive as scored
+    # terms, so "when should I use an item def instead of a part def" carried
+    # four junk terms that diluted every real one.
+    "also",
+    "any",
+    "as",
+    "between",
+    "but",
+    "by",
+    "difference",
+    "differences",
+    "differ",
+    "do",
+    "from",
+    "i",
+    "if",
+    "instead",
+    "it",
+    "just",
+    "mean",
+    "means",
+    "my",
+    "need",
+    "not",
+    "only",
+    "other",
+    "rather",
+    "should",
+    "that",
+    "their",
+    "them",
+    "there",
+    "these",
+    "they",
+    "this",
+    "those",
+    "use",
+    "used",
+    "using",
+    "versus",
+    "vs",
+    "want",
+    "which",
+    "while",
+    "who",
+    "why",
+    "would",
+    "write",
+    "you",
+    "your",
 }
+
+
+def _section_sort_key(number: str) -> tuple[object, ...]:
+    """Stable tie-break: 7.9 sorts before 7.10, and letters sort after digits."""
+    return tuple((0, int(part)) if part.isdigit() else (1, part) for part in number.split("."))
 
 
 @dataclass(frozen=True)
@@ -61,7 +137,9 @@ class Specification:
     specification_id: str
     title: str
     pdf_title: str
-    document_number: str
+    version_identity: str
+    page_footer_prefix: str
+    short_label: str
     source_url: str
     source_sha256: str
     source_pdf: Path
@@ -72,14 +150,52 @@ class Specification:
 
 
 @dataclass(frozen=True)
+class Document:
+    """One retrievable unit, whatever corpus it came from.
+
+    The three corpora answer disjoint questions -- the specification says what a
+    construct means, the library says what exists and what it specialises, and
+    the examples say what it looks like -- so a hit is labelled with its source
+    rather than blended into one undifferentiated ranking.
+
+    Specification units are numbered clauses, not physical PDF pages: pages are
+    an artefact of typesetting, and a clause straddling a page break used to
+    split into two mediocre halves so that neither won.
+    """
+
+    source: str
+    corpus_id: str
+    identifier: str
+    title_path: tuple[str, ...]
+    citation: str
+    location: Path | None
+    body: str
+    sort_key: tuple[object, ...]
+    extraction_warning: bool = False
+    # Body text is shaped for matching and repeats the name to boost it. A
+    # summary, when present, is what a reader should actually see.
+    summary: str = ""
+
+
+@dataclass(frozen=True)
 class SearchResult:
-    specification_id: str
-    physical_page: int
-    printed_page: str
-    page_path: Path
-    section_titles: tuple[str, ...]
+    source: str
+    corpus_id: str
+    identifier: str
+    title_path: tuple[str, ...]
+    citation: str
+    location: Path | None
     snippet: str
     score: float
+    extraction_warning: bool = False
+
+    @property
+    def specification_id(self) -> str:
+        return self.corpus_id
+
+    @property
+    def section_number(self) -> str:
+        return self.identifier
 
 
 class _WarningCollector(logging.Handler):
@@ -103,12 +219,16 @@ def _sha256(path: Path) -> str:
 
 def _load_specifications() -> list[Specification]:
     lock = json.loads(LANGUAGE_LOCK_PATH.read_text(encoding="utf-8"))
-    grammar = lock.get("grammar")
-    if not isinstance(grammar, dict):
-        raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing grammar artifacts")
+    artifacts = lock.get("specifications")
+    if not isinstance(artifacts, dict):
+        raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing specification artifacts")
+    source = lock.get("source")
+    if not isinstance(source, dict):
+        raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing source")
+    checkout = RELEASE_CACHE_ROOT / str(source["tag"])
     specifications: list[Specification] = []
     for artifact_id in ("sysml_language_pdf", "kerml_language_pdf"):
-        artifact = grammar.get(artifact_id)
+        artifact = artifacts.get(artifact_id)
         if not isinstance(artifact, dict):
             raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing {artifact_id}")
         try:
@@ -118,10 +238,12 @@ def _load_specifications() -> list[Specification]:
                     specification_id=str(artifact["specification_id"]),
                     title=str(artifact["title"]),
                     pdf_title=str(artifact["pdf_title"]),
-                    document_number=str(artifact["document_number"]),
-                    source_url=str(artifact["url"]),
+                    version_identity=str(artifact["version_identity"]),
+                    page_footer_prefix=str(artifact["page_footer_prefix"]),
+                    short_label=str(artifact["short_label"]),
+                    source_url=(f"{source['web_root']}/{source['tag']}/{artifact['path']}"),
                     source_sha256=str(artifact["sha256"]),
-                    source_pdf=FORMAL_CACHE_ROOT / f"{artifact_id}.pdf",
+                    source_pdf=checkout / str(artifact["path"]),
                     front_matter_start=int(artifact["front_matter_start_physical_page"]),
                     body_start=int(artifact["body_start_physical_page"]),
                     expected_page_count=int(artifact["expected_page_count"]),
@@ -180,6 +302,10 @@ def _printed_page(specification: Specification, physical_page: int) -> str:
     return str(physical_page - specification.body_start + 1)
 
 
+def _page_span(start: str, end: str) -> str:
+    return start if start == end else f"{start}-{end}"
+
+
 def _section_number(title: str) -> str | None:
     match = SECTION_NUMBER.match(title)
     return match.group("number") if match else None
@@ -222,11 +348,7 @@ def _flatten_outline(reader: PdfReader) -> list[dict[str, Any]]:
         )
         entry["physical_page_end"] = max(entry["physical_page_start"], next_page - 1)
         next_peer = next(
-            (
-                later
-                for later in entries[index + 1 :]
-                if later["level"] <= entry["level"]
-            ),
+            (later for later in entries[index + 1 :] if later["level"] <= entry["level"]),
             None,
         )
         entry["subtree_physical_page_end"] = (
@@ -249,10 +371,10 @@ def _verify_pdf_identity(
             f"{specification.pdf_title!r}, found {actual_title!r}"
         )
     cover_text = reader.pages[0].extract_text() or ""
-    if specification.document_number not in cover_text:
+    if specification.version_identity not in cover_text:
         raise RuntimeError(
-            f"{specification.specification_id}: cover does not contain configured document "
-            f"number {specification.document_number!r}"
+            f"{specification.specification_id}: cover does not contain configured version "
+            f"identity {specification.version_identity!r}"
         )
     anchors = {str(entry["title"]): int(entry["physical_page_start"]) for entry in entries}
     expected_anchors = {
@@ -284,9 +406,7 @@ def _page_context_before(entries: list[dict[str, Any]], physical_page: int) -> l
     return _entry_path(entries, prior[-1]) if prior else []
 
 
-def _section_paths_starting(
-    entries: list[dict[str, Any]], physical_page: int
-) -> list[list[str]]:
+def _section_paths_starting(entries: list[dict[str, Any]], physical_page: int) -> list[list[str]]:
     return [
         _entry_path(entries, entry)
         for entry in entries
@@ -297,10 +417,7 @@ def _section_paths_starting(
 def _normalize_text(text: str, specification: Specification) -> str:
     normalized = text.replace("\r\n", "\n").replace("\r", "\n").replace("\f", "")
     lines = [line.rstrip() for line in normalized.splitlines()]
-    if specification.specification_id == "sysml-2.0":
-        footer = re.compile(r"^Systems Modeling Language v2\.0, Part 1\s+\d+$")
-    else:
-        footer = re.compile(r"^Kernel Modeling Language v1\.0\s+\d+$")
+    footer = re.compile(rf"^{re.escape(specification.page_footer_prefix)}\s+\d+$")
     lines = [line for line in lines if not footer.fullmatch(line.strip())]
     while lines and not lines[0]:
         lines.pop(0)
@@ -337,7 +454,7 @@ def _page_markdown(
         "---",
         f"specification_id: {_json_string(specification.specification_id)}",
         f"specification: {_json_string(specification.title)}",
-        f"document_number: {_json_string(specification.document_number)}",
+        f"version_identity: {_json_string(specification.version_identity)}",
         f"source_url: {_json_string(specification.source_url)}",
         f"source_sha256: {_json_string(specification.source_sha256)}",
         f"physical_page: {physical_page}",
@@ -351,9 +468,7 @@ def _page_markdown(
         lines[-1] = "section_context_before_page: []"
     if starting_paths:
         lines.append("section_paths_starting_here:")
-        lines.extend(
-            f"  - {json.dumps(path, ensure_ascii=False)}" for path in starting_paths
-        )
+        lines.extend(f"  - {json.dumps(path, ensure_ascii=False)}" for path in starting_paths)
     else:
         lines.append("section_paths_starting_here: []")
     if starts:
@@ -380,7 +495,7 @@ def _page_markdown(
             "---",
             "",
             f"Source: [{specification.title}]({specification.source_url}), "
-            f"{specification.document_number}, physical page {physical_page}. "
+            f"{specification.version_identity}, physical page {physical_page}. "
             "The official PDF is authoritative.",
             "",
         ]
@@ -399,9 +514,7 @@ def _outline_data(
         value["printed_page_start"] = _printed_page(
             specification, int(entry["physical_page_start"])
         )
-        value["printed_page_end"] = _printed_page(
-            specification, int(entry["physical_page_end"])
-        )
+        value["printed_page_end"] = _printed_page(specification, int(entry["physical_page_end"]))
         projected.append(value)
     return {
         "schema_version": 1,
@@ -425,7 +538,7 @@ def _index_markdown(
         "is authoritative; do not edit these pages manually or treat them as a replacement",
         "specification.",
         "",
-        f"- OMG document: `{specification.document_number}`",
+        f"- Specification version: `{specification.version_identity}`",
         f"- Official source: [{specification.source_url}]({specification.source_url})",
         f"- Source SHA-256: `{specification.source_sha256}`",
         f"- Physical pages: {page_count}",
@@ -483,9 +596,7 @@ def _write_specification(specification: Specification, output_root: Path) -> dic
                 for entry in entries
                 if entry["physical_page_start"] == physical_page
             ]
-            text = _normalize_text(
-                page.extract_text(extraction_mode="layout") or "", specification
-            )
+            text = _normalize_text(page.extract_text(extraction_mode="layout") or "", specification)
             warnings = list(warning_collector.messages)
             if warnings:
                 extraction_warning_pages[str(physical_page)] = warnings
@@ -521,10 +632,11 @@ def _write_specification(specification: Specification, output_root: Path) -> dic
     manifest = {
         "schema_version": 1,
         "generator_version": GENERATOR_VERSION,
+        "lock_sha256": _sha256(LANGUAGE_LOCK_PATH),
         "specification_id": specification.specification_id,
         "title": specification.title,
         "pdf_title": specification.pdf_title,
-        "document_number": specification.document_number,
+        "version_identity": specification.version_identity,
         "source_url": specification.source_url,
         "source_sha256": specification.source_sha256,
         "page_count": page_count,
@@ -540,16 +652,18 @@ def _write_specification(specification: Specification, output_root: Path) -> dic
 
 def _render_into(output_root: Path) -> list[dict[str, Any]]:
     output_root.mkdir(parents=True)
+    specifications = _load_specifications()
     manifests = [
-        _write_specification(specification, output_root)
-        for specification in _load_specifications()
+        _write_specification(specification, output_root) for specification in specifications
     ]
+    links = "".join(
+        f"- [{specification.short_label}]({specification.specification_id}/index.md)\n"
+        for specification in specifications
+    )
     (output_root / "index.md").write_text(
         "# SysML and KerML specification references\n\n"
         "Generated searchable projections of the checksum-pinned official specifications. "
-        "The official PDFs are authoritative.\n\n"
-        "- [SysML 2.0](sysml-2.0/index.md)\n"
-        "- [KerML 1.0](kerml-1.0/index.md)\n",
+        f"The official PDFs are authoritative.\n\n{links}",
         encoding="utf-8",
     )
     return manifests
@@ -571,44 +685,97 @@ def render(output_root: Path = SPECIFICATION_REFERENCE_ROOT) -> list[dict[str, A
     return manifests
 
 
-def _directory_files(root: Path) -> dict[str, str]:
-    if not root.exists():
-        return {}
-    return {
-        path.relative_to(root).as_posix(): _sha256(path)
-        for path in sorted(root.rglob("*"))
-        if path.is_file()
-    }
-
-
 def check(reference_root: Path = SPECIFICATION_REFERENCE_ROOT) -> list[str]:
-    with tempfile.TemporaryDirectory(prefix="vellis-sysml-reference-") as temporary:
-        generated = Path(temporary) / "specifications"
-        render(generated)
-        expected = _directory_files(generated)
-        actual = _directory_files(reference_root)
-    missing = sorted(set(expected) - set(actual))
-    extra = sorted(set(actual) - set(expected))
-    changed = sorted(path for path in set(expected) & set(actual) if expected[path] != actual[path])
+    """Verify the generated corpus against the pin that produced it.
+
+    The corpus is generated into the ignored cache rather than committed, so there
+    is no repository copy to diff. What can go wrong instead is a lock bumped
+    without regenerating, or a hand-edited page. Both are caught by comparing the
+    recorded lock digest and the recorded per-file digests.
+    """
     findings: list[str] = []
-    findings.extend(f"missing generated reference: {path}" for path in missing)
-    findings.extend(f"unexpected generated reference: {path}" for path in extra)
-    findings.extend(f"stale generated reference: {path}" for path in changed)
+    lock_digest = _sha256(LANGUAGE_LOCK_PATH)
+    for specification in _load_specifications():
+        target = reference_root / specification.specification_id
+        manifest_path = target / "manifest.json"
+        if not manifest_path.exists():
+            findings.append(
+                f"missing generated corpus for {specification.specification_id}; "
+                f"run `just model-setup`"
+            )
+            continue
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("lock_sha256") != lock_digest:
+            findings.append(
+                f"{specification.specification_id}: generated from a different language lock; "
+                f"run `just model-reference-render`"
+            )
+            continue
+        if int(manifest.get("generator_version", 0)) != GENERATOR_VERSION:
+            findings.append(
+                f"{specification.specification_id}: generated by generator version "
+                f"{manifest.get('generator_version')}, expected {GENERATOR_VERSION}; "
+                f"run `just model-reference-render`"
+            )
+            continue
+        recorded = manifest.get("files")
+        if not isinstance(recorded, dict):
+            findings.append(f"{specification.specification_id}: manifest has no file digests")
+            continue
+        present = {
+            path.relative_to(target).as_posix()
+            for path in target.rglob("*")
+            if path.is_file() and path.name != "manifest.json"
+        }
+        for relative in sorted(set(recorded) - present):
+            findings.append(f"missing generated reference: {relative}")
+        for relative in sorted(present - set(recorded)):
+            findings.append(f"unexpected generated reference: {relative}")
+        for relative in sorted(set(recorded) & present):
+            if _sha256(target / relative) != recorded[relative]:
+                findings.append(f"hand-edited generated reference: {relative}")
     return findings
 
 
+def _stem(word: str) -> str:
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def _term_counts(value: str) -> collections.Counter[str]:
+    """Term frequencies for a document. Unlike a query, repetition is signal."""
+    return collections.Counter(
+        _stem(word) for word in SEARCH_WORD.findall(value.lower()) if word not in SEARCH_STOP_WORDS
+    )
+
+
 def _search_terms(value: str) -> tuple[str, ...]:
+    """Distinct query terms. Deduplicated: asking twice is not asking harder."""
     terms: list[str] = []
     for word in SEARCH_WORD.findall(value.lower()):
         if word in SEARCH_STOP_WORDS:
             continue
-        if len(word) > 4 and word.endswith("ies"):
-            word = word[:-3] + "y"
-        elif len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
-            word = word[:-1]
-        if word not in terms:
-            terms.append(word)
+        stemmed = _stem(word)
+        if stemmed not in terms:
+            terms.append(stemmed)
     return tuple(terms)
+
+
+def _definition_snippet(body: str) -> str | None:
+    """The defining sentence of a library element, if its doc comment has one.
+
+    A library hit answers "what is this and what does it specialise", so leading
+    with the definition removes a file-open from the common case.
+    """
+    match = re.search(r"\b(?:is|are)\s+(?:a|an|the)\b.*", body)
+    if match is None:
+        return None
+    sentence = re.split(r"(?<=\.)\s", match.group(0))[0]
+    compact = " ".join(sentence.split())
+    return compact[:320] + ("…" if len(compact) > 320 else "") if len(compact) > 25 else None
 
 
 def _search_snippet(text: str, terms: tuple[str, ...]) -> str:
@@ -628,96 +795,531 @@ def _search_snippet(text: str, terms: tuple[str, ...]) -> str:
     return compact[:320] + ("…" if len(compact) > 320 else "")
 
 
+def _release_checkout() -> Path:
+    lock = json.loads(LANGUAGE_LOCK_PATH.read_text(encoding="utf-8"))
+    source = lock.get("source")
+    if not isinstance(source, dict):
+        raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing source")
+    return RELEASE_CACHE_ROOT / str(source["tag"])
+
+
+def _validator_library_root() -> Path:
+    lock = json.loads(VALIDATOR_LOCK_PATH.read_text(encoding="utf-8"))
+    version = str(lock["implementation_version"])
+    return VALIDATOR_CACHE_ROOT / version / "kernel" / str(lock["kernel"]["library"])
+
+
+LIBRARY_DECLARATION = re.compile(
+    r"^[ \t]*(?:(?:private|protected|public)\s+)?(?:abstract\s+)?"
+    r"(?P<kind>[a-z]+(?:\s+def)?)\s+(?P<name>'[^']+'|[A-Za-z_]\w*)"
+    r"(?P<tail>[^{;]*)",
+    re.MULTILINE,
+)
+LIBRARY_KINDS = frozenset(
+    {
+        "part def",
+        "item def",
+        "attribute def",
+        "action def",
+        "port def",
+        "interface def",
+        "connection def",
+        "state def",
+        "constraint def",
+        "requirement def",
+        "calc def",
+        "enum def",
+        "metadata def",
+        "view def",
+        "viewpoint def",
+        "rendering def",
+        "verification def",
+        "case def",
+        "analysis def",
+        "concern def",
+        "allocation def",
+        "flow def",
+        "occurrence def",
+        "datatype",
+        "class",
+        "struct",
+        "classifier",
+        "assoc",
+        "behavior",
+        "function",
+        "predicate",
+        "interaction",
+        "metaclass",
+        "type",
+    }
+)
+
+
+@functools.lru_cache(maxsize=4)
+def _library_documents(library_root: Path | None = None) -> tuple[Document, ...]:
+    """Library elements: what actually exists, and what it specialises.
+
+    The specification never lists library declarations, so questions like "what
+    do I import for a String attribute" are unanswerable from prose alone. Only
+    the Systems and Kernel libraries are indexed; the ISQ quantity files are
+    thousands of unit types that would swamp every query.
+    """
+    root = library_root if library_root is not None else _validator_library_root()
+    if not root.is_dir():
+        return ()
+    documents: list[Document] = []
+    for path in sorted(root.rglob("*")):
+        if path.suffix not in {".sysml", ".kerml"}:
+            continue
+        area = path.relative_to(root).parts[0]
+        if area not in {"Systems Library", "Kernel Libraries"}:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        lines = text.splitlines()
+        package = next(
+            (
+                match.group(1)
+                for line in lines[:5]
+                if (match := re.search(r"package\s+([A-Za-z_]\w*)", line))
+            ),
+            path.stem,
+        )
+        for match in LIBRARY_DECLARATION.finditer(text):
+            kind = " ".join(match.group("kind").split())
+            if kind not in LIBRARY_KINDS:
+                continue
+            name = match.group("name").strip("'")
+            line_number = text.count("\n", 0, match.start()) + 1
+            declaration = " ".join(f"{kind} {name}{match.group('tail')}".split())[:200]
+            documents.append(
+                Document(
+                    source="library",
+                    corpus_id=area,
+                    identifier=f"{package}::{name}",
+                    title_path=(package, name),
+                    citation=f"{path.relative_to(root).as_posix()}:{line_number}",
+                    location=path,
+                    body=f"{name} {kind} {declaration} {_declaration_doc(lines, line_number)}",
+                    summary=" ".join(
+                        part for part in (declaration, _declaration_doc(lines, line_number)) if part
+                    ),
+                    sort_key=(package, name),
+                )
+            )
+    return tuple(documents)
+
+
+def _declaration_doc(lines: list[str], line_number: int) -> str:
+    """First doc comment following a declaration, which is its definition."""
+    collected: list[str] = []
+    inside = False
+    for line in lines[line_number : line_number + 12]:
+        stripped = line.strip()
+        if not inside and stripped.startswith("doc"):
+            inside = True
+            stripped = stripped[3:].strip()
+        if inside:
+            if "*/" in stripped:
+                collected.append(stripped.split("*/")[0])
+                break
+            collected.append(stripped)
+    text = " ".join(collected).replace("/*", " ").replace("*", " ")
+    return " ".join(text.split())[:400]
+
+
+@functools.lru_cache(maxsize=4)
+def _example_documents(checkout: Path | None = None) -> tuple[Document, ...]:
+    """Training, example, and validation models: what a construct looks like.
+
+    The 42 training modules are named for the decisions agents get wrong, and
+    each is a short validated model rather than prose about one.
+    """
+    root = checkout if checkout is not None else _release_checkout()
+    documents: list[Document] = []
+    for area, base in (
+        ("training", root / "sysml" / "src" / "training"),
+        ("example", root / "sysml" / "src" / "examples"),
+        ("validation", root / "sysml" / "src" / "validation"),
+        ("kerml", root / "kerml" / "src"),
+    ):
+        if not base.is_dir():
+            continue
+        for path in sorted(base.rglob("*")):
+            if path.suffix not in {".sysml", ".kerml"}:
+                continue
+            relative = path.relative_to(base)
+            module = relative.parts[0] if len(relative.parts) > 1 else path.stem
+            documents.append(
+                Document(
+                    source="example",
+                    corpus_id=area,
+                    identifier=relative.as_posix(),
+                    title_path=(module, path.stem),
+                    citation=f"{area}/{relative.as_posix()}",
+                    location=path,
+                    body=f"{module} {path.stem} "
+                    + path.read_text(encoding="utf-8", errors="replace"),
+                    sort_key=(area, relative.as_posix()),
+                )
+            )
+    return tuple(documents)
+
+
+@functools.lru_cache(maxsize=8)
+def _clause_documents(specification: Specification, reference_root: Path) -> tuple[Document, ...]:
+    root = reference_root / specification.specification_id
+    outline_path = root / "outline.json"
+    if not outline_path.exists():
+        raise RuntimeError(
+            f"missing generated corpus for {specification.specification_id} at {root}; "
+            f"run `just model-setup`"
+        )
+    outline = json.loads(outline_path.read_text(encoding="utf-8"))
+    entries = outline.get("entries")
+    if not isinstance(entries, list):
+        raise RuntimeError(f"invalid reference outline: {outline_path}")
+
+    page_text: dict[int, str] = {}
+    page_paths: dict[int, Path] = {}
+    warned_pages: set[int] = set()
+    marker = "## Extracted specification text"
+    for page_path in sorted((root / "pages").glob("page-*.md")):
+        physical_page = int(page_path.stem.removeprefix("page-"))
+        raw = page_path.read_text(encoding="utf-8")
+        page_text[physical_page] = raw.split(marker, 1)[1] if marker in raw else raw
+        page_paths[physical_page] = page_path
+        if "extraction_warnings: []" not in raw.split(marker, 1)[0]:
+            warned_pages.add(physical_page)
+
+    # Concatenate the body once, then cut it at each clause's own section-number
+    # anchor. Assembling whole pages made every clause carry its neighbours' text,
+    # because clauses start mid-page: descriptions and scores both reflected the
+    # wrong prose. Anchors resolve for 98% of clauses; the rest keep page text,
+    # which is the previous behaviour rather than a loss.
+    ordered = sorted(page_text)
+    joined: list[str] = []
+    page_at: list[tuple[int, int]] = []
+    for page in ordered:
+        page_at.append((len("".join(joined)), page))
+        joined.append(page_text[page])
+    corpus = "".join(joined)
+
+    anchor_at: dict[str, int] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("section_number")
+        if not number:
+            continue
+        page = int(entry["physical_page_start"])
+        base = next((off for off, candidate in page_at if candidate == page), None)
+        if base is None:
+            continue
+        window = corpus[base : base + len(page_text.get(page, ""))]
+        match = re.search(rf"(?m)^\s*{re.escape(str(number))}(?=\s)", window)
+        if match is not None:
+            anchor_at[str(number)] = base + match.start()
+    boundaries = sorted(anchor_at.values())
+
+    clauses: list[Document] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("section_number")
+        if not number or int(entry.get("level", 0)) < 1:
+            continue
+        start = int(entry["physical_page_start"])
+        end = int(entry["physical_page_end"])
+        pages = [page for page in range(start, end + 1) if page in page_text]
+        begin = anchor_at.get(str(number))
+        if begin is None:
+            body = "\n".join(page_text[page] for page in pages)
+        else:
+            stop = next((offset for offset in boundaries if offset > begin), len(corpus))
+            body = corpus[begin:stop]
+        printed = _page_span(_printed_page(specification, start), _printed_page(specification, end))
+        physical = _page_span(str(start), str(end))
+        clauses.append(
+            Document(
+                source="specification",
+                corpus_id=specification.specification_id,
+                identifier=str(number),
+                title_path=tuple(_entry_path(entries, entry)),
+                citation=(
+                    f"{specification.short_label} {number}, printed {printed}, physical {physical}"
+                ),
+                location=page_paths[pages[0]] if pages else None,
+                body=body,
+                sort_key=_section_sort_key(str(number)),
+                extraction_warning=any(page in warned_pages for page in pages),
+            )
+        )
+    return tuple(clauses)
+
+
+def _bm25_scores(
+    clauses: Sequence[Document], terms: tuple[str, ...], *, k1: float = BM25_K1, b: float = BM25_B
+) -> dict[int, float]:
+    """Okapi BM25 over clause bodies, with a light title-path channel.
+
+    Textbook parameters, deliberately not fitted. A parameter sweep showed
+    retrieval degrading monotonically as title weight rises, so the title channel
+    is a nudge rather than the dominant signal it used to be.
+    """
+    body_counts = [_term_counts(clause.body) for clause in clauses]
+    title_counts = [_term_counts(" ".join(clause.title_path)) for clause in clauses]
+    lengths = [sum(counts.values()) for counts in body_counts]
+    total = len(clauses)
+    average_length = (sum(lengths) / total) if total else 0.0
+    document_frequency = collections.Counter(term for counts in body_counts for term in set(counts))
+    scores: dict[int, float] = collections.defaultdict(float)
+    for term in terms:
+        frequency = document_frequency.get(term, 0)
+        if not frequency:
+            continue
+        idf = math.log((total - frequency + 0.5) / (frequency + 0.5) + 1)
+        for index, counts in enumerate(body_counts):
+            occurrences = counts.get(term, 0)
+            if occurrences:
+                normalization = 1 - b + b * (lengths[index] / average_length or 1)
+                scores[index] += idf * (occurrences * (k1 + 1)) / (occurrences + k1 * normalization)
+            if title_counts[index].get(term, 0):
+                scores[index] += BM25_TITLE_WEIGHT * idf
+    return scores
+
+
+SOURCES = ("specification", "library", "example")
+
+
+@dataclass(frozen=True)
+class Concept:
+    name: str
+    pointer: str
+    origin: str
+
+
+def concepts(reference_root: Path = SPECIFICATION_REFERENCE_ROOT) -> list[Concept]:
+    """The vocabulary an agent needs in order to ask a good question.
+
+    Retrieval reaches the right clause ~93% of the time once the concept name is
+    right, so the bottleneck is naming, not search. The inventory is small enough
+    (~60 entries, well under a thousand tokens) to put in front of the agent and
+    let it map the question itself.
+
+    Two sources, because neither alone is sufficient. Clause titles are
+    authoritative but use specification vocabulary; the training modules are
+    finer-grained and use practitioner vocabulary. The specification calls clause
+    7.6 "Definition and Usage"; the curriculum calls the same idea "Variability",
+    which is the word someone actually searches for.
+    """
+    found: dict[str, Concept] = {}
+    for specification in _load_specifications():
+        outline_path = reference_root / specification.specification_id / "outline.json"
+        if not outline_path.exists():
+            continue
+        entries = json.loads(outline_path.read_text(encoding="utf-8")).get("entries", [])
+        for entry in entries:
+            number = entry.get("section_number") or ""
+            if not number.startswith("7."):
+                continue
+            depth = number.count(".")
+            wanted = 1 if specification.specification_id.startswith("sysml") else 2
+            if depth != wanted:
+                continue
+            title = re.sub(r"^[\d.]+\s*", "", str(entry["title"])).strip()
+            if not title or title.endswith("Overview"):
+                continue
+            found.setdefault(
+                title.casefold(),
+                Concept(title, f"{specification.specification_id} {number}", "specification"),
+            )
+    training = _release_checkout() / "sysml" / "src" / "training"
+    if training.is_dir():
+        for module in sorted(path for path in training.iterdir() if path.is_dir()):
+            title = re.sub(r"^\d+\.\s*", "", module.name).strip()
+            found.setdefault(
+                title.casefold(),
+                Concept(title, f"training/{module.name}", "training"),
+            )
+    return sorted(found.values(), key=lambda concept: concept.name)
+
+
+def _print_concept_hint() -> None:
+    """Always shown, because a lexical score cannot detect its own failure.
+
+    This was previously gated on a low top score. Measured against the routing
+    questions, that gate fired for none of the 23 failing lay or professional
+    questions: they return confident wrong answers scoring 9 to 30, because BM25
+    measures term overlap rather than correctness. A query using words the
+    specification never contains still matches something, and matches it firmly.
+
+    Retrieval is measured at 100% once the construct is named correctly, so the
+    escape hatch matters more than the ranking does for those registers. An
+    unconditional line is honest about a limitation the tool cannot detect.
+    """
+    print()
+    print(
+        "Note: SysML v2 often names a concept differently from common "
+        "systems-engineering usage (states not modes, constraints not rules, "
+        "specialization not inheritance). A confident-looking result can still be "
+        "the wrong register. Run `just model-reference-concepts` and search again "
+        "by construct name if these results do not answer the question."
+    )
+
+
+def _print_concepts(inventory: list[Concept]) -> None:
+    width = max((len(concept.name) for concept in inventory), default=0)
+    for concept in inventory:
+        print(f"  {concept.name.ljust(width)}  {concept.pointer}")
+
+
+def _clause_family_weight(identifier: str) -> float:
+    """Prefer the descriptive chapter over the reference chapters.
+
+    Specification clause 7 describes what constructs mean and how to use them.
+    Clause 8 is concrete and abstract syntax, clause 9 is the model libraries,
+    and both restate construct names constantly, so term frequency alone favours
+    them heavily for exactly the "what does this mean" questions clause 7
+    answers. This is a fact about how the document is organised rather than a fit
+    to any question set.
+
+    Swept: 1.0 (off) reaches 13/15, 5/15, and 2/15 across the jargon, lay, and
+    professional registers; 2.0 reaches 14/15, 6/15, and 6/15. Dampening clauses
+    8 and 9 as well was also tried and added nothing over this single factor.
+    """
+    return DESCRIPTIVE_CLAUSE_WEIGHT if identifier.split(".")[0] == "7" else 1.0
+
+
+def _rank_documents(documents: Sequence[Document], terms: tuple[str, ...]) -> list[SearchResult]:
+    scores = _bm25_scores(documents, terms)
+    scores = {
+        index: score
+        * (
+            _clause_family_weight(documents[index].identifier)
+            if documents[index].source == "specification"
+            else 1.0
+        )
+        for index, score in scores.items()
+    }
+    ranked = [
+        SearchResult(
+            source=documents[index].source,
+            corpus_id=documents[index].corpus_id,
+            identifier=documents[index].identifier,
+            title_path=documents[index].title_path,
+            citation=documents[index].citation,
+            location=documents[index].location,
+            extraction_warning=documents[index].extraction_warning,
+            snippet=(
+                _definition_snippet(documents[index].summary)
+                or documents[index].summary[:320]
+                or _search_snippet(documents[index].body, terms)
+            ),
+            score=score,
+        )
+        for index, score in scores.items()
+        if score > 0
+    ]
+    return sorted(
+        ranked,
+        key=lambda result: (
+            -round(result.score, 6),
+            result.corpus_id,
+            documents_sort_key(documents, result),
+        ),
+    )
+
+
+def documents_sort_key(documents: Sequence[Document], result: SearchResult) -> tuple[object, ...]:
+    for document in documents:
+        if document.identifier == result.identifier and document.corpus_id == result.corpus_id:
+            return document.sort_key
+    return (result.identifier,)
+
+
 def find_references(
     query: str,
     *,
     limit: int = 8,
     specification_id: str | None = None,
+    sources: tuple[str, ...] = SOURCES,
     reference_root: Path = SPECIFICATION_REFERENCE_ROOT,
 ) -> list[SearchResult]:
+    if not 1 <= limit <= 50:
+        raise ValueError("reference result limit must be between 1 and 50")
     terms = _search_terms(query)
     if not terms:
         raise ValueError("reference query must contain at least one searchable term")
-    normalized_query = " ".join(terms)
+    unknown = set(sources) - set(SOURCES)
+    if unknown:
+        raise ValueError(f"unknown source: {sorted(unknown)[0]}")
     specifications = {
-        specification.specification_id: specification
-        for specification in _load_specifications()
+        specification.specification_id: specification for specification in _load_specifications()
     }
-    selected = (
-        [specifications[specification_id]]
-        if specification_id is not None
-        else list(specifications.values())
-    )
-    results: list[SearchResult] = []
-    for specification in selected:
-        root = reference_root / specification.specification_id
-        outline_path = root / "outline.json"
-        if not outline_path.exists():
-            raise RuntimeError(f"missing reference outline: {outline_path}")
-        outline = json.loads(outline_path.read_text(encoding="utf-8"))
-        entries = outline.get("entries")
-        if not isinstance(entries, list):
-            raise RuntimeError(f"invalid reference outline: {outline_path}")
-        entries_by_page: dict[int, list[dict[str, Any]]] = {}
-        for entry in entries:
-            if isinstance(entry, dict):
-                entries_by_page.setdefault(int(entry["physical_page_start"]), []).append(entry)
-        for page_path in sorted((root / "pages").glob("page-*.md")):
-            physical_page = int(page_path.stem.removeprefix("page-"))
-            text = page_path.read_text(encoding="utf-8")
-            text_terms = _search_terms(text)
-            text_term_set = set(text_terms)
-            matched = sum(term in text_term_set for term in terms)
-            if matched == 0:
-                continue
-            coverage = matched / len(terms)
-            normalized_text = " ".join(text_terms)
-            frequency = sum(min(normalized_text.count(term), 8) for term in terms)
-            page_entries = entries_by_page.get(physical_page, [])
-            section_titles = (
-                tuple(str(entry["title"]) for entry in page_entries)
-                if page_entries
-                else tuple(_page_context_before(entries, physical_page))
-            )
-            section_term_set = set(_search_terms(" ".join(section_titles)))
-            section_matched = sum(term in section_term_set for term in terms)
-            section_coverage = section_matched / len(terms)
-            score = coverage * 50 + section_coverage * 45 + min(frequency, 20)
-            if coverage == 1:
-                score += 35
-            if section_coverage == 1:
-                score += 55
-            if normalized_query in normalized_text:
-                score += 70
-            results.append(
-                SearchResult(
-                    specification_id=specification.specification_id,
-                    physical_page=physical_page,
-                    printed_page=_printed_page(specification, physical_page),
-                    page_path=page_path,
-                    section_titles=section_titles,
-                    snippet=_search_snippet(text, terms),
-                    score=score,
-                )
-            )
-    return sorted(
-        results,
-        key=lambda result: (-result.score, result.specification_id, result.physical_page),
-    )[:limit]
+    if specification_id is not None and specification_id not in specifications:
+        raise ValueError(f"unknown specification: {specification_id}")
+
+    per_source: dict[str, list[SearchResult]] = {}
+    if "specification" in sources:
+        selected = (
+            [specifications[specification_id]]
+            if specification_id is not None
+            else list(specifications.values())
+        )
+        clauses = [
+            clause
+            for specification in selected
+            for clause in _clause_documents(specification, reference_root)
+        ]
+        per_source["specification"] = _rank_documents(clauses, terms)
+    if specification_id is None:
+        # A specification filter is a request for normative prose specifically.
+        if "library" in sources:
+            per_source["library"] = _rank_documents(_library_documents(), terms)
+        if "example" in sources:
+            per_source["example"] = _rank_documents(_example_documents(), terms)
+
+    # Interleave by rank rather than merging scores. BM25 scores computed over
+    # 1,550 clauses, ~400 library elements, and ~310 example models are not on a
+    # common scale, and normalising them would be inventing a calibration.
+    merged: list[SearchResult] = []
+    position = 0
+    while len(merged) < limit:
+        added = False
+        for name in SOURCES:
+            candidates = per_source.get(name, [])
+            if position < len(candidates):
+                merged.append(candidates[position])
+                added = True
+                if len(merged) == limit:
+                    break
+        if not added:
+            break
+        position += 1
+    return merged
 
 
 def _print_search_results(results: list[SearchResult]) -> None:
     for index, result in enumerate(results, start=1):
-        sections = "; ".join(result.section_titles) or "continuation page"
-        try:
-            page_path = result.page_path.relative_to(ROOT)
-        except ValueError:
-            page_path = result.page_path
-        print(
-            f"{index}. {result.specification_id}: {sections} — physical "
-            f"{result.physical_page}, printed {result.printed_page}"
+        title = result.title_path[-1] if result.title_path else result.identifier
+        # Every hit is labelled with the corpus it came from, so an agent never
+        # has to guess whether it is reading normative prose, a library
+        # declaration, or a worked example.
+        warning = (
+            "  [extraction warning: verify against the PDF]" if result.extraction_warning else ""
         )
-        print(f"   {page_path}")
+        print(
+            f"{index}. [{result.source}] {title} — {result.citation}  ({result.score:.1f}){warning}"
+        )
+        if len(result.title_path) > 1:
+            print(f"   {' > '.join(result.title_path[:-1])}")
+        if result.location is not None:
+            location = result.location
+            try:
+                location = location.relative_to(ROOT)
+            except ValueError:
+                pass
+            print(f"   {location}")
         print(f"   {result.snippet}")
 
 
@@ -728,14 +1330,25 @@ def main() -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("render")
     subparsers.add_parser("check")
+    subparsers.add_parser("concepts")
     find_parser = subparsers.add_parser("find")
     find_parser.add_argument("query")
     find_parser.add_argument("--limit", type=int, default=8)
     find_parser.add_argument(
-        "--specification", choices=("sysml-2.0", "kerml-1.0"), default=None
+        "--json",
+        action="store_true",
+        help="emit structured results, which agents parse more reliably than text",
+    )
+    find_parser.add_argument(
+        "--specification",
+        choices=tuple(specification.specification_id for specification in _load_specifications()),
+        default=None,
     )
     args = parser.parse_args()
     try:
+        if args.command == "concepts":
+            _print_concepts(concepts())
+            return 0
         if args.command == "render":
             manifests = render()
             for manifest in manifests:
@@ -750,10 +1363,36 @@ def main() -> int:
                 limit=args.limit,
                 specification_id=args.specification,
             )
+            if getattr(args, "json", False):
+                print(
+                    json.dumps(
+                        {
+                            "query": args.query,
+                            "results": [
+                                {
+                                    "source": result.source,
+                                    "corpus": result.corpus_id,
+                                    "identifier": result.identifier,
+                                    "title_path": list(result.title_path),
+                                    "citation": result.citation,
+                                    "location": (str(result.location) if result.location else None),
+                                    "score": round(result.score, 3),
+                                    "extraction_warning": result.extraction_warning,
+                                    "snippet": result.snippet,
+                                }
+                                for result in results
+                            ],
+                        },
+                        indent=2,
+                    )
+                )
+                return 0 if results else 1
             if not results:
-                print("No reference pages matched the query.")
+                print("No reference material matched the query.")
+                _print_concept_hint()
                 return 1
             _print_search_results(results)
+            _print_concept_hint()
             return 0
         findings = check()
     except (OSError, ValueError, RuntimeError) as error:

@@ -1,0 +1,71 @@
+schema_version: "1.0"
+evolution:
+  id: system-evolution
+  mode: copilot
+  objective: Reconcile one evidence-backed change set across accepted authority and implementation.
+  observable_distinction: The accepted target behavior and its implementation can be distinguished from the source baseline and the nearest plausible wrong system.
+  lifecycle: discovery
+  approval:
+    status: pending
+    reason: Changed system meaning or a consequential selected boundary requires human acceptance.
+    checkpoint: null
+  blocker: null
+  checkpoint: null
+baselines:
+  source:
+    model: source-model-baseline
+    implementation: source-implementation-baseline
+    language: language-baseline
+    execution_environment: null
+    checkpoint: null
+  target: null
+scope:
+  authority_scope:
+    - accepted-system-authority
+  implementation_scope:
+    - affected-system-realization
+  review_lenses:
+    - authority and conformance
+    - engineering and evidence
+  non_goals: []
+findings:
+  - id: F001
+    summary: One reproducible observation requires disposition.
+    classification: model gap
+    consequence: Current accepted authority cannot distinguish the observed system from the intended one.
+    authority_refs:
+      - Model::AffectedAuthority
+    evidence_refs:
+      - evidence-system-reference
+    disposition: model-change
+    owner_work_item_id: W001
+decisions: []
+work_items:
+  - id: W001
+    label: Close the affected accepted model meaning
+    kind: modeling
+    dependencies: []
+    finding_ids:
+      - F001
+    decision_ids: []
+    authority_refs:
+      - Model::AffectedAuthority
+    acceptance:
+      - id: A1
+        wrong_behavior: Accepted authority still permits the observed consequence after the change.
+        evidence_ref: evidence-system-reference
+    compatibility_effect: Compatibility remains to be evaluated.
+    non_effects: []
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs:
+      - evidence-system-reference
+    blocker: null
+    checkpoint: null
+reviews: []
+closure:
+  model_status: not evaluated
+  implementation_status: not evaluated
+  compatibility: Not yet evaluated.
+  evidence_refs: []
+  checkpoint: null

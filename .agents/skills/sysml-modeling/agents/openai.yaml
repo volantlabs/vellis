@@ -1,0 +1,6 @@
+interface:
+  display_name: "SysML Modeling"
+  short_description: "Develop models and implementation handoffs"
+  default_prompt: "Use $sysml-modeling to close one proportional system slice and produce an implementation-ready handoff with explicit authority coverage, remaining obligations, and conformance-evidence intent."
+policy:
+  allow_implicit_invocation: true

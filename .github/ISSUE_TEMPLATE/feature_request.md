@@ -1,19 +1,23 @@
 ---
 name: Feature request
-about: Propose a new component, capability, or improvement
+about: Propose one Vellis outcome or model-first workflow improvement
 title: ""
 labels: enhancement
 ---
 
-## Problem
+## Primary owner question
 
-What need or gap this addresses.
+What one owner outcome or engineering question should this address?
 
-## Proposal
+## Current gap
 
-What you'd like to see. If it changes a component's public behavior, identify the affected SysML
-component or application contract.
+What behavior, meaning, state effect, refusal, failure, responsibility, or evidence is missing?
 
-## Alternatives considered
+## Smallest decisive evidence
 
-Other approaches and why they fall short.
+What accepted result, failure non-effect, or invalid counterexample would prove the change is right?
+
+## Affected authority
+
+Which existing model claim appears to change? Leave this open rather than inventing structure when it
+is not yet known.

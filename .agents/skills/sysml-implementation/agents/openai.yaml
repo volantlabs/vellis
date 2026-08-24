@@ -1,0 +1,6 @@
+interface:
+  display_name: "SysML Implementation"
+  short_description: "Turn model authority into conformant software slices"
+  default_prompt: "Use $sysml-implementation to turn current SysML v2 authority into a bounded software slice with explicit authority coverage, realization decisions, and discriminating conformance evidence."
+policy:
+  allow_implicit_invocation: true

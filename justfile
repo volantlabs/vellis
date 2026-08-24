@@ -1,118 +1,88 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
+# List available recipes.
 default:
     @just --list
 
+# Install Python tooling for this repository.
 setup:
     @uv sync --dev
 
-test:
-    @if find apps components tests -path '*/test_*.py' -print -quit 2>/dev/null | grep -q .; then uv run pytest; else echo "No tests found."; fi
-
+# Check formatting and lint rules.
 lint:
     @uv run ruff check .
+    @uv run ruff check vellis --select C901
+    @uv run ruff format --check .
 
+# Apply formatting.
 format:
     @uv run ruff format .
 
+# Type-check tools and tests.
+typecheck:
+    @uv run basedpyright
+
+# Run the test suite.
+test:
+    @uv run pytest
+
+# Validate repo-local skills and their managed links.
 skills-check:
     @uv run python tools/validate_skills.py
     @uv run python tools/sync_agent_skills.py --check
 
+# Validate the active model-and-implementation evolution record.
+system-evolution-check:
+    @uv run python tools/system_evolution.py check
+
+# Build the distributable wheel and source distribution into dist/.
+build:
+    @uv run python tools/package_smoke.py --build-only
+
+# Build and smoke-test the installable wheel and source distribution.
+package-check:
+    @uv run python tools/package_smoke.py
+
+# Show the active evolution lifecycle, approval, and next work.
+system-evolution-status:
+    @uv run python tools/system_evolution.py status
+
+
+
+
+# Regenerate managed skill links.
 skills-sync:
     @uv run python tools/sync_agent_skills.py
 
-typecheck:
-    @uv run basedpyright
-
-build:
-    @uv build
-
-# Fetch and verify pinned SysML/KerML assets, then inspect the validator gate.
+# Fetch pinned specifications, libraries, examples, and validator, then generate the search corpus.
 model-setup:
-    @uv run python tools/model_tool.py setup
+    @uv run python tools/sysml_validator.py setup
+    @uv run python tools/sysml_reference.py render
 
-model-check-foundation:
-    @uv run python tools/model_tool.py check --scope foundation
-
-model-check-bibliotek:
-    @uv run python tools/model_tool.py check --scope bibliotek
-
-model-check-vellis:
-    @uv run python tools/model_tool.py check --scope vellis
-
-# Run repository profile, architecture, realization, and generated-artifact checks.
+# Validate every authored SysML file with the pinned official validator.
 model-check:
-    @uv run python tools/model_tool.py package
-    @uv run python tools/model_tool.py check --scope all --require-external
-    @uv run python tools/model_tool.py check-generated
-    @uv run python tools/sysml_reference.py check
+    @uv run python tools/model_policy.py
+    @uv run python tools/sysml_validator.py validate --self-test
 
-model-check-formal:
-    @uv run python tools/model_tool.py package
-    @uv run python tools/sysml_validator.py validate-products --self-test
-
-model-render:
-    @uv run python tools/sysml_validator.py export-index --output generated/model/formal-model-index.json
-    @uv run python tools/model_tool.py render
-
+# Regenerate the searchable specification corpus from the pinned PDFs.
 model-reference-render:
     @uv run python tools/sysml_reference.py render
 
+# Prove the generated corpus still matches its pin.
 model-reference-check:
     @uv run python tools/sysml_reference.py check
 
-model-reference-find query:
-    @uv run python tools/sysml_reference.py find "{{query}}"
+# Search specifications, model libraries, and examples; optional specification and limit are positional.
+model-reference-find query specification="" limit="8":
+    @specification={{quote(specification)}}; if test -n "$specification"; then uv run python tools/sysml_reference.py find {{quote(query)}} --specification "$specification" --limit {{quote(limit)}}; else uv run python tools/sysml_reference.py find {{quote(query)}} --limit {{quote(limit)}}; fi
 
-model-package:
-    @uv run python tools/model_tool.py package
+# Run the complete repository gate.
+check: lint typecheck skills-check system-evolution-check model-check model-reference-check test package-check
 
-model-diff:
-    @uv run python tools/model_tool.py diff
+# List every SysML v2 construct name, for turning a question into a searchable term.
+model-reference-concepts:
+    @uv run python tools/sysml_reference.py concepts
 
-model-handoff *args:
-    @target="{{args}}"; target="${target#TARGET=}"; test -n "$target" || { echo "Set TARGET=<stable-id>" >&2; exit 2; }; uv run python tools/model_tool.py handoff "$target"
-
-# Generate a read-only advisory model/implementation evidence bundle.
-model-audit target="":
-    @target="{{target}}"; if test -n "$target"; then uv run python tools/model_tool.py audit "$target"; else uv run python tools/model_tool.py audit; fi
-
-# Run the RTG Knowledge Graph app with default .data storage.
-rtg:
-    @uv run python -m apps.rtg_knowledge_graph --json
-
-# Print default stdio MCP client config, prompt paths, and first-call smoke check.
-rtg-mcp-info:
-    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport stdio --dry-run --json
-
-# Print only copy-pastable stdio MCP client configuration.
-rtg-mcp-config storage_root=".data/vellis-beta-001":
-    @uv run vellis-rtg-knowledge-graph mcp-config --transport stdio --storage-root {{storage_root}}
-
-# Launch the default RTG Knowledge Graph stdio MCP server.
-rtg-mcp:
-    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport stdio
-
-# Print localhost HTTP MCP client config for a fresh beta storage root.
-rtg-mcp-http-info storage_root=".data/vellis-beta-001" host="127.0.0.1" port="8765" path="/mcp":
-    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport http --host {{host}} --port {{port}} --path {{path}} --dry-run --json --storage-root {{storage_root}}
-
-# Launch an unauthenticated localhost HTTP MCP server.
-rtg-mcp-http storage_root=".data/vellis-beta-001" host="127.0.0.1" port="8765" path="/mcp":
-    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport http --host {{host}} --port {{port}} --path {{path}} --storage-root {{storage_root}} --sql-database-path {{storage_root}}/controller.sqlite
-
-# Print beta eval MCP metadata with an explicit storage root.
-rtg-eval-info storage_root=".data/vellis-beta-001":
-    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport stdio --dry-run --json --storage-root {{storage_root}} --empty --manual-recovery
-
-run-rtg-knowledge-graph *args:
-    @uv run python -m apps.rtg_knowledge_graph {{args}}
-
-run-rtg-knowledge-graph-mcp *args:
-    @uv run python -m apps.rtg_knowledge_graph serve-mcp {{args}}
-
-run-rtg-knowledge-graph-mcp-info *args:
-    @uv run python -m apps.rtg_knowledge_graph serve-mcp --dry-run --json {{args}}
-
-check: lint typecheck skills-check model-check test
+# Check one SysML snippet against the pinned parser (about six seconds).
+model-probe source:
+    @uv run python tools/sysml_validator.py probe {{quote(source)}}

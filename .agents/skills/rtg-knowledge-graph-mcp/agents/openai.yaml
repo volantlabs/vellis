@@ -1,6 +1,0 @@
-interface:
-  display_name: "RTG Knowledge Graph MCP"
-  short_description: "Use the RTG MCP graph tools"
-  default_prompt: "Use $rtg-knowledge-graph-mcp to operate the Vellis RTG Knowledge Graph MCP server."
-policy:
-  allow_implicit_invocation: true

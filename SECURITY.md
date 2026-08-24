@@ -1,29 +1,29 @@
 # Security
 
-Vellis is beta-stage software and should not be used yet with sensitive production data.
-
 ## Reporting
 
-Do not disclose security issues publicly before maintainers have had a chance to respond. Use GitHub private vulnerability reporting on [`volantlabs/vellis`](https://github.com/volantlabs/vellis/security/advisories) when it is enabled for the repository. If private reporting is not available, email the maintainer at <labs@volantpartners.com>.
+Do not disclose security issues publicly before maintainers can respond. Use GitHub private
+vulnerability reporting for [`volantlabs/vellis`](https://github.com/volantlabs/vellis/security/advisories)
+when available. Otherwise email <labs@volantpartners.com>.
 
-## Scope
+## Current scope
 
-Useful reports include:
+This repository contains the runnable local Vellis application as well as its SysML v2 system model
+and development tooling. Vellis serves a trusted owner-configured client over STDIO or foreground
+HTTP. Guided HTTP uses a private bearer token, and non-loopback binding refuses to start without
+one. Vellis does not implement TLS, OAuth, users, roles, or per-call authorization; use a trusted
+network, Tailscale or SSH tunnel, or an external TLS proxy for non-loopback HTTP. See
+[`docs/http-operation.md`](docs/http-operation.md).
 
-- unsafe file writes or path traversal
-- unexpected network or subprocess behavior
-- dependency or packaging vulnerabilities
-- MCP interface behavior that exposes unintended data or mutation authority
-- failures to preserve audit, replay, or recovery guarantees
+Vellis databases, backups, activity, and migration reports are plaintext at rest. Verbose activity
+and v1 reports can be especially sensitive. On POSIX systems (macOS and Linux), new Vellis data
+directories are mode `0700`, and databases, backups, reports, tokens, WAL/SHM companions, and import
+temporaries are mode `0600`. These owner-private modes are the selected local protection boundary;
+they are not encryption. Use platform full-disk or file-level encryption when confidentiality at
+rest requires it.
 
-## Beta Caveat
-
-Vellis is intended for a person's own local graph or a graph shared deliberately on a private
-machine. Ordinary stdio mode opens no network service; advanced HTTP mode is unauthenticated and
-must remain bound to `127.0.0.1`.
-
-Graph state is reconstructed from the durable local controller ledger and stored unencrypted under
-the ignored `.data/rtg_knowledge_graph/` directory by default. The AI agent or model connected to
-Vellis can receive graph contents when it invokes tools. Back up local state as appropriate and do
-not use it for information you are unwilling to provide to that client or model. Vellis does not
-yet provide encryption, authentication, user accounts, or multi-user authorization.
+Useful reports include unsafe runtime, store, CLI, backup/import, or MCP-boundary behavior; destructive
+or unexpected file handling; unexpected network or subprocess behavior; dependency vulnerabilities;
+checksum failures; and paths that could expose or modify ignored user data. The `.data/` directory
+is local, may contain owner memory, and is outside repository checks; never include its contents in a
+public report.

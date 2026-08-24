@@ -1,69 +1,65 @@
 [build-system]
-requires = [
-    "setuptools>=83.0.0",
-    "wheel",
-]
+requires = ["setuptools>=83.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "vellis"
-version = "1.0.0"
-description = "Reusable software components and tooling for AI-native software construction."
+version = "2.0.0"
+description = "A local-first personal-memory system built on a Reified Type Graph."
 readme = "README.md"
 requires-python = ">=3.14"
 license = "Apache-2.0"
-license-files = [
-    "LICENSE",
-]
-authors = [
-    { name = "Vellis contributors" },
+license-files = ["LICENSE"]
+authors = [{ name = "Vellis contributors" }]
+keywords = [
+    "sysml",
+    "sysml-v2",
+    "mcp",
+    "model-context-protocol",
+    "knowledge-graph",
+    "personal-memory",
+    "local-first",
+    "sqlite",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Environment :: Console",
     "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.14",
-    "Topic :: Software Development :: Libraries",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [
-    "fastmcp>=3.4.7,<4",
+    "fastmcp==3.4.5",
+    "pydantic==2.13.4",
+    "uvicorn==0.52.1",
     "google-re2==1.1.20251105",
+    "ijson==3.5.1",
 ]
 
 [project.scripts]
-vellis = "apps.rtg_knowledge_graph.main:main"
-vellis-rtg-knowledge-graph = "apps.rtg_knowledge_graph.main:main"
+vellis = "vellis.__main__:main"
 
 [project.urls]
+Homepage = "https://github.com/volantlabs/vellis"
+Documentation = "https://github.com/volantlabs/vellis/blob/main/README.md"
 Repository = "https://github.com/volantlabs/vellis"
 Issues = "https://github.com/volantlabs/vellis/issues"
 
 [tool.setuptools.packages.find]
-where = [
-    ".",
-]
+where = ["."]
 namespaces = false
-include = [
-    "apps*",
-    "components*",
-    "vellis*",
-]
-exclude = [
-    "tests*",
-    "apps.*.tests*",
-    "components.*.tests*",
-]
-
-[tool.setuptools.package-data]
-"apps.rtg_knowledge_graph" = [
-    "resources/*.json",
-]
+include = ["vellis*"]
+exclude = ["tests*"]
 
 [dependency-groups]
 dev = [
     "basedpyright>=1.39.10",
     "jupyter-client>=8.6,<9",
-    "mcp>=1.28.1,<2",
+    "jsonschema>=4.25,<5",
     "pypdf>=6.15.0",
     "pytest>=8.0",
     "pyyaml>=6.0.3",
@@ -71,36 +67,18 @@ dev = [
 ]
 
 [tool.basedpyright]
-include = [
-    "apps",
-    "components",
-    "tools",
-]
+include = ["vellis", "tools", "tests"]
 pythonVersion = "3.14"
 typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
-pythonpath = [
-    ".",
-]
-testpaths = [
-    "apps",
-    "components",
-    "tests",
-]
-python_files = [
-    "test_*.py",
-]
+pythonpath = ["."]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py314"
 
 [tool.ruff.lint]
-select = [
-    "E",
-    "F",
-    "I",
-    "UP",
-    "B",
-]
+select = ["E", "F", "I", "UP", "B"]

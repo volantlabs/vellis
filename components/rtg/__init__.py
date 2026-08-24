@@ -1,1 +1,0 @@
-"""Reified Type Graph components."""

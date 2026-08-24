@@ -1,84 +1,51 @@
 {
   "language": {
-    "sysml": "2.0",
-    "kerml": "1.0",
-    "sysml_specification": "https://www.omg.org/spec/SysML/2.0",
-    "kerml_specification": "https://www.omg.org/spec/KerML/1.0"
+    "sysml": "2.1 Beta 1",
+    "kerml": "1.1 Beta 1",
+    "release": "2026-05",
+    "release_repository": "https://github.com/Systems-Modeling/SysML-v2-Release",
+    "note": "Beta specifications carry no OMG document number; identity is verified by version string and checksum."
   },
-  "libraries": {
-    "policy": "formal-2.0-only",
-    "source": "OMG formal machine-readable artifacts",
-    "floating_versions_allowed": false,
-    "artifacts": [
-      {
-        "id": "sysml-systems-library-2.0.0",
-        "url": "https://www.omg.org/spec/SysML/20250201/Systems-Library.kpar",
-        "sha256": "df7d8b2c6e08232ca7ce123a63148949c383fcbeaeba8d89c27ceece43793a1f"
-      },
-      {
-        "id": "kerml-semantic-library-1.0.0",
-        "url": "https://www.omg.org/spec/KerML/20250201/Semantic-Library.kpar",
-        "sha256": "6d9e311646a557cb08b64313cab6a7931109751b2ac7fbfcefad5c2216a6167b"
-      },
-      {
-        "id": "kerml-data-type-library-1.0.0",
-        "url": "https://www.omg.org/spec/KerML/20250201/Data-Type-Library.kpar",
-        "sha256": "957e4ff5c60f7fc5eedaf0b6d4f776856061c0aa7a424e260eeccb8d6ed7bfbd"
-      },
-      {
-        "id": "kerml-function-library-1.0.0",
-        "url": "https://www.omg.org/spec/KerML/20250201/Function-Library.kpar",
-        "sha256": "a8319da3ab1d8ffc0f390ea1aef29d85a00451655c41a9267ce396845c2b1c8d"
-      }
+  "source": {
+    "repository": "https://github.com/Systems-Modeling/SysML-v2-Release.git",
+    "web_root": "https://github.com/Systems-Modeling/SysML-v2-Release/blob",
+    "tag": "2026-05",
+    "commit": "de1070ae8e79c21532b8004fc663d47b35d0e9fa",
+    "sparse_paths": [
+      "doc/1-Kernel_Modeling_Language.pdf",
+      "doc/2a-OMG_Systems_Modeling_Language.pdf",
+      "sysml/src/**",
+      "kerml/src/**"
     ]
   },
-  "grammar": {
+  "specifications": {
     "sysml_language_pdf": {
-      "specification_id": "sysml-2.0",
-      "title": "OMG Systems Modeling Language (SysML) Version 2.0, Part 1: Language Specification",
+      "specification_id": "sysml-2.1",
+      "title": "OMG Systems Modeling Language (SysML) Version 2.1 Beta 1, Part 1: Language Specification",
       "pdf_title": "SysML Specification",
-      "document_number": "formal/2026-03-02",
+      "version_identity": "Version 2.1 Beta 1",
       "front_matter_start_physical_page": 11,
       "body_start_physical_page": 33,
-      "expected_page_count": 691,
-      "expected_outline_count": 991,
-      "url": "https://www.omg.org/spec/SysML/2.0/Language/PDF",
-      "sha256": "46e6c0476a6f1f34f367d57e039d56659bff75e41d2e4b3d37ca4cadea84a83a"
+      "expected_page_count": 695,
+      "expected_outline_count": 985,
+      "sha256": "2560a68bef67a8cca7783fdf0c1badae4ce864f15df07e9378430f96d6dd9640",
+      "page_footer_prefix": "Systems Modeling Language v2.1, Beta 1, Part 1",
+      "short_label": "SysML 2.1 Beta 1",
+      "path": "doc/2a-OMG_Systems_Modeling_Language.pdf"
     },
     "kerml_language_pdf": {
-      "specification_id": "kerml-1.0",
-      "title": "Kernel Modeling Language (KerML) Version 1.0",
+      "specification_id": "kerml-1.1",
+      "title": "Kernel Modeling Language (KerML) Version 1.1 Beta 1",
       "pdf_title": "KerML Specification",
-      "document_number": "formal/2026-03-01",
+      "version_identity": "Version 1.1 Beta 1",
       "front_matter_start_physical_page": 11,
       "body_start_physical_page": 27,
-      "expected_page_count": 454,
+      "expected_page_count": 460,
       "expected_outline_count": 661,
-      "url": "https://www.omg.org/spec/KerML/1.0/PDF",
-      "sha256": "3bcc96f989bfa9d05cd28e026df3351b795fe8d494187b87bff3db7d96373697"
-    }
-  },
-  "validator": {
-    "adapter": "tools/sysml_validator.py",
-    "profile_validation": "required",
-    "external_validation": "required",
-    "external_provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",
-    "external_version": "2025-06 / 0.50.0",
-    "external_checksum": "f6c9fa760ff198c21ceae08fc377f4b7366cf12671c3cbef90ebd3e526103060",
-    "command": [
-      "{python}",
-      "tools/sysml_validator.py",
-      "validate-products",
-      "--self-test"
-    ],
-    "official_java_evaluation": {
-      "candidate": "Systems-Modeling/SysML-v2-Pilot-Implementation",
-      "status": "qualified-headless",
-      "selected_release": "2025-06",
-      "selected_commit": "04096d6",
-      "selected_plugin_version": "0.50.0",
-      "runtime": "repository-cached Eclipse Temurin JRE 21.0.11+10",
-      "diagnostics": "syntax, linking, and semantic validation with source line and column"
+      "sha256": "c2624342c6f17fcb2c4719dd4dabea9cf1fbe99687da21c1e3d8ed0484c28ddd",
+      "page_footer_prefix": "Kernel Modeling Language v1.1, Beta 1",
+      "short_label": "KerML 1.1 Beta 1",
+      "path": "doc/1-Kernel_Modeling_Language.pdf"
     }
   }
 }

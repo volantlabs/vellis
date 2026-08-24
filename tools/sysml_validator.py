@@ -8,14 +8,15 @@ import platform
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import time
 import urllib.request
 import zipfile
-from collections import Counter
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -24,87 +25,44 @@ from jupyter_client.connect import write_connection_file
 
 try:
     from .model_layout import (
-        MODEL_PACKAGE_ROOT,
+        LANGUAGE_LOCK_PATH,
         MODEL_ROOT,
+        RELEASE_CACHE_ROOT,
         ROOT,
-        SOFTWARE_COMPONENT_PATTERN_PATH,
         VALIDATOR_CACHE_ROOT,
         VALIDATOR_LOCK_PATH,
     )
 except ImportError:  # pragma: no cover - direct script execution
     from model_layout import (  # type: ignore[no-redef]
-        MODEL_PACKAGE_ROOT,
+        LANGUAGE_LOCK_PATH,
         MODEL_ROOT,
+        RELEASE_CACHE_ROOT,
         ROOT,
-        SOFTWARE_COMPONENT_PATTERN_PATH,
         VALIDATOR_CACHE_ROOT,
         VALIDATOR_LOCK_PATH,
     )
-
-LOCK_PATH = VALIDATOR_LOCK_PATH
-CACHE_ROOT = VALIDATOR_CACHE_ROOT
-
-MODEL_ORDER = (
-    "foundation/SoftwareComponentModeling.sysml",
-    "bibliotek/shared-values/SoftwareValues.sysml",
-    "bibliotek/shared-values/RtgDiagnostics.sysml",
-    "bibliotek/components/component.storage.json_file.sysml",
-    "bibliotek/components/component.storage.sql.sysml",
-    "bibliotek/components/component.rtg.graph.sysml",
-    "bibliotek/components/component.rtg.schema.sysml",
-    "bibliotek/components/component.rtg.migration.sysml",
-    "bibliotek/components/component.rtg.query.sysml",
-    "bibliotek/components/component.rtg.constraints.sysml",
-    "bibliotek/components/component.rtg.change_validation.sysml",
-    "bibliotek/components/component.rtg.discovery.sysml",
-    "bibliotek/components/component.rtg.controller.sysml",
-    "bibliotek/Bibliotek.sysml",
-    "bibliotek/views/BibliotekViews.sysml",
-    "vellis/EverydayLifeOntology.sysml",
-    "vellis/VellisOperations.sysml",
-    "vellis/Vellis.sysml",
-    "vellis/use-cases/VellisUseCases.sysml",
-    "vellis/realizations/VellisLocalPython.sysml",
-    "vellis/realizations/VellisMcpPython.sysml",
-    "vellis/views/VellisViews.sysml",
-)
-
-PACKAGE_ARCHIVES = {
-    "foundation": "software-component-modeling-foundation-0.1.0.kpar",
-    "bibliotek": "bibliotek-0.1.0.kpar",
-    "vellis": "vellis-0.1.0.kpar",
-}
 
 DIAGNOSTIC = re.compile(
     r"(?P<level>ERROR|WARNING):(?P<message>.*?)"
     r"\((?P<cell>\d+)\.sysml line : (?P<line>\d+) column : (?P<column>\d+)\)"
 )
-LISTING_LINE = re.compile(
-    r"^(?P<kind>[A-Za-z_]\w*)(?:\s+(?P<name>.*?))?\s+"
-    r"\([0-9a-fA-F-]{36}\)$"
+QUALIFIED_MODEL_REFERENCE = re.compile(
+    r"(?:[A-Za-z_]\w*|'[^'\r\n]+')(?:\s*::\s*(?:[A-Za-z_]\w*|'[^'\r\n]+'))+\Z"
 )
-INDEXED_ELEMENT_KINDS = {
-    "AllocationUsage",
-    "RequirementUsage",
-    "SatisfyRequirementUsage",
-    "UseCaseUsage",
-    "ViewUsage",
-}
 
 
-def _lock() -> dict[str, Any]:
-    value = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+@dataclass(frozen=True)
+class SourceSpan:
+    path: Path
+    first_line: int
+    last_line: int
+
+
+def _json_object(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
-        raise ValueError("validator lock must be a JSON object")
+        raise ValueError(f"{path} must contain a JSON object")
     return value
-
-
-def _platform_key() -> str:
-    system = platform.system().lower()
-    machine = platform.machine().lower()
-    if machine == "aarch64":
-        machine = "arm64"
-    return f"{system}-{machine}"
 
 
 def _sha256(path: Path) -> str:
@@ -115,19 +73,129 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+DOWNLOAD_READ_TIMEOUT_SECONDS = 300
+
+
 def _download(url: str, expected: str, destination: Path) -> None:
     if destination.exists() and _sha256(destination) == expected:
         return
     destination.parent.mkdir(parents=True, exist_ok=True)
-    request = urllib.request.Request(url, headers={"User-Agent": "vellis-sysml-validator"})
+    request = urllib.request.Request(url, headers={"User-Agent": "vellis-model-setup"})
     with tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as temporary:
         temporary_path = Path(temporary.name)
-        with urllib.request.urlopen(request, timeout=120) as response:  # noqa: S310
-            shutil.copyfileobj(response, temporary)
-    if _sha256(temporary_path) != expected:
+    try:
+        with (
+            urllib.request.urlopen(  # noqa: S310
+                request, timeout=DOWNLOAD_READ_TIMEOUT_SECONDS
+            ) as response,
+            temporary_path.open("wb") as stream,
+        ):
+            shutil.copyfileobj(response, stream)
+        actual = _sha256(temporary_path)
+        if actual != expected:
+            raise RuntimeError(f"checksum mismatch for {url}: expected {expected}, found {actual}")
+    except BaseException:
+        # A partial or corrupt download must never be left behind: the next run
+        # would either resume from it or report a confusing checksum failure.
         temporary_path.unlink(missing_ok=True)
-        raise RuntimeError(f"checksum mismatch for {url}")
+        raise
     temporary_path.replace(destination)
+
+
+def _git(*arguments: str, cwd: Path | None = None) -> str:
+    completed = subprocess.run(  # noqa: S603
+        ["git", *arguments],
+        cwd=str(cwd) if cwd is not None else None,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(f"git {' '.join(arguments)} failed:\n{completed.stderr.strip()}")
+    return completed.stdout.strip()
+
+
+def _setup_release_checkout() -> Path:
+    """Materialise the pinned upstream release into the cache.
+
+    A blobless sparse clone fetches only the paths the reference layer needs
+    (12MB rather than 364MB), and Git's content addressing verifies every object,
+    so pinning the commit is a stronger guarantee than per-file checksums.
+    """
+    lock = _json_object(LANGUAGE_LOCK_PATH)
+    source = lock.get("source")
+    if not isinstance(source, dict):
+        raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing source")
+    repository = str(source["repository"])
+    tag = str(source["tag"])
+    commit = str(source["commit"])
+    paths = [str(entry) for entry in source["sparse_paths"]]
+    checkout = RELEASE_CACHE_ROOT / tag
+
+    if (checkout / ".git").is_dir():
+        if _git("rev-parse", "HEAD", cwd=checkout) == commit:
+            return checkout
+        shutil.rmtree(checkout)
+
+    checkout.parent.mkdir(parents=True, exist_ok=True)
+    staged = checkout.with_name(f"{checkout.name}.partial")
+    if staged.exists():
+        shutil.rmtree(staged)
+    try:
+        _git(
+            "clone",
+            "--depth",
+            "1",
+            "--branch",
+            tag,
+            "--filter=blob:none",
+            "--sparse",
+            "--quiet",
+            repository,
+            str(staged),
+        )
+        _git("sparse-checkout", "set", "--no-cone", *paths, cwd=staged)
+        actual = _git("rev-parse", "HEAD", cwd=staged)
+        if actual != commit:
+            raise RuntimeError(
+                f"{repository} tag {tag} resolved to commit {actual}, expected {commit}"
+            )
+    except BaseException:
+        shutil.rmtree(staged, ignore_errors=True)
+        raise
+    staged.replace(checkout)
+    return checkout
+
+
+def _setup_language_pdfs() -> list[Path]:
+    checkout = _setup_release_checkout()
+    lock = _json_object(LANGUAGE_LOCK_PATH)
+    artifacts = lock.get("specifications")
+    if not isinstance(artifacts, dict):
+        raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing specification artifacts")
+    pdfs: list[Path] = []
+    for artifact_id in ("sysml_language_pdf", "kerml_language_pdf"):
+        artifact = artifacts.get(artifact_id)
+        if not isinstance(artifact, dict):
+            raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing {artifact_id}")
+        source_pdf = checkout / str(artifact["path"])
+        if not source_pdf.is_file():
+            raise RuntimeError(f"{artifact_id}: {source_pdf} is absent from the pinned checkout")
+        actual = _sha256(source_pdf)
+        if actual != str(artifact["sha256"]):
+            raise RuntimeError(
+                f"{artifact_id}: checksum mismatch in the pinned checkout: "
+                f"expected {artifact['sha256']}, found {actual}"
+            )
+        pdfs.append(source_pdf)
+    return pdfs
+
+
+def _platform_key() -> str:
+    machine = platform.machine().lower()
+    if machine == "aarch64":
+        machine = "arm64"
+    return f"{platform.system().lower()}-{machine}"
 
 
 def _java_path(runtime: Path) -> Path:
@@ -135,12 +203,13 @@ def _java_path(runtime: Path) -> Path:
     return mac if mac.exists() else runtime / "bin" / "java"
 
 
-def setup() -> tuple[Path, Path, Path]:
-    lock = _lock()
+def _setup_validator() -> tuple[Path, Path, Path]:
+    lock = _json_object(VALIDATOR_LOCK_PATH)
     version = str(lock["implementation_version"])
-    destination = CACHE_ROOT / version
+    destination = VALIDATOR_CACHE_ROOT / version
     kernel = lock["kernel"]
-    assert isinstance(kernel, dict)
+    if not isinstance(kernel, dict):
+        raise RuntimeError(f"{VALIDATOR_LOCK_PATH}: invalid kernel metadata")
     kernel_archive = destination / "downloads" / "kernel.zip"
     _download(str(kernel["url"]), str(kernel["sha256"]), kernel_archive)
     kernel_root = destination / "kernel"
@@ -153,11 +222,10 @@ def setup() -> tuple[Path, Path, Path]:
             archive.extractall(kernel_root)
 
     java_lock = lock["java"]
-    assert isinstance(java_lock, dict)
-    platforms = java_lock["platforms"]
-    assert isinstance(platforms, dict)
+    if not isinstance(java_lock, dict) or not isinstance(java_lock.get("platforms"), dict):
+        raise RuntimeError(f"{VALIDATOR_LOCK_PATH}: invalid Java metadata")
     key = _platform_key()
-    artifact = platforms.get(key)
+    artifact = java_lock["platforms"].get(key)
     if not isinstance(artifact, dict):
         raise RuntimeError(f"no pinned Java runtime for {key}")
     java_archive = destination / "downloads" / f"java-{key}.tar.gz"
@@ -171,9 +239,8 @@ def setup() -> tuple[Path, Path, Path]:
             archive.extractall(runtime, filter="data")
         children = [path for path in runtime.iterdir() if path.is_dir()]
         if len(children) == 1 and not _java_path(runtime).exists():
-            extracted = children[0]
             temporary = destination / f"java-{key}.moving"
-            extracted.replace(temporary)
+            children[0].replace(temporary)
             runtime.rmdir()
             temporary.replace(runtime)
         java = _java_path(runtime)
@@ -182,124 +249,45 @@ def setup() -> tuple[Path, Path, Path]:
     return java, jar, library
 
 
-def _authored_model_files() -> set[str]:
-    return {
-        path.relative_to(MODEL_ROOT).as_posix()
-        for path in MODEL_ROOT.rglob("*.sysml")
-        if not {".cache", "dist"}.intersection(path.relative_to(MODEL_ROOT).parts)
-    }
+def setup() -> tuple[list[Path], Path, Path, Path]:
+    pdfs = _setup_language_pdfs()
+    java, jar, library = _setup_validator()
+    return pdfs, java, jar, library
 
 
-def _check_inventory_and_order() -> None:
-    authored = _authored_model_files()
-    ordered = set(MODEL_ORDER)
-    missing = sorted(authored - ordered)
-    stale = sorted(ordered - authored)
-    if missing or stale:
-        raise RuntimeError(
-            f"validator model inventory differs: unlisted={missing}, missing={stale}"
-        )
-
-    package_files: dict[str, str] = {}
-    imports_by_file: dict[str, set[str]] = {}
-    for relative in MODEL_ORDER:
-        text = (MODEL_ROOT / relative).read_text(encoding="utf-8")
-        package_match = re.search(r"\b(?:library\s+)?package\s+([A-Za-z_]\w*)\s*\{", text)
-        if not package_match:
-            raise RuntimeError(f"{relative} does not declare a package")
-        package = package_match.group(1)
-        if package in package_files:
-            raise RuntimeError(
-                f"package {package} is declared by both {package_files[package]} and {relative}"
-            )
-        package_files[package] = relative
-        imports_by_file[relative] = set(
-            re.findall(
-                r"\b(?:private|public)?\s*import\s+([A-Za-z_]\w*)::",
-                text,
-            )
-        )
-
-    position = {relative: index for index, relative in enumerate(MODEL_ORDER)}
-    for relative, imports in imports_by_file.items():
-        for imported_package in imports:
-            dependency = package_files.get(imported_package)
-            if dependency is not None and position[dependency] >= position[relative]:
-                raise RuntimeError(
-                    f"validator load order places {relative} before imported package "
-                    f"{imported_package} in {dependency}"
-                )
+def _model_files() -> list[Path]:
+    files = sorted(MODEL_ROOT.glob("*.sysml"), key=lambda path: path.name)
+    if not files:
+        raise RuntimeError(f"no SysML model files found in {MODEL_ROOT}")
+    return files
 
 
-def _model_files(scope: str) -> list[Path]:
-    _check_inventory_and_order()
-    allowed = {
-        "foundation": ("foundation/",),
-        "bibliotek": ("foundation/", "bibliotek/"),
-        "vellis": ("foundation/", "bibliotek/", "vellis/"),
-        "all": ("foundation/", "bibliotek/", "vellis/", "realizations/"),
-    }[scope]
-    return [MODEL_ROOT / relative for relative in MODEL_ORDER if relative.startswith(allowed)]
+def _combined_source(files: list[Path]) -> tuple[str, list[SourceSpan]]:
+    """Assemble one model submission while retaining file-aware line spans."""
+    chunks: list[str] = []
+    spans: list[SourceSpan] = []
+    first_line = 1
+    for path in files:
+        source = path.read_text(encoding="utf-8")
+        if not source.endswith("\n"):
+            source += "\n"
+        line_count = source.count("\n")
+        spans.append(SourceSpan(path, first_line, first_line + line_count - 1))
+        chunks.append(source)
+        first_line += line_count
+    return "".join(chunks), spans
 
 
-def _packaged_model_files(scope: str, destination: Path) -> tuple[list[Path], list[str]]:
-    _check_inventory_and_order()
-    products = {
-        "foundation": ("foundation",),
-        "bibliotek": ("foundation", "bibliotek"),
-        "vellis": ("foundation", "bibliotek", "vellis"),
-    }[scope]
-    extracted_by_name: dict[str, Path] = {}
-    labels_by_name: dict[str, str] = {}
-    for product in products:
-        archive_path = MODEL_PACKAGE_ROOT / PACKAGE_ARCHIVES[product]
-        if not archive_path.exists():
-            raise RuntimeError(f"missing packaged model artifact: {archive_path}")
-        product_root = destination / product
-        with zipfile.ZipFile(archive_path) as archive:
-            archive.extractall(product_root)
-        for path in product_root.rglob("*.sysml"):
-            if path.name in extracted_by_name:
-                raise RuntimeError(f"duplicate packaged model filename: {path.name}")
-            extracted_by_name[path.name] = path
-            labels_by_name[path.name] = f"{archive_path.name}!/{path.name}"
-
-    allowed = {
-        "foundation": ("foundation/",),
-        "bibliotek": ("foundation/", "bibliotek/"),
-        "vellis": ("foundation/", "bibliotek/", "vellis/"),
-    }[scope]
-    relatives = [relative for relative in MODEL_ORDER if relative.startswith(allowed)]
-    files: list[Path] = []
-    labels: list[str] = []
-    for relative in relatives:
-        name = Path(relative).name
-        path = extracted_by_name.get(name)
-        if path is None:
-            raise RuntimeError(f"packaged {scope} product omits {relative}")
-        files.append(path)
-        labels.append(labels_by_name[name])
-    unexpected = sorted(set(extracted_by_name) - {path.name for path in files})
-    if unexpected:
-        raise RuntimeError(f"packaged {scope} product has unexpected SysML files: {unexpected}")
-    source_by_name = {Path(relative).name: MODEL_ROOT / relative for relative in relatives}
-    stale = [
-        name
-        for name, packaged_path in extracted_by_name.items()
-        if name in source_by_name
-        and packaged_path.read_bytes() != source_by_name[name].read_bytes()
-    ]
-    if stale:
-        raise RuntimeError(
-            f"packaged {scope} product is stale for current model sources: {sorted(stale)}; "
-            "run `just model-package`"
-        )
-    return files, labels
+def _source_location(spans: list[SourceSpan], line: int) -> tuple[str, int]:
+    for span in spans:
+        if span.first_line <= line <= span.last_line:
+            return span.path.relative_to(ROOT).as_posix(), line - span.first_line + 1
+    return "model", line
 
 
 @contextmanager
 def _kernel_session() -> Iterator[BlockingKernelClient]:
-    java, jar, library = setup()
+    _, java, jar, library = setup()
     with tempfile.TemporaryDirectory(prefix="vellis-sysml-") as temporary:
         connection_file = Path(temporary) / "kernel.json"
         write_connection_file(str(connection_file))
@@ -341,242 +329,263 @@ def _kernel_session() -> Iterator[BlockingKernelClient]:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
+                process.wait(timeout=5)
 
 
-def _execute_source(
-    client: BlockingKernelClient, source: str
-) -> tuple[list[str], list[dict[str, Any]]]:
+def _execute_source(client: BlockingKernelClient, source: str) -> list[str]:
     diagnostics: list[str] = []
-    outputs: list[dict[str, Any]] = []
     message_id = client.execute(source)
     while True:
         message = client.get_iopub_msg(timeout=120)
         if message["parent_header"].get("msg_id") != message_id:
             continue
-        message_type = message["msg_type"]
         content = message["content"]
-        if message_type == "stream" and content.get("name") == "stderr":
-            diagnostics.extend(str(content.get("text", "")).splitlines())
-        elif message_type == "error":
+        if message["msg_type"] == "stream":
+            lines = str(content.get("text", "")).splitlines()
+            if content.get("name") == "stderr":
+                diagnostics.extend(lines)
+            else:
+                diagnostics.extend(line for line in lines if DIAGNOSTIC.search(line))
+        elif message["msg_type"] == "error":
             diagnostics.extend(str(line) for line in content.get("traceback", []))
-        elif message_type in {"display_data", "execute_result"}:
-            data = content.get("data", {})
-            if isinstance(data, dict):
-                outputs.append(data)
-        elif message_type == "status" and content.get("execution_state") == "idle":
+        elif message["msg_type"] == "status" and content.get("execution_state") == "idle":
             break
-    return diagnostics, outputs
+    return diagnostics
 
 
-def _validate_files(
-    files: list[Path], labels: list[str], self_test: bool, product_label: str
-) -> int:
-    diagnostics: list[str] = []
-    negative_diagnostics: list[str] = []
+def unresolved_model_references(references: list[str]) -> list[str]:
+    """Resolve qualified campaign references with the pinned official validator.
+
+    The regular expression is only an injection guard for constructing the probe. Resolution is
+    performed by alias memberships in the complete authored model, not by matching source text.
+    """
+    unique_references = list(dict.fromkeys(references))
+    malformed = [
+        reference
+        for reference in unique_references
+        if QUALIFIED_MODEL_REFERENCE.fullmatch(reference) is None
+    ]
+    resolvable = [reference for reference in unique_references if reference not in malformed]
+    if not resolvable:
+        return malformed
+
+    source, _ = _combined_source(_model_files())
+    first_alias_line = source.count("\n") + 2
+    aliases = [
+        f"    private alias campaignReference{index:04d} for {reference};"
+        for index, reference in enumerate(resolvable, start=1)
+    ]
+    source += "package 'Implementation Campaign Reference Validation' {\n"
+    source += "\n".join(aliases)
+    source += "\n}\n"
+
     with _kernel_session() as client:
-        if self_test:
-            negative_diagnostics, _ = _execute_source(
-                client, "package ValidatorNegative { part def Broken :> MissingType; }"
+        diagnostics = _execute_source(client, source)
+
+    unresolved = set(malformed)
+    unrelated: list[str] = []
+    for diagnostic in diagnostics:
+        match = DIAGNOSTIC.search(diagnostic)
+        if match is None or match.group("level") != "ERROR":
+            continue
+        line = int(match.group("line"))
+        index = line - first_alias_line
+        if 0 <= index < len(resolvable):
+            unresolved.add(resolvable[index])
+        else:
+            unrelated.append(diagnostic)
+    if unrelated:
+        raise RuntimeError(
+            "official validation failed outside the generated campaign reference aliases:\n"
+            + "\n".join(unrelated)
+        )
+    return [reference for reference in unique_references if reference in unresolved]
+
+
+# The pinned parser already rejects every one of these -- a separate lint would
+# catch nothing it does not. What it does not do is say *why*: the diagnostic for
+# `block def A;` is "no viable alternative at input 'def'", which never mentions
+# that `block` is SysML v1 or that `part def` replaces it. These hints supply the
+# missing half. Because a hint only ever fires on a line the parser has already
+# rejected, false positives are impossible by construction -- `attribute def
+# 'Block Diagram'` parses, so it is never inspected.
+V1_NOTATION_HINTS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(r"\bblock\s+def\b|^\s*block\s+\w", re.IGNORECASE | re.MULTILINE),
+        "'block' is SysML v1 notation. SysML v2 uses 'part def' for structural "
+        "constituents, 'item def' for things that flow or are acted on, and "
+        "'attribute def' for values without identity.",
+    ),
+    (
+        re.compile(r"[«»]"),
+        "Guillemet stereotypes are UML/SysML v1 notation. SysML v2 uses "
+        "'metadata def' with an '@' annotation, or a '#' user keyword.",
+    ),
+    (
+        re.compile(r"\bValueType\b|\bvalue\s+(?:def|property|type)\b", re.IGNORECASE),
+        "'ValueType' and value properties are SysML v1 notation. SysML v2 uses "
+        "'attribute def'; attributes are values and carry no identity.",
+    ),
+    (
+        re.compile(r"\bassoc(?:iation)?\s+(?:def\b|[A-Za-z_]\w*\s*\{)", re.IGNORECASE),
+        "SysML v2 has no 'association'. Use 'connection def' with 'end' features, "
+        "or a plain reference feature when the relationship needs no identity.",
+    ),
+    (
+        re.compile(r"\b(?:part|value|flow)\s+property\b", re.IGNORECASE),
+        "Properties are SysML v1 notation. SysML v2 declares features directly, "
+        "for example 'part wheel : Wheel;' or 'attribute mass : MassValue;'.",
+    ),
+    (
+        re.compile(r"\b(?:flow|full|proxy)\s+port\b", re.IGNORECASE),
+        "Flow, full, and proxy ports are SysML v1 notation. SysML v2 uses "
+        "'port def' with directed features and '~' conjugation.",
+    ),
+    (
+        re.compile(r"\b(?:stereotype|profile|taggedValue)\b", re.IGNORECASE),
+        "Stereotypes and profiles are UML notation. SysML v2 extends the language "
+        "with 'metadata def'.",
+    ),
+    (
+        re.compile(
+            r"\b(?:struct|datatype|assoc|metaclass|behavior|function|predicate)\s+[A-Za-z_]"
+        ),
+        "This is KerML root notation, which a .sysml file does not accept. Use the "
+        "SysML-layer equivalent, such as 'item def', 'attribute def', "
+        "'connection def', 'action def', or 'calc def'.",
+    ),
+    (
+        re.compile(r"^\s*(?:bdd|ibd|par|stm|act|uc|sd)\b", re.MULTILINE | re.IGNORECASE),
+        "SysML v2 has no diagram-kind syntax. Views are modelled with 'view def' "
+        "and 'viewpoint def'.",
+    ),
+)
+
+
+def _v1_notation_hint(line_text: str) -> str | None:
+    for pattern, message in V1_NOTATION_HINTS:
+        if pattern.search(line_text):
+            return message
+    return None
+
+
+def _report_diagnostics(
+    diagnostics: list[str],
+    *,
+    source: str,
+    spans: object,
+    label_for: Any,
+) -> bool:
+    """Print diagnostics, annotating parse errors caused by displaced v1 notation."""
+    lines = source.splitlines()
+    failed = False
+    for diagnostic in diagnostics:
+        match = DIAGNOSTIC.search(diagnostic)
+        if not match:
+            if diagnostic.strip():
+                print(f"ERROR {diagnostic.strip()}")
+                failed = True
+            continue
+        combined_line = int(match.group("line"))
+        label, local_line = label_for(spans, combined_line)
+        level = match.group("level")
+        print(
+            f"{level} {label}:{local_line}:{match.group('column')}:{match.group('message').strip()}"
+        )
+        if 1 <= combined_line <= len(lines):
+            hint = _v1_notation_hint(lines[combined_line - 1])
+            if hint is not None:
+                print(f"  hint: {hint}")
+        failed = failed or level == "ERROR"
+    return failed
+
+
+def probe(snippet: str) -> int:
+    """Check an arbitrary snippet against the pinned parser.
+
+    Roughly six seconds, which is far cheaper than reading grammar clauses to
+    settle a syntax question. Each probe gets a fresh kernel, so one probe can
+    never depend on names left behind by an earlier one.
+    """
+    with _kernel_session() as client:
+        diagnostics = _execute_source(client, snippet)
+    failed = _report_diagnostics(
+        diagnostics,
+        source=snippet,
+        spans=None,
+        label_for=lambda _spans, line: ("probe", line),
+    )
+    if failed:
+        print("Snippet rejected by the pinned validator.")
+        return 1
+    print("Snippet accepted by the pinned validator. Acceptance is not meaning.")
+    return 0
+
+
+def validate(*, self_test: bool = False) -> int:
+    files = _model_files()
+    source, spans = _combined_source(files)
+    diagnostics: list[str] = []
+    negative: list[str] = []
+    with _kernel_session() as client:
+        diagnostics.extend(_execute_source(client, source))
+    if self_test:
+        with _kernel_session() as client:
+            negative = _execute_source(
+                client,
+                "package VellisValidatorNegative_7F3A { "
+                "part def Broken :> VellisMissingType_7F3A; }",
             )
-        for path in files:
-            captured, _ = _execute_source(client, path.read_text(encoding="utf-8"))
-            diagnostics.extend(captured)
 
     failed = False
-    cell_offset = 1 if self_test else 0
     if self_test and not any(
         match and match.group("level") == "ERROR"
-        for diagnostic in negative_diagnostics
-        if (match := DIAGNOSTIC.search(diagnostic))
+        for line in negative
+        if (match := DIAGNOSTIC.search(line))
     ):
         print("ERROR formal validator negative self-test accepted an unresolved type")
         failed = True
-    for diagnostic in diagnostics:
-        match = DIAGNOSTIC.search(diagnostic)
-        if match:
-            cell = int(match.group("cell")) - cell_offset
-            label = labels[cell - 1] if 0 < cell <= len(labels) else "model"
-            level = match.group("level")
-            print(
-                f"{level} {label}:{match.group('line')}:{match.group('column')}:"
-                f"{match.group('message').strip()}"
-            )
-            failed = failed or level == "ERROR"
-        elif diagnostic.strip():
-            print(f"ERROR {diagnostic.strip()}")
-            failed = True
+    failed = (
+        _report_diagnostics(diagnostics, source=source, spans=spans, label_for=_source_location)
+        or failed
+    )
     if failed:
-        print(f"Formal SysML validation failed for {product_label}.")
+        print("Formal SysML validation failed.")
         return 1
+    version = _json_object(VALIDATOR_LOCK_PATH)["implementation_version"]
     print(
-        f"Formal SysML validation passed for {product_label} ({len(files)} files) "
-        f"with official Java pilot {_lock()['implementation_version']}."
+        f"Formal SysML validation passed for {len(files)} files with official Java pilot {version}."
     )
     return 0
 
 
-def validate(scope: str, self_test: bool = False, packaged: bool = False) -> int:
-    if packaged:
-        if scope == "all":
-            raise RuntimeError("packaged validation requires a concrete product scope")
-        with tempfile.TemporaryDirectory(prefix=f"vellis-{scope}-kpar-") as temporary:
-            files, labels = _packaged_model_files(scope, Path(temporary))
-            return _validate_files(files, labels, self_test, f"packaged {scope}")
-    files = _model_files(scope)
-    labels = [path.relative_to(ROOT).as_posix() for path in files]
-    return _validate_files(files, labels, self_test, f"source {scope}")
-
-
-def validate_products(self_test: bool = False) -> int:
-    for scope in ("foundation", "bibliotek", "vellis"):
-        if validate(scope, self_test=self_test, packaged=True):
-            return 1
-    return validate_fixture(self_test=self_test)
-
-
-def validate_fixture(self_test: bool = False) -> int:
-    with tempfile.TemporaryDirectory(prefix="vellis-foundation-fixture-") as temporary:
-        files, labels = _packaged_model_files("foundation", Path(temporary))
-        files.append(SOFTWARE_COMPONENT_PATTERN_PATH)
-        labels.append(SOFTWARE_COMPONENT_PATTERN_PATH.relative_to(ROOT).as_posix())
-        return _validate_files(files, labels, self_test, "foundation modeling fixture")
-
-
-def _source_digest(files: list[Path]) -> str:
-    digest = hashlib.sha256()
-    for path in sorted(files, key=lambda item: item.relative_to(MODEL_ROOT).as_posix()):
-        relative = path.relative_to(MODEL_ROOT).as_posix()
-        digest.update(relative.encode())
-        digest.update(b"\0")
-        digest.update(path.read_bytes())
-        digest.update(b"\0")
-    return digest.hexdigest()
-
-
-def export_index(output: Path) -> None:
-    files = _model_files("all")
-    package_sources: dict[str, str] = {}
-    for path in files:
-        text = path.read_text(encoding="utf-8")
-        match = re.search(r"\b(?:library\s+)?package\s+([A-Za-z_]\w*)\s*\{", text)
-        if not match:
-            raise RuntimeError(f"{path} does not declare a package")
-        package_sources[match.group(1)] = path.relative_to(ROOT).as_posix()
-
-    package_indexes: dict[str, dict[str, Any]] = {}
-    with _kernel_session() as client:
-        for path in files:
-            diagnostics, _ = _execute_source(client, path.read_text(encoding="utf-8"))
-            if any(DIAGNOSTIC.search(line) for line in diagnostics):
-                raise RuntimeError(
-                    f"cannot export invalid model {path.relative_to(ROOT)}:\n"
-                    + "\n".join(diagnostics)
-                )
-        for package, source in sorted(package_sources.items()):
-            diagnostics, outputs = _execute_source(client, f"%list {package}::**")
-            if diagnostics:
-                raise RuntimeError(f"listing of {package} failed:\n" + "\n".join(diagnostics))
-            listing = next(
-                (
-                    value
-                    for result in outputs
-                    if isinstance((value := result.get("text/plain")), str)
-                ),
-                None,
-            )
-            if listing is None:
-                raise RuntimeError(f"official Java pilot did not list package {package}")
-            named_elements: list[dict[str, str]] = []
-            for line in listing.splitlines():
-                match = LISTING_LINE.match(line.strip())
-                if not match:
-                    if line.strip():
-                        raise RuntimeError(
-                            f"unrecognized official listing line for {package}: {line}"
-                        )
-                    continue
-                listed_name = match.group("name") or ""
-                identification = re.match(r"<([^>]+)>\s+(.*)", listed_name)
-                element = {
-                    "kind": match.group("kind"),
-                    "name": identification.group(2) if identification else listed_name,
-                }
-                if identification:
-                    element["short_name"] = identification.group(1)
-                named_elements.append(element)
-            counts = Counter(element["kind"] for element in named_elements)
-            contract_elements = [
-                element
-                for element in named_elements
-                if element["name"]
-                and (
-                    element["kind"].endswith("Definition")
-                    or element["kind"] in INDEXED_ELEMENT_KINDS
-                )
-            ]
-            package_indexes[package] = {
-                "source": source,
-                "element_counts": dict(sorted(counts.items())),
-                "named_elements": sorted(
-                    contract_elements, key=lambda item: (item["kind"], item["name"])
-                ),
-            }
-
-    value = {
-        "schema_version": 1,
-        "source_digest": _source_digest(files),
-        "validator": {
-            "provider": _lock()["provider"],
-            "release": _lock()["release"],
-            "implementation_version": _lock()["implementation_version"],
-        },
-        "authored_packages": dict(sorted(package_sources.items())),
-        "packages": package_indexes,
-    }
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"Exported official parser-backed model index to {output.resolve().relative_to(ROOT)}.")
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Pinned official SysML v2 Java validator adapter")
+    parser = argparse.ArgumentParser(description="Pinned official SysML v2 validator adapter")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("setup")
     validate_parser = subparsers.add_parser("validate")
-    validate_parser.add_argument(
-        "--scope", choices=("foundation", "bibliotek", "vellis", "all"), default="all"
+    validate_parser.add_argument("--self-test", action="store_true")
+    probe_parser = subparsers.add_parser("probe")
+    probe_parser.add_argument(
+        "source",
+        nargs="?",
+        help="SysML snippet; omit to read from standard input",
     )
-    validate_parser.add_argument(
-        "--self-test",
-        action="store_true",
-        help="require the official validator to reject an unresolved-type probe before validation",
-    )
-    validate_parser.add_argument(
-        "--packaged",
-        action="store_true",
-        help="validate sources extracted from the packaged product artifact",
-    )
-    products_parser = subparsers.add_parser("validate-products")
-    products_parser.add_argument("--self-test", action="store_true")
-    fixture_parser = subparsers.add_parser("validate-fixture")
-    fixture_parser.add_argument("--self-test", action="store_true")
-    export_parser = subparsers.add_parser("export-index")
-    export_parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
+    if arguments.command == "probe":
+        snippet = arguments.source if arguments.source is not None else sys.stdin.read()
+        if not snippet.strip():
+            raise SystemExit("probe requires a SysML snippet argument or standard input")
+        return probe(snippet)
     if arguments.command == "setup":
-        java, jar, library = setup()
+        pdfs, java, jar, library = setup()
+        for pdf in pdfs:
+            print(f"Pinned specification: {pdf}")
         print(f"Pinned Java: {java}")
         print(f"Pinned validator: {jar}")
         print(f"Pinned library: {library}")
         return 0
-    if arguments.command == "validate-products":
-        return validate_products(arguments.self_test)
-    if arguments.command == "validate-fixture":
-        return validate_fixture(arguments.self_test)
-    if arguments.command == "export-index":
-        export_index(arguments.output)
-        return 0
-    return validate(arguments.scope, arguments.self_test, arguments.packaged)
+    return validate(self_test=arguments.self_test)
 
 
 if __name__ == "__main__":

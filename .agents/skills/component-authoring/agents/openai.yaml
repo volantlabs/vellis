@@ -1,6 +1,0 @@
-interface:
-  display_name: "Component Authoring"
-  short_description: "Author native SysML v2 component models"
-  default_prompt: "Use $component-authoring to author or review a native SysML v2 black-box component or application model with requirements, satisfaction, and verification."
-policy:
-  allow_implicit_invocation: true

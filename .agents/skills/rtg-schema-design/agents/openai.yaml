@@ -1,4 +1,6 @@
 interface:
   display_name: "RTG Schema Design"
-  short_description: "Design and evolve precise RTG schemas safely"
-  default_prompt: "Use $rtg-schema-design to design or evolve this RTG schema from user needs."
+  short_description: "Design RTG meaning and implementation handoffs"
+  default_prompt: "Use $rtg-schema-design to design or review RTG meaning and emit an implementation-ready semantic handoff with explicit authority coverage and remaining obligations, without prescribing code structure."
+policy:
+  allow_implicit_invocation: true
