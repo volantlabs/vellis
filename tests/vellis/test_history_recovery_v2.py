@@ -1586,3 +1586,29 @@ def test_audit_rejects_a_database_missing_a_required_schema_object(tmp_path: Pat
 
     assert not result.clean
     assert any("canonical_record_time_idx" in each for each in result.findings)
+
+
+def test_audit_rejects_a_database_carrying_an_unexpected_schema_object(tmp_path: Path) -> None:
+    """An extra object can change behavior the schema never selected.
+
+    Comparing only for missing names lets an added trigger through, and backup
+    publication trusts the verdict, so the inventory is compared in both directions.
+    """
+    path = _database(tmp_path)
+    _seed(path)
+    assert audit_database(path).clean
+
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute(
+            "CREATE TRIGGER refuse_activity BEFORE INSERT ON activity_header "
+            "BEGIN SELECT RAISE(ABORT, 'refused'); END"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    result = audit_database(path)
+
+    assert not result.clean
+    assert any("unexpected schema objects: refuse_activity" in each for each in result.findings)

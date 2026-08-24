@@ -68,27 +68,46 @@ def _expected_schema_objects() -> set[str]:
     """Object names the fresh schema creates, read from the schema itself.
 
     Deriving them keeps this from becoming a second inventory that drifts: a schema
-    change updates the expectation in the same edit that makes it.
+    change updates the expectation in the same edit that makes it. Full-text virtual
+    tables carry automatically created shadow objects, so those are derived from the
+    virtual tables the schema declares rather than listed by name.
     """
     pattern = re.compile(
         r"CREATE\s+(?:UNIQUE\s+)?(?:VIRTUAL\s+)?(?:TABLE|INDEX|VIEW|TRIGGER)\s+"
         r"(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z_][A-Za-z0-9_]*)",
         re.IGNORECASE,
     )
-    return set(pattern.findall(_SCHEMA))
+    expected = set(pattern.findall(_SCHEMA))
+    virtual = re.findall(
+        r"CREATE\s+VIRTUAL\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z_][A-Za-z0-9_]*)",
+        _SCHEMA,
+        re.IGNORECASE,
+    )
+    for name in virtual:
+        expected.update(f"{name}_{suffix}" for suffix in ("data", "idx", "docsize", "config"))
+    return expected
 
 
 def _check_schema_objects(connection: sqlite3.Connection, findings: list[str]) -> None:
-    """A supported version does not prove the objects a public operation needs still exist."""
+    """A supported version does not prove the schema objects are the expected ones.
+
+    Both directions matter. A missing object breaks a public operation; an unexpected
+    one can change behavior the schema never selected, and backup publication trusts
+    this verdict either way.
+    """
     present = {
         str(row[0])
         for row in connection.execute(
             "SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'"
         )
     }
-    missing = sorted(_expected_schema_objects() - present)
+    expected = _expected_schema_objects()
+    missing = sorted(expected - present)
     if missing:
         findings.append(f"database is missing required schema objects: {', '.join(missing)}")
+    unexpected = sorted(present - expected)
+    if unexpected:
+        findings.append(f"database contains unexpected schema objects: {', '.join(unexpected)}")
 
 
 def _audit_snapshot(connection: sqlite3.Connection) -> AuditReport:
