@@ -102,7 +102,6 @@ Useful focused checks include:
 
 `just check` validates the current model, evolution record, product, package, skills, and repository
 policy.
-The inactive campaign engine has separate explicit recipes and is not an ordinary product gate.
 
 ## Runnable v2 boundary
 

@@ -39,8 +39,8 @@ and modules, then return failing cases
 or feasibility evidence translated back into stakeholder-visible systems meaning. Code structure informs
 engineering judgment but does not become the model by transcription.
 
-The reference, modeling, whole-model planning, bounded implementation, campaign-management, and
-implemented-system evolution skills form a portable SysML v2 MBSwE core. A project
+The reference, modeling, bounded implementation, and implemented-system evolution skills form a
+portable SysML v2 MBSwE core. A project
 binds that core to its model layout, language baseline, validator, engineering checks, source rules,
 and change workflow; optional domain skills add specialized meaning. Vellis contributes RTG as one
 such extension, not as the assumed shape of the method. The repository does not yet ship a standalone
