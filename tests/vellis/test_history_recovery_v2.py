@@ -1520,3 +1520,69 @@ def test_corrupt_backup_source_publishes_no_initialization_destination(tmp_path:
         initialize_from_backup(source, destination)
     assert not destination.exists()
     assert not destination.parent.exists()
+
+
+def test_audit_rejects_a_misplaced_transition_even_with_a_consistent_chain(
+    tmp_path: Path,
+) -> None:
+    """The hash chain attests that a label was not altered, not that it may appear there.
+
+    Recomputing the chain over a relabelled record leaves it internally consistent, so
+    only a placement rule can reject a lineage whose first record is not initialization.
+    """
+    path = _database(tmp_path)
+    _seed(path)
+    connection = sqlite3.connect(path)
+    connection.row_factory = sqlite3.Row
+    try:
+        lineage = str(
+            connection.execute(
+                "SELECT lineage_uuid FROM metadata_setting WHERE singleton = 1"
+            ).fetchone()[0]
+        )
+        connection.execute(
+            "UPDATE canonical_record SET transition_kind = 'restore' WHERE revision = 0"
+        )
+        audit_module._prepare_audit_descriptors(connection, [])  # noqa: SLF001
+        previous = bytes(32)
+        for row in connection.execute("SELECT * FROM canonical_record ORDER BY revision"):
+            header = audit_module._header_from_row(row, lineage)  # noqa: SLF001
+            recomputed = audit_module._audit_record_hash(  # noqa: SLF001
+                connection, previous, header, int(row["revision"])
+            )
+            connection.execute(
+                "UPDATE canonical_record SET previous_hash = ?, record_hash = ? WHERE revision = ?",
+                (previous, recomputed, int(row["revision"])),
+            )
+            previous = recomputed
+        connection.commit()
+    finally:
+        connection.close()
+
+    result = audit_database(path)
+
+    assert not result.clean
+    assert any("revision zero is not an initialization record" in each for each in result.findings)
+
+
+def test_audit_rejects_a_database_missing_a_required_schema_object(tmp_path: Path) -> None:
+    """A supported version does not prove the objects a public operation needs still exist.
+
+    Backup publication trusts this audit, so a database whose schema identity matches but
+    whose objects do not would otherwise be certified and published.
+    """
+    path = _database(tmp_path)
+    _seed(path)
+    assert audit_database(path).clean
+
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute("DROP INDEX canonical_record_time_idx")
+        connection.commit()
+    finally:
+        connection.close()
+
+    result = audit_database(path)
+
+    assert not result.clean
+    assert any("canonical_record_time_idx" in each for each in result.findings)

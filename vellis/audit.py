@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,7 +16,7 @@ from vellis.canonical_encoding import (
     canonical_record_hash_members,
     descriptor_member,
 )
-from vellis.database import connect_database, require_supported_database
+from vellis.database import _SCHEMA, connect_database, require_supported_database
 from vellis.definition_repository import definition_descriptors, load_definitions
 from vellis.domain import (
     RevisionState,
@@ -63,10 +64,38 @@ def audit_connection(connection: sqlite3.Connection) -> AuditReport:
             connection.rollback()
 
 
+def _expected_schema_objects() -> set[str]:
+    """Object names the fresh schema creates, read from the schema itself.
+
+    Deriving them keeps this from becoming a second inventory that drifts: a schema
+    change updates the expectation in the same edit that makes it.
+    """
+    pattern = re.compile(
+        r"CREATE\s+(?:UNIQUE\s+)?(?:VIRTUAL\s+)?(?:TABLE|INDEX|VIEW|TRIGGER)\s+"
+        r"(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z_][A-Za-z0-9_]*)",
+        re.IGNORECASE,
+    )
+    return set(pattern.findall(_SCHEMA))
+
+
+def _check_schema_objects(connection: sqlite3.Connection, findings: list[str]) -> None:
+    """A supported version does not prove the objects a public operation needs still exist."""
+    present = {
+        str(row[0])
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'"
+        )
+    }
+    missing = sorted(_expected_schema_objects() - present)
+    if missing:
+        findings.append(f"database is missing required schema objects: {', '.join(missing)}")
+
+
 def _audit_snapshot(connection: sqlite3.Connection) -> AuditReport:
     findings: list[str] = _FindingCategories()
     try:
         require_supported_database(connection)
+        _check_schema_objects(connection, findings)
         _check_lineage_identity(connection, findings)
         _check_sqlite_integrity(connection, findings)
         _check_intervals(connection, findings)
@@ -470,6 +499,17 @@ def _check_timestamp_representations(connection: sqlite3.Connection, findings: l
             findings.append(f"{relation} contains inconsistent timestamp representations")
 
 
+def _check_transition_placement(revision: int, transition: str, findings: list[str]) -> None:
+    """The hash chain attests a label was not altered, not that it may appear here.
+
+    Revision zero carries the one initialization record, and initialization never recurs.
+    """
+    if revision == 0 and transition != "initialization":
+        findings.append("canonical revision zero is not an initialization record")
+    if revision != 0 and transition == "initialization":
+        findings.append("canonical initialization appears after revision zero")
+
+
 def _check_revisions(connection: sqlite3.Connection, findings: list[str]) -> None:
     _prepare_audit_descriptors(connection, findings)
     previous_hash = bytes(32)
@@ -487,6 +527,7 @@ def _check_revisions(connection: sqlite3.Connection, findings: list[str]) -> Non
         if revision != expected_revision:
             findings.append("canonical revisions are not contiguous from zero")
         expected_revision = revision + 1
+        _check_transition_placement(revision, str(row["transition_kind"]), findings)
         timestamp = (int(row["recorded_epoch_seconds"]), int(row["recorded_nanosecond"]))
         if previous_time is not None and timestamp < previous_time:
             findings.append("canonical recorded times decrease")
