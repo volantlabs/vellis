@@ -74,6 +74,8 @@ STDIO or bearer-protected HTTP for one owner.
   remodeling review.
 - [`system-evolution.yaml`](system-evolution.yaml) is the current execution and evidence index, not
   product authority.
+- [`docs/porting-the-mbswe-core.md`](docs/porting-the-mbswe-core.md) lists everything needed to
+  reproduce the model-as-authority experience in a fresh repository.
 - [`.agents/skills/`](.agents/skills/) contains the portable SysML workflow and Vellis-specific
   extensions.
 
