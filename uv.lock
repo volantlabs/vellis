@@ -1258,7 +1258,7 @@ dev = [
     { name = "basedpyright", specifier = ">=1.39.10" },
     { name = "jupyter-client", specifier = ">=8.6,<9" },
     { name = "mcp", specifier = ">=1.28.1,<2" },
-    { name = "pypdf", specifier = ">=6.15.0" },
+    { name = "pypdf", specifier = "==6.15.0" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "ruff", specifier = ">=0.16.3" },

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -173,6 +174,21 @@ def test_reference_extraction_preserves_representative_language_and_examples() -
     assert "port def       FuelingPort" in sysml_port
     assert "7.2.2.1  Elements and Relationships Overview" in kerml_root
     assert "A binding connector is declared as a feature" in kerml_binding
+
+
+def test_layout_extraction_preserves_searchable_word_boundaries() -> None:
+    sysml = sysml_reference._load_specifications()[0]
+    page = PdfReader(sysml.source_pdf).pages[669]
+
+    text = sysml_reference._normalize_text(
+        page.extract_text(extraction_mode="layout") or "",
+        sysml,
+    )
+
+    assert re.search(
+        r"The\s+fuel\s+contains\s+an\s+attribute\s+called\s+fuelMass\.",
+        text,
+    )
 
 
 def test_page_metadata_reports_boundary_context_and_every_starting_section() -> None:
