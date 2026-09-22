@@ -212,6 +212,40 @@ def test_claude_desktop_merge_preserves_other_entries_and_is_idempotent(tmp_path
     )
 
 
+def test_opencode_merge_preserves_other_entries_and_is_idempotent(tmp_path: Path) -> None:
+    env = {"HOME": str(tmp_path)}
+    path = tmp_path / ".config" / "opencode" / "opencode.json"
+    path.parent.mkdir(parents=True)
+    existing = json.dumps(
+        {
+            "mcp": {"other": {"type": "local", "command": ["other"]}},
+            "plugin": ["/some/plugin"],
+            "autoupdate": False,
+        }
+    )
+    path.write_text(existing, encoding="utf-8")
+    server = {"command": "/absolute/path/uv", "args": ["run", "vellis"], "cwd": "/repo"}
+    result = register_client("opencode", server, data_dir=tmp_path / "data", env=env)
+
+    assert result == "configured"
+    value = json.loads(path.read_text(encoding="utf-8"))
+    assert value["autoupdate"] is False
+    assert value["plugin"] == ["/some/plugin"]
+    assert value["mcp"]["other"] == {"type": "local", "command": ["other"]}
+    assert value["mcp"]["rtg_knowledge_graph"] == {
+        "type": "local",
+        "command": ["/absolute/path/uv", "run", "vellis"],
+        "cwd": "/repo",
+        "enabled": True,
+    }
+    assert list(path.parent.glob("opencode.json.vellis-backup-*"))
+
+    assert (
+        register_client("opencode", server, data_dir=tmp_path / "data", env=env)
+        == "already_configured"
+    )
+
+
 @pytest.mark.parametrize(
     ("client", "executable", "config_relative", "add_fragment"),
     [
