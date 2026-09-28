@@ -177,6 +177,9 @@ def test_reference_extraction_preserves_representative_language_and_examples() -
 
 
 def test_layout_extraction_preserves_searchable_word_boundaries() -> None:
+    # Guards the pypdf==6.15.0 pin in pyproject.toml: newer pypdf's layout-mode
+    # synthetic-space detection merges/splits word boundaries (py-pdf/pypdf#4067,
+    # open as of 2026-09). Re-run this against a candidate bump before unpinning.
     sysml = sysml_reference._load_specifications()[0]
     page = PdfReader(sysml.source_pdf).pages[669]
 
