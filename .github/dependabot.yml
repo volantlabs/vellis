@@ -8,3 +8,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Pinned in pyproject.toml (see the pin's comment) until py-pdf/pypdf#4067 is fixed.
+      - dependency-name: "pypdf"
