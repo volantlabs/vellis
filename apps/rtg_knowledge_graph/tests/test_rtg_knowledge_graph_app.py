@@ -558,7 +558,7 @@ def test_cli_help_explains_both_first_run_client_paths() -> None:
     )
 
     assert "vellis setup" in result.stdout
-    assert "--client {auto,codex,claude-code,claude-desktop,generic-json}" in result.stdout
+    assert "--client {auto,codex,claude-code,claude-desktop,opencode,generic-json}" in result.stdout
     assert "MCP client owns the configured stdio process" in result.stdout
 
 
