@@ -352,9 +352,27 @@ Repo-local agent skills live in [`.agents/skills/`](.agents/skills/). This is th
 ## Community And Release
 
 - License: [`Apache-2.0`](LICENSE)
+- Attribution: [`NOTICE`](NOTICE)
 - Contributing guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Security reporting: [`SECURITY.md`](SECURITY.md)
 - Code of conduct: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
+
+## License And Scope
+
+Copyright 2026 Volant Partners, Inc.
+Copyright 2026 Vellis contributors
+
+The Vellis open-source software in this repository is licensed under the
+[Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for attribution.
+Third-party materials retain their respective licenses and notices.
+
+This release covers the software made available in this repository. It does not
+release or grant rights to customer-specific work, customer data, or proprietary
+commercial extensions that are not included in this open-source release. Such
+materials remain subject to their separate ownership, agreements, and license terms.
+Using Vellis to store or process data does not license that data under Apache-2.0.
+These scope clarifications do not restrict the rights granted by Apache-2.0 for
+software released under that license, including commercial use and modification.
 
 ## Status
 
