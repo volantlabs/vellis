@@ -4,7 +4,7 @@ evolution:
   mode: copilot
   objective: Move the development-only pypdf dependency out of every open advisory range without silently degrading
     the specification search corpus it produces.
-  observable_distinction: The locked pypdf is 7.0.1, outside all 29 open Dependabot advisory ranges (fixed at 6.21.4
+  observable_distinction: The locked pypdf is 6.21.4, outside all 29 open Dependabot advisory ranges (fixed at 6.21.4
     and earlier), and the regenerated specification corpus differs from the 6.16.1 rendering only in the recorded
     whitespace and word-join consequences.
   lifecycle: active
@@ -24,10 +24,10 @@ baselines:
     checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
   target:
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:d30ae17337f94a8b34463173b764c3db772e965b
+    implementation: git:6db8b38bb9e91c384d4c45b37cd32850375eec0d
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:e7ce1b1e9269923025d844dfe3804e1b034acfb3fb998c88c087f55d2a320796
-    checkpoint: git:d30ae17337f94a8b34463173b764c3db772e965b
+    execution_environment: sha256:59459f815299bdec094f936189c406374a65e0386440e6a8139b7649ad470e6a
+    checkpoint: git:6db8b38bb9e91c384d4c45b37cd32850375eec0d
 scope:
   authority_scope: []
   implementation_scope:
@@ -47,8 +47,8 @@ findings:
   summary: The locked pypdf 6.16.1 lies inside the vulnerable range of 26 of the 29 open Dependabot advisories,
     and the previous floor of 6.15.0 admitted all 29.
   classification: realization decision
-  consequence: Every advisory is a denial-of-service class defect on malformed PDF input, fixed between 6.16.0 and
-    6.21.4. pypdf is a development dependency used only by the specification reference tool, which reads checksum-pinned
+  consequence: All but one are denial-of-service defects on malformed PDF input; the low-severity JPEG alert reaches an image
+    parser only when the optional Pillow is installed, which it is not. Fixes land between 6.16.0 and 6.21.4. pypdf is a development dependency used only by the specification reference tool, which reads checksum-pinned
     official PDFs, so exposure is low, but the alerts stay open until the lock leaves every vulnerable range. The
     model leaves the toolchain version open, so this is a selection rather than a defect under authority.
   authority_refs: []
@@ -60,11 +60,11 @@ findings:
   summary: No patched pypdf preserves the 6.19.0 layout-mode spacing; from 6.20.0 on, a few word boundaries at text
     style changes are dropped.
   classification: feasibility consequence
-  consequence: Rendering the 1155-page SysML 2.1 and KerML 1.1 corpus with 6.16.1 and with 7.0.1 changed 129 pages.
+  consequence: Rendering the 1155-page SysML 2.1 and KerML 1.1 corpus with 6.16.1 and with 6.21.4 changed 129 pages.
     115 differ only in within-line spacing, mostly diagram columns. Five lose spurious spaces around registered-trademark
     signs. Nine change word tokens, mostly by dropping about a dozen real word boundaries such as inClause, aPartsTreeView
-    and outfuel in the vehicle example annex, and two by reordering metamodel diagram labels. Page count, outline and extraction-warning pages are unchanged, and 6.21.4 renders
-    byte-identically to 7.0.1. A per-release probe places the change at 6.20.0. The owner accepted the trade-off
+    and outfuel in the vehicle example annex, and two by reordering metamodel diagram labels. Page count, outline and extraction-warning pages are unchanged, and 7.0.1 renders
+    byte-identically to 6.21.4. A per-release probe places the change at 6.20.0. The owner accepted the trade-off
     in exchange for leaving the advisory ranges.
   authority_refs: []
   evidence_refs:
@@ -76,7 +76,7 @@ findings:
     superseded extraction after this bump.
   classification: out of scope
   consequence: model-reference-check compares the language lock digest, the generator version and per-file digests,
-    but not the extractor version, so a corpus rendered under 6.16.1 still passes after the lock moves to 7.0.1.
+    but not the extractor version, so a corpus rendered under 6.16.1 still passes after the lock moves to 6.21.4.
     The difference is limited to the F002 consequences and a just model-setup refreshes it. Recording the extractor
     identity in the manifest is a separate tooling change outside this objective.
   authority_refs: []
@@ -86,10 +86,11 @@ findings:
   owner_work_item_id: W001
 decisions:
 - id: D001
-  summary: Raise the floor to pypdf>=6.21.4 without an upper bound, which locks 7.0.1.
+  summary: Raise the floor to pypdf>=6.21.4 and cap it below 7, which locks 6.21.4.
   authority_refs: []
   alternatives:
-  - Cap below 7 and lock 6.21.4, which renders a byte-identical corpus and only defers the next major-version alert.
+  - Leave the floor uncapped and lock 7.0.1, which renders a byte-identical corpus but depends on a release uploaded
+    the same day, four days after 7.0.0.
   - Keep 6.16.1 or 6.19.0 for their spacing, which leaves high-severity advisories open.
   - Post-process extracted text to reinsert word boundaries, which adds a heuristic the reference tool would have
     to own.

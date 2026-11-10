@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import hashlib
-import importlib
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -40,7 +40,7 @@ def test_outline_hierarchy_and_ranges_are_preserved(tmp_path: Path) -> None:
 
 
 def test_layout_extraction_the_renderer_uses_reads_page_text(tmp_path: Path) -> None:
-    """Exercise the exact pypdf calls the corpus renderer makes on every page."""
+    """Exercise the pypdf extraction call and warning channel the corpus renderer uses."""
     writer = PdfWriter()
     page = writer.add_blank_page(width=612, height=792)
     font = DictionaryObject(
@@ -54,18 +54,26 @@ def test_layout_extraction_the_renderer_uses_reads_page_text(tmp_path: Path) -> 
         {NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})}
     )
     content = StreamObject()
-    content.set_data(b"BT /F1 12 Tf 72 700 Td (Part definition Vehicle) Tj ET")
+    # The second, rotated run makes layout mode emit a warning, as diagram pages do.
+    content.set_data(
+        b"BT /F1 12 Tf 72 700 Td (Part definition Vehicle) Tj ET "
+        b"BT /F1 12 Tf 0 1 -1 0 300 300 Tm (Rotated label) Tj ET"
+    )
     page[NameObject("/Contents")] = writer._add_object(content)
     pdf = tmp_path / "text.pdf"
     with pdf.open("wb") as stream:
         writer.write(stream)
-
-    text = PdfReader(pdf).pages[0].extract_text(extraction_mode="layout")
+    # Collect warnings exactly as _write_specification does.
+    logger = logging.getLogger("pypdf._text_extraction._layout_mode._fixed_width_page")
+    collector = sysml_reference._WarningCollector()
+    logger.addHandler(collector)
+    try:
+        text = PdfReader(pdf).pages[0].extract_text(extraction_mode="layout")
+    finally:
+        logger.removeHandler(collector)
 
     assert "Part definition Vehicle" in text
-    # The renderer collects extraction warnings from this logger; a renamed module
-    # would silently empty every page's extraction_warnings.
-    importlib.import_module("pypdf._text_extraction._layout_mode._fixed_width_page")
+    assert any("Rotated text" in message for message in collector.messages)
 
 
 def _lock_artifacts() -> list[dict[str, object]]:
