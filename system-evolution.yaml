@@ -7,14 +7,14 @@ evolution:
   observable_distinction: The locked pypdf is 6.21.4, outside all 29 open Dependabot advisory ranges (fixed at 6.21.4
     and earlier), and the regenerated specification corpus differs from the 6.16.1 rendering only in the recorded
     whitespace and word-join consequences.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: not-required
     reason: The change selects a development toolchain version. No model authority, product runtime dependency,
       external boundary, or compatibility promise changes, and the reference tooling is not modeled.
     checkpoint: null
   blocker: null
-  checkpoint: null
+  checkpoint: git:72a1ff09b38515d3232a942f6fbd9acf7824f0b4
 baselines:
   source:
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
@@ -24,10 +24,10 @@ baselines:
     checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
   target:
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:6db8b38bb9e91c384d4c45b37cd32850375eec0d
+    implementation: git:72a1ff09b38515d3232a942f6fbd9acf7824f0b4
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:59459f815299bdec094f936189c406374a65e0386440e6a8139b7649ad470e6a
-    checkpoint: git:6db8b38bb9e91c384d4c45b37cd32850375eec0d
+    checkpoint: git:72a1ff09b38515d3232a942f6fbd9acf7824f0b4
 scope:
   authority_scope: []
   implementation_scope:
@@ -130,20 +130,51 @@ work_items:
   - Do not inspect .data.
   - Do not change tools/sysml_reference.py or the corpus format.
   - Do not change any runtime dependency.
-  lifecycle: active
-  implementation_status: not evaluated
+  lifecycle: complete
+  implementation_status: conforming
   evidence_refs:
   - command:just system-evolution-check
   - path:tests/test_sysml_reference.py#test_outline_hierarchy_and_ranges_are_preserved
   - path:tests/test_sysml_reference.py#test_layout_extraction_the_renderer_uses_reads_page_text
-  - command:just model-reference-check
-  - command:just check
   blocker: null
-  checkpoint: null
-reviews: []
+  checkpoint: git:72a1ff09b38515d3232a942f6fbd9acf7824f0b4
+reviews:
+- lens: engineering and evidence
+  status: findings
+  reviewer: fresh-reviewer-1
+  checkpoint: git:d30ae17337f94a8b34463173b764c3db772e965b
+  evidence_refs:
+  - path:tests/test_sysml_reference.py#test_layout_extraction_the_renderer_uses_reads_page_text
+  scope: W001
+- lens: engineering and evidence
+  status: findings
+  reviewer: fresh-reviewer-2
+  checkpoint: git:6db8b38bb9e91c384d4c45b37cd32850375eec0d
+  evidence_refs:
+  - path:tests/test_sysml_reference.py#test_layout_extraction_the_renderer_uses_reads_page_text
+  scope: W001
+- lens: engineering and evidence
+  status: clean
+  reviewer: fresh-reviewer-3
+  checkpoint: git:72a1ff09b38515d3232a942f6fbd9acf7824f0b4
+  evidence_refs:
+  - path:tests/test_sysml_reference.py#test_layout_extraction_the_renderer_uses_reads_page_text
+  - command:just system-evolution-check
+  scope: closure
+- lens: authority and conformance
+  status: clean
+  reviewer: repository owner
+  checkpoint: git:72a1ff09b38515d3232a942f6fbd9acf7824f0b4
+  evidence_refs:
+  - command:just check
+  scope: closure
 closure:
-  model_status: not evaluated
-  implementation_status: not evaluated
-  compatibility: Not yet evaluated.
-  evidence_refs: []
-  checkpoint: null
+  model_status: unchanged
+  implementation_status: conforming
+  compatibility: Development toolchain only. pypdf moves from 6.16.1 to 6.21.4 behind a >=6.21.4,<7 constraint,
+    clearing all 29 open advisories. The installed Vellis package, runtime dependencies, tools, wire, and database
+    are unchanged. A regenerated specification corpus carries the accepted F002 spacing and word-join consequences;
+    F003 records that an existing cache is not forced to regenerate.
+  evidence_refs:
+  - command:just check
+  checkpoint: git:72a1ff09b38515d3232a942f6fbd9acf7824f0b4
