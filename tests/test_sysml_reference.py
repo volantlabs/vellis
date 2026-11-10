@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 from pathlib import Path
 
 import pytest
 import yaml
 from pypdf import PdfReader, PdfWriter
+from pypdf.generic import DictionaryObject, NameObject, StreamObject
 
 from tools import model_layout, sysml_reference
 
@@ -35,6 +37,35 @@ def test_outline_hierarchy_and_ranges_are_preserved(tmp_path: Path) -> None:
     ]
     assert entries[1]["parent_id"] == entries[0]["id"]
     assert entries[0]["subtree_physical_page_end"] == 2
+
+
+def test_layout_extraction_the_renderer_uses_reads_page_text(tmp_path: Path) -> None:
+    """Exercise the exact pypdf calls the corpus renderer makes on every page."""
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=612, height=792)
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    page[NameObject("/Resources")] = DictionaryObject(
+        {NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})}
+    )
+    content = StreamObject()
+    content.set_data(b"BT /F1 12 Tf 72 700 Td (Part definition Vehicle) Tj ET")
+    page[NameObject("/Contents")] = writer._add_object(content)
+    pdf = tmp_path / "text.pdf"
+    with pdf.open("wb") as stream:
+        writer.write(stream)
+
+    text = PdfReader(pdf).pages[0].extract_text(extraction_mode="layout")
+
+    assert "Part definition Vehicle" in text
+    # The renderer collects extraction warnings from this logger; a renamed module
+    # would silently empty every page's extraction_warnings.
+    importlib.import_module("pypdf._text_extraction._layout_mode._fixed_width_page")
 
 
 def _lock_artifacts() -> list[dict[str, object]]:

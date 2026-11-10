@@ -24,22 +24,23 @@ baselines:
     checkpoint: git:9c90ae02742052d19e28ce6633311c1d865d1623
   target:
     model: sha256:7fcb28cb48bc81589d6c17ffc5ade6421d7c5809964f28302f631c0de2d249bc
-    implementation: git:98727ad4eccfd3babee5ab7ff314a41da274ccdf
+    implementation: git:d30ae17337f94a8b34463173b764c3db772e965b
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:e7ce1b1e9269923025d844dfe3804e1b034acfb3fb998c88c087f55d2a320796
-    checkpoint: git:98727ad4eccfd3babee5ab7ff314a41da274ccdf
+    checkpoint: git:d30ae17337f94a8b34463173b764c3db772e965b
 scope:
   authority_scope: []
   implementation_scope:
   - pyproject.toml
   - uv.lock
   - system-evolution.yaml
+  - tests/test_sysml_reference.py
   review_lenses:
   - authority and conformance
   - engineering and evidence
   non_goals:
   - No model authority, product runtime dependency, package, wire, or database change.
-  - No change to tools/sysml_reference.py or to the generated corpus format.
+  - No change to tools/sysml_reference.py or to the generated corpus format; only focused evidence is added.
   - No workaround that post-processes extracted text to restore the 6.19 spacing.
 findings:
 - id: F001
@@ -59,10 +60,10 @@ findings:
   summary: No patched pypdf preserves the 6.19.0 layout-mode spacing; from 6.20.0 on, a few word boundaries at text
     style changes are dropped.
   classification: feasibility consequence
-  consequence: Rendering the 1158-page SysML 2.1 and KerML 1.1 corpus with 6.16.1 and with 7.0.1 changed 129 pages.
+  consequence: Rendering the 1155-page SysML 2.1 and KerML 1.1 corpus with 6.16.1 and with 7.0.1 changed 129 pages.
     115 differ only in within-line spacing, mostly diagram columns. Five lose spurious spaces around registered-trademark
-    signs. Nine lose about fifteen real word boundaries, such as inClause, aPartsTreeView and outfuel:, mostly in
-    the vehicle example annex. Page count, outline and extraction-warning pages are unchanged, and 6.21.4 renders
+    signs. Nine change word tokens, mostly by dropping about a dozen real word boundaries such as inClause, aPartsTreeView
+    and outfuel in the vehicle example annex, and two by reordering metamodel diagram labels. Page count, outline and extraction-warning pages are unchanged, and 6.21.4 renders
     byte-identically to 7.0.1. A per-release probe places the change at 6.20.0. The owner accepted the trade-off
     in exchange for leaving the advisory ranges.
   authority_refs: []
@@ -116,8 +117,12 @@ work_items:
     evidence_ref: command:just system-evolution-check
   - id: A2
     wrong_behavior: The new major version changes the reader, writer or outline API the reference tool uses, so outline
-      flattening or page extraction fails.
-    evidence_ref: command:uv run pytest tests/test_sysml_reference.py
+      flattening fails.
+    evidence_ref: path:tests/test_sysml_reference.py#test_outline_hierarchy_and_ranges_are_preserved
+  - id: A3
+    wrong_behavior: The new major version changes the layout-mode page extraction or the warning logger the renderer
+      uses, so pages render empty or extraction warnings are silently lost.
+    evidence_ref: path:tests/test_sysml_reference.py#test_layout_extraction_the_renderer_uses_reads_page_text
   compatibility_effect: Development toolchain only. The installed Vellis package, its runtime dependencies, tools,
     wire, and database are unchanged. The regenerated specification corpus carries the F002 consequences.
   non_effects:
@@ -128,7 +133,8 @@ work_items:
   implementation_status: not evaluated
   evidence_refs:
   - command:just system-evolution-check
-  - command:uv run pytest tests/test_sysml_reference.py
+  - path:tests/test_sysml_reference.py#test_outline_hierarchy_and_ranges_are_preserved
+  - path:tests/test_sysml_reference.py#test_layout_extraction_the_renderer_uses_reads_page_text
   - command:just model-reference-check
   - command:just check
   blocker: null
